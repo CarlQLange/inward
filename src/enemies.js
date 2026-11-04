@@ -83,8 +83,7 @@ const arcIsClear = (world, from, { vx, vy }, flight) => {
 
 const spitter = (g, e, dt) => {
   const S = E.spitter
-  const distance = g.index / (TUNING.run.rooms - 1)
-  const calm = 1 - distance
+  const calm = 1 - g.ring / 7
   if (shoved(g, e, dt)) return
   e.vy = Math.min(P.maxFall, e.vy + E.gravity * dt)
   e.vx = 0

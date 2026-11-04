@@ -66,6 +66,7 @@ const openOptions = g => openMenu(g, {
 const openPage = page => g => openMenu(g, { page, title: page.toUpperCase().replace('-', ' '), items: [back] })
 
 export const openSkills = openPage('skills')
+export const openMap = g => openMenu(g, { page: 'map', title: 'MAP', items: [back] })
 const openControls = openPage('controls')
 const openRecords = openPage('records')
 const openNotes = g => openMenu(g, { page: 'notes', title: 'FIELD NOTES', scroll: 0, items: [back] })
@@ -88,6 +89,7 @@ export const openPause = g => openMenu(g, {
   items: [
     { label: 'RESUME', run: closeMenu },
     { label: 'SKILLS', run: openSkills },
+    { label: 'MAP', run: openMap },
     { label: 'FIELD NOTES', run: openNotes },
     { label: 'CONTROLS', run: openControls },
     { label: 'OPTIONS', run: openOptions },

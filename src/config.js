@@ -59,7 +59,12 @@ export const TUNING = {
   },
   flung: { gravity: 360, damage: 2, stun: 0.8, friendlyAfter: 0.25 },
   run: {
-    rooms: 8,
+    ringBonus: 100,
+    lockLean: 0.8,
+    cardChance: 0.1,
+    hermitChance: 0.08,
+    minerChance: 0.05,
+    moleChance: 0.08,
     chainWindow: 4,
     firstLevel: 3,
     levelHeal: 2,

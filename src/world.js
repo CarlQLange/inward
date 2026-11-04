@@ -36,6 +36,7 @@ export const createWorld = (rows, overloaded = false) => {
     burning: 0,
     charged: 0,
     events: [],
+    drains: [],
     overloaded,
   }
 }
@@ -175,6 +176,7 @@ const ageOut = (w, i, dt) => {
 const stepFluids = (w, dt) => {
   w.moved.fill(0)
   w.crushing.fill(0)
+  for (const i of w.drains) if (!props(w.mat[i]).solid || props(w.mat[i]).falls) place(w, i, M.EMPTY)
   w.flip ^= 1
   const column = k => (w.flip ? k : ROOM - 1 - k)
   for (let y = ROOM - 2; y >= 1; y--) {
@@ -214,7 +216,7 @@ const explode = (w, x, y, reach) => {
       const n = idx(nx, ny)
       w.crushing[n] = 1
       ignite(w, nx, ny)
-      if (reach > 1 && (w.mat[n] === M.ROCK || w.mat[n] === M.SAND)) place(w, n, M.EMPTY)
+      if (reach > 1 && [M.ROCK, M.SAND, M.BRICK].includes(w.mat[n])) place(w, n, M.EMPTY)
     }
   }
 }

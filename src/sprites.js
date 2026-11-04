@@ -44,7 +44,7 @@ const WHITE = { W: '#f4f8f2', K: '#10181a' }
 const HEART = ['.gg.gg.', 'ggggggg', 'ggggggg', '.ggggg.', '..ggg..', '...g...']
 
 const TILE_INDEX = {
-  rock: [0, 1, 0, 1, 12], moss: [2], peat: [3], wood: [4], metal: [5], scrap: [6],
+  rock: [0, 1], brick: [12], moss: [2], peat: [3], wood: [4], metal: [5], scrap: [6],
   bedrock: [7], sand: [8], volatile: [9], gate: [11], ice: [15],
 }
 const ICON_INDEX = {

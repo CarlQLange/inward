@@ -34,7 +34,7 @@ export const FIRST_ROOM = {
     '############################',
   ],
   spawn: at(5, 20),
-  doors: { right: 16 },
+  doors: { right: { row: 16 } },
   cards: [{ kind: 'bolt', ...at(23, 8) }],
   wares: [],
   enemies: [

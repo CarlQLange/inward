@@ -6,6 +6,7 @@ import { SPRITES } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
+import { CORE_RING, keyOf, ringOf } from './map.js'
 
 const GREEN = '#76d648'
 const DIM = '#3d7a3c'
@@ -92,6 +93,7 @@ const CONTROLS = [
   ['X', 'SHOOT'],
   ['C V B', 'SKILLS'],
   ['TAB', 'SKILLS PAGE'],
+  ['M', 'MAP'],
   ['ESC OR P', 'PAUSE'],
   ['R', 'NEW RUN'],
   ['1 TO 9', 'PREVIEW DISTANCE TO CORE'],
@@ -212,7 +214,8 @@ const drawSummary = (ctx, g, menu) => {
   const rows = [
     ['SCORE', g.score, GREEN],
     ['BEST', save.best, g.newBest ? YELLOW : DIM],
-    ['ROOM', `${g.index + 1} OF ${g.rooms.length}`, PALE],
+    ['RING', `${g.deepestRing + 1} OF ${CORE_RING + 1}`, PALE],
+    ['ROOMS', g.roomsSeen, PALE],
     ['LEVEL', g.level, PALE],
     ['KILLS', g.kills, PALE],
     ['BY THE WORLD', g.environmentKills, YELLOW],
@@ -259,7 +262,53 @@ const drawCards = (ctx, menu, cards) => {
   centred(ctx, 'LEFT AND RIGHT, THEN Z', top + 98, DIM)
 }
 
+const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW }
+const STEPS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }
+const MAP_RINGS = ['#0d2412', '#10291a', '#13301f', '#163624', '#1a3d29', '#1e452e', '#234e34', '#2b5a3a']
+
+export const drawMapGrid = (ctx, g, left, top, pitch) => {
+  const cellSize = pitch - 1
+  for (let y = 0; y < 15; y++) {
+    for (let x = 0; x < 15; x++) {
+      const room = g.rooms[keyOf(x, y)]
+      const seen = room?.visited
+      const here = x === g.x && y === g.y
+      const core = x === 7 && y === 7
+      ctx.fillStyle = here ? WHITE : seen ? GREEN : core ? YELLOW : MAP_RINGS[ringOf(x, y)]
+      ctx.fillRect(left + x * pitch, top + y * pitch, cellSize, cellSize)
+      if (!seen) continue
+      for (const [dir, link] of Object.entries(room.links)) {
+        const [dx, dy] = STEPS[dir]
+        const lock = link.lock && room.doors[dir] && lockStands(room, dir)
+        ctx.fillStyle = lock ? LOCK_COLOURS[link.lock] : GREEN
+        const px = left + x * pitch + (cellSize - 1) / 2 + dx * (pitch / 2 + (cellSize - 1) / 4)
+        const py = top + y * pitch + (cellSize - 1) / 2 + dy * (pitch / 2 + (cellSize - 1) / 4)
+        ctx.fillRect(Math.round(px), Math.round(py), 1, 1)
+      }
+    }
+  }
+}
+
+const LOCK_CELL = {
+  left: d => [0, d.row], right: d => [ROOM - 1, d.row], up: d => [d.col, 0], down: d => [d.col, ROOM - 1],
+}
+
+const lockStands = (room, dir) => {
+  const [x, y] = LOCK_CELL[dir](room.doors[dir])
+  return room.world.mat[y * ROOM + x] !== M.EMPTY
+}
+
+const drawMap = (ctx, g, menu) => {
+  sheet(ctx, menu.title)
+  const pitch = 10
+  const size = 15 * pitch
+  drawMapGrid(ctx, g, CENTRE - size / 2, ORIGIN.y + 34, pitch)
+  centred(ctx, `RING ${g.ring + 1} OF ${CORE_RING + 1}   ROOMS SEEN ${g.roomsSeen}`, ORIGIN.y + 188, PALE)
+  drawList(ctx, menu, ORIGIN.y + 200)
+}
+
 const PAGES = {
+  map: (ctx, g, menu) => drawMap(ctx, g, menu),
   title: (ctx, g, menu) => drawTitle(ctx, g, menu),
   pause: (ctx, g, menu) => drawPause(ctx, menu),
   confirm: (ctx, g, menu) => drawConfirm(ctx, menu),

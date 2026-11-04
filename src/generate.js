@@ -185,27 +185,28 @@ const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) 
   return enemies
 }
 
-const standing = grid => (x, y) => {
+const standing = (grid, extra) => (x, y) => {
   const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || SOLID.has(grid[b][a])
   const wet = (a, b) => grid[b]?.[a] === '~' || grid[b]?.[a] === 'o'
-  return { solid, ok: !solid(x, y) && !solid(x, y - 1) && (solid(x, y + 1) || wet(x, y) || wet(x, y + 1)) }
+  const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || extra.has(`${x},${y}`)
+  return { solid, ok: !solid(x, y) && !solid(x, y - 1) && stands }
 }
 
 const arcIsOpen = (solid, x0, y0, x1, y1) => {
-  const top = Math.min(y0, y1) - 2
-  for (let y = top; y <= y0; y++) if (solid(x0, y)) return false
-  for (let y = top; y <= y1; y++) if (solid(x1, y)) return false
+  const top = Math.min(y0, y1) - 1
+  for (let y = top; y <= y0; y++) if (y >= 0 && solid(x0, y)) return false
+  for (let y = top; y <= y1; y++) if (y >= 0 && solid(x1, y)) return false
   const dir = Math.sign(x1 - x0)
   for (let x = x0 + dir; x !== x1 && dir !== 0; x += dir) {
-    if (solid(x, top) || solid(x, top + 1)) return false
+    if ((top >= 0 && solid(x, top)) || solid(x, top + 1)) return false
   }
   return true
 }
 
-const reachable = (grid, start) => {
+const reachable = (grid, start, extra) => {
   const seen = new Set([start.join()])
   const queue = [start]
-  const at = standing(grid)
+  const at = standing(grid, extra)
   while (queue.length) {
     const [x, y] = queue.pop()
     for (let dx = -5; dx <= 5; dx++) {
@@ -224,22 +225,105 @@ const reachable = (grid, start) => {
   return seen
 }
 
-const passes = (grid, doors, goals) => {
-  const seen = reachable(grid, [0, doors.left + 1])
-  const near = ([gx, gy]) => [...seen].some(k => {
+const passes = (grid, anchors, goals) => {
+  const extra = new Set(anchors.map(a => a.join()))
+  const sets = anchors.map(a => reachable(grid, a, extra))
+  const joined = sets.every(seen => anchors.every(a => seen.has(a.join())))
+  if (!joined || sets.length === 0) return joined
+  const near = ([gx, gy]) => [...sets[0]].some(k => {
     const [x, y] = k.split(',').map(Number)
     return Math.abs(x - gx) <= 1 && Math.abs(y - gy) <= 1
   })
-  const door = doors.right === undefined || seen.has(`27,${doors.right + 1}`)
-  return door && goals.every(near)
+  return goals.every(near)
 }
 
-const attempt = (index, total, seed, lean) => {
-  const rand = seeded(seed + index * 7919)
+const shaft = (grid, c, top, bottom) => {
+  for (let y = Math.max(top, 1); y <= bottom; y++) {
+    for (let x = c; x <= c + 3; x++) grid[y][x] = '.'
+  }
+  let side = 0
+  for (let y = bottom - 2; y >= top + 2; y -= 3) {
+    grid[y][c + side] = grid[y][c + side + 1] = 'R'
+    side = side === 0 ? 2 : 0
+  }
+}
+
+const widestSegment = (segments, rand) =>
+  [...segments].sort((a, b) => (b.to - b.from) + rand() - (a.to - a.from) - rand())[0]
+
+const addDoors = (grid, links, layout, floors) => {
+  const doors = {}
+  const anchors = []
+  const first = layout.segments[0]
+  const last = layout.segments[layout.segments.length - 1]
+  if (links.left) {
+    const row = first.floor - 2
+    grid[row][0] = grid[row + 1][0] = '.'
+    doors.left = { row }
+    anchors.push([1, row + 1])
+  }
+  if (links.right) {
+    const row = last.floor - 2
+    grid[row][ROOM - 1] = grid[row + 1][ROOM - 1] = '.'
+    doors.right = { row }
+    anchors.push([ROOM - 2, row + 1])
+  }
+  return { doors, anchors, floors }
+}
+
+const addVerticalDoors = (grid, links, layout, floors, doors, anchors, rand) => {
+  const columnFor = () => {
+    const s = widestSegment(layout.segments, rand)
+    return clamp(s.from, 2, ROOM - 6)
+  }
+  if (links.up) {
+    const c = columnFor()
+    const floor = floors[c + 1] ?? floors[c] ?? WATER_BOTTOM
+    shaft(grid, c, 0, floor - 1)
+    grid[0][c + 1] = grid[0][c + 2] = '.'
+    doors.up = { col: c + 1 }
+    anchors.push([c + 1, 1])
+  }
+  if (links.down) {
+    const c = columnFor()
+    const floor = Math.min(...[c, c + 1, c + 2, c + 3].map(x => floors[x] ?? WATER_BOTTOM))
+    shaft(grid, c, floor, ROOM - 2)
+    grid[ROOM - 1][c + 1] = grid[ROOM - 1][c + 2] = '.'
+    doors.down = { col: c + 1 }
+    anchors.push([c + 1, ROOM - 2])
+  }
+}
+
+const LOCK_CELLS = {
+  left: ({ row }) => [[0, row], [0, row + 1], [1, row], [1, row + 1]],
+  right: ({ row }) => [[ROOM - 1, row], [ROOM - 1, row + 1], [ROOM - 2, row], [ROOM - 2, row + 1]],
+  up: ({ col }) => [[col, 0], [col + 1, 0], [col, 1], [col + 1, 1]],
+  down: ({ col }) => [[col, ROOM - 1], [col + 1, ROOM - 1], [col, ROOM - 2], [col + 1, ROOM - 2]],
+}
+const LOCK_TILES = { peat: 'p', gate: 'G', brick: 'B', ice: 'I', scrap: 'S' }
+
+const applyLocks = (grid, links, doors, layout, enemies) => {
+  const first = layout.segments[0]
+  const last = layout.segments[layout.segments.length - 1]
+  for (const [dir, link] of Object.entries(links)) {
+    if (!link.lock || !doors[dir]) continue
+    for (const [x, y] of LOCK_CELLS[dir](doors[dir])) grid[y][x] = LOCK_TILES[link.lock]
+    if (link.lock !== 'peat') continue
+    const s = dir === 'left' ? first : last
+    const toward = dir === 'left' ? s.from + 2 : s.to - 2
+    if (dir === 'left' || dir === 'right') {
+      enemies.push(place(clamp(toward, s.from, s.to) - (dir === 'left' ? 0 : 1), s.floor, 'spitter'))
+      for (let x = Math.min(toward, dir === 'left' ? 1 : ROOM - 2); x <= Math.max(toward, dir === 'left' ? 1 : ROOM - 2); x++) {
+        if (grid[s.floor][x] === 'R' || grid[s.floor][x] === 'M') grid[s.floor][x] = 'm'
+      }
+    }
+  }
+}
+
+const attempt = ({ seed, depth, links, lean, special }) => {
+  const rand = seeded(seed)
   const range = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1))
-  const depth = index / (total - 1)
   const help = 1 - depth
-  const core = index === total - 1
 
   const grid = Array.from({ length: ROOM }, (_, y) =>
     Array.from({ length: ROOM }, (_, x) => (x === 0 || y === 0 || x === ROOM - 1 || y === ROOM - 1 ? '#' : 'R')))
@@ -252,13 +336,12 @@ const attempt = (index, total, seed, lean) => {
   dress(grid, layout, floors, ceilings, depth, lean, rand, range)
   const enemies = populate(layout, depth, lean, rand, range, grid, ceilings)
 
+  const { doors, anchors } = addDoors(grid, links, layout, floors)
+  addVerticalDoors(grid, links, layout, floors, doors, anchors, rand)
+
   const first = layout.segments[0]
   const last = layout.segments[layout.segments.length - 1]
   const midway = layout.segments[Math.floor(layout.segments.length / 2)]
-  const leftRow = first.floor - 2
-  const rightRow = last.floor - 2
-  grid[leftRow][0] = grid[leftRow + 1][0] = '.'
-  if (!core) grid[rightRow][ROOM - 1] = grid[rightRow + 1][ROOM - 1] = '.'
   for (const s of [first, last]) {
     for (let x = s.from; x <= Math.min(s.from + 2, s.to); x++) {
       if (grid[s.floor - 1][x] === 'S') grid[s.floor - 1][x] = '.'
@@ -274,29 +357,34 @@ const attempt = (index, total, seed, lean) => {
     goals.push([x, s.floor - 1])
     return x
   }
-  if (index === 2 || index === 5) cards.push({ kind: 'skill', x: mark(midway, 1) * BLOCK, row: midway.floor })
-  if (core) {
+  if (special.card) cards.push({ kind: 'skill', x: mark(midway, 1) * BLOCK, row: midway.floor })
+  if (special.core) {
     cards.push({ kind: 'core', x: mark(last, 1) * BLOCK, row: last.floor })
     enemies.push(place(Math.max(midway.from, midway.to - 3), midway.floor, 'guardian'))
   }
-  if (index === 3) {
+  if (special.mole) {
     enemies.push(place(mark(midway, 0), midway.floor, 'mole'))
     wares.push({ kind: 'heart', x: mark(midway, 2) * BLOCK, row: midway.floor })
     if (midway.to - midway.from >= 4) wares.push({ kind: 'upgrade', x: mark(midway, 4) * BLOCK, row: midway.floor })
   }
-  if (index === 1 || index === 4) enemies.push(place(mark(midway, 1), midway.floor, 'hermit'))
-  if (index === 3 || index === 6) enemies.push(place(mark(last, 2), last.floor, 'miner'))
+  if (special.hermit) enemies.push(place(mark(first, 2), first.floor, 'hermit'))
+  if (special.miner) enemies.push(place(mark(last, 2), last.floor, 'miner'))
 
-  const doors = core ? { left: leftRow } : { left: leftRow, right: rightRow }
-  return { grid, doors, goals, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies } }
+  const ok = passes(grid, anchors, goals)
+  applyLocks(grid, links, doors, layout, enemies)
+
+  const drains = []
+  grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
+  grid[ROOM - 1].forEach((c, x) => { if (c !== '#') drains.push((ROOM - 1) * ROOM + x) })
+  return { ok, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies, drains } }
 }
 
 const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }
 
-export const generateRoom = (index, total, seed, lean = NO_LEAN) => {
-  let result = attempt(index, total, seed, lean)
-  for (let tries = 1; tries < 40 && !passes(result.grid, result.doors, result.goals); tries++) {
-    result = attempt(index, total, seed + tries * 104729, lean)
+export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {} }) => {
+  let result = attempt({ seed, depth, links, lean, special })
+  for (let tries = 1; tries < 60 && !result.ok; tries++) {
+    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special })
   }
-  return result.definition
+  return { ...result.definition, passed: result.ok }
 }

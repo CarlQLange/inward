@@ -3,11 +3,12 @@ import { M, props } from './materials.js'
 import { createWorld, ignite, matAt, puff, setCell, stepWorld, energize } from './world.js'
 import { FIRST_ROOM } from './room.js'
 import { generateRoom } from './generate.js'
+import { CORE_RING, OPPOSITE, buildMap, keyOf, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, spillNapalm } from './skills.js'
-import { closeMenu, dropCard, openMenu, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
+import { closeMenu, dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
 import { knownNotes, persist, recordRun, save } from './store.js'
 
 const P = TUNING.player
@@ -44,16 +45,63 @@ const lean = g => {
   }
 }
 
-const depthOf = (g, index) => {
-  const distance = index / (R.rooms - 1)
+const depthFor = (g, ring) => {
+  const distance = ring / CORE_RING
   return g.awake ? R.wakeDepth + (1 - R.wakeDepth) * distance : distance
 }
 
-const buildRoom = (g, index) => {
-  const definition = index === 0 ? FIRST_ROOM : generateRoom(index, R.rooms, g.seed, lean(g))
+const LOCK_OPENERS = {
+  peat: ['bolt', 'ember', 'hammer'],
+  gate: ['bolt'],
+  brick: ['hammer'],
+  ice: ['ember', 'hammer'],
+  scrap: ['repel', 'hammer'],
+}
+const LOCKS = Object.keys(LOCK_OPENERS)
+
+const pickLock = (g, depth) => {
+  const owned = g.player.skills.map(s => s.kind)
+  const usable = LOCKS.filter(lock => LOCK_OPENERS[lock].some(s => owned.includes(s)))
+  const leaning = usable.length > 0 && Math.random() < (1 - depth) * R.lockLean
+  const pool = leaning ? usable : LOCKS
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+const resolveLinks = (g, links, depth) =>
+  Object.fromEntries(Object.entries(links).map(([dir, link]) => {
+    if (link.lock === 'any') link.lock = pickLock(g, depth)
+    return [dir, link]
+  }))
+
+const rollSpecial = ring => ({
+  core: ring === CORE_RING,
+  card: ring < CORE_RING && Math.random() < R.cardChance,
+  hermit: ring < CORE_RING && Math.random() < R.hermitChance,
+  miner: ring < CORE_RING && Math.random() < R.minerChance,
+  mole: ring < CORE_RING && Math.random() < R.moleChance,
+})
+
+const buildRoom = (g, x, y) => {
+  const key = keyOf(x, y)
+  const ring = ringOf(x, y)
+  const links = g.map.links[key] ?? {}
+  const start = key === keyOf(...g.map.start)
+  const depth = ring / CORE_RING
+  const definition = start
+    ? FIRST_ROOM
+    : generateRoom({
+      seed: g.seed + x * 7919 + y * 104723,
+      depth,
+      links: resolveLinks(g, links, depth),
+      lean: lean(g),
+      special: rollSpecial(ring),
+    })
+  const world = createWorld(definition.map, ring === CORE_RING)
+  world.drains = definition.drains ?? []
   return {
+    x, y, ring, links,
     doors: definition.doors,
-    world: createWorld(definition.map, index === R.rooms - 1),
+    world,
     enemies: definition.enemies.map(createEnemy).map(e => ({ ...e, cooldown: e.cooldown + R.entryGrace })),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare),
@@ -73,47 +121,69 @@ const settleFlung = (g, f) => {
 
 const leaveRoom = g => {
   g.flung.forEach(f => settleFlung(g, f))
-  Object.assign(g.rooms[g.index], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
+  Object.assign(g.rooms[keyOf(g.x, g.y)], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
 
-const enterRoom = (g, index) => {
-  g.rooms[index] ??= buildRoom(g, index)
-  const room = g.rooms[index]
+const enterRoom = (g, x, y) => {
+  const key = keyOf(x, y)
+  g.rooms[key] ??= buildRoom(g, x, y)
+  const room = g.rooms[key]
+  const firstVisit = !room.visited
   room.visited = true
   room.world.notes = knownNotes
   room.world.mat.forEach(m => knownNotes.add(`seen:${m}`))
   room.enemies.forEach(e => knownNotes.add(`met:${e.kind}`))
+  if (firstVisit) g.roomsSeen += 1
   Object.assign(g, {
-    index,
+    x, y,
+    ring: room.ring,
     world: room.world,
     enemies: room.enemies,
     cards: room.cards,
     wares: room.wares,
     pickups: room.pickups,
-    depth: g.depthOverride ?? depthOf(g, index),
+    depth: g.depthOverride ?? depthFor(g, room.ring),
     shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [],
   })
+  if (room.ring > g.deepestRing) {
+    g.deepestRing = room.ring
+    g.score += room.ring * R.ringBonus
+    if (room.ring < CORE_RING) showToast(g, `RING ${room.ring + 1} OF ${CORE_RING}`, 'THE WORLD IS LESS PATIENT HERE.')
+  }
 }
 
-const walkThrough = (g, index, side) => {
+const walkThrough = (g, dir) => {
+  const here = g.rooms[keyOf(g.x, g.y)]
+  const [nx, ny] = here.links[dir].to
   leaveRoom(g)
   persist()
-  enterRoom(g, index)
+  enterRoom(g, nx, ny)
   const p = g.player
-  const door = g.rooms[index].doors[side]
-  p.x = side === 'left' ? 1 : WORLD_PX - p.w - 1
-  p.y = (door + 2) * BLOCK - p.h
-  p.vy = Math.min(p.vy, 0)
+  const door = g.rooms[keyOf(nx, ny)].doors[OPPOSITE[dir]]
+  if (dir === 'right' || dir === 'left') {
+    p.x = dir === 'right' ? 1 : WORLD_PX - p.w - 1
+    p.y = (door.row + 2) * BLOCK - p.h
+    p.vy = Math.min(p.vy, 0)
+  } else {
+    p.x = (door.col + 1) * BLOCK - p.w / 2
+    p.y = dir === 'down' ? 1 : WORLD_PX - p.h - 1
+    p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
+  }
 }
 
 const showToast = (g, title, text) => { g.toast = { title, text, life: R.toastLife } }
 
 const createRun = depthOverride => {
+  const seed = Math.floor(Math.random() * 1e9)
+  const map = buildMap(seed)
   const g = {
+    map,
+    roomsSeen: 0,
+    deepestRing: 0,
     depthOverride,
     awake: false,
     shownDepth: depthOverride ?? 0,
-    seed: Math.floor(Math.random() * 1e9),
+    seed,
     cardPool: shuffled(ALL_SKILLS.filter(s => s !== 'bolt')),
     time: 0,
     phase: 'playing',
@@ -121,8 +191,7 @@ const createRun = depthOverride => {
     pause: 0,
     pulse: 0,
     shake: 0,
-    rooms: new Array(R.rooms).fill(null),
-    index: 0,
+    rooms: {},
     player: createPlayer(FIRST_ROOM.spawn),
     flung: [],
     score: 0,
@@ -146,7 +215,7 @@ const createRun = depthOverride => {
     newBest: false,
     summaryShown: false,
   }
-  enterRoom(g, 0)
+  enterRoom(g, ...map.start)
   return g
 }
 
@@ -179,7 +248,7 @@ const learn = (g, kind) => {
   g.shake = Math.max(g.shake, 3)
   if (!g.awake) {
     g.awake = true
-    g.depth = g.depthOverride ?? depthOf(g, g.index)
+    g.depth = g.depthOverride ?? depthFor(g, g.ring)
   }
 }
 
@@ -318,7 +387,7 @@ const finishRun = (g, phase) => {
   g.newBest = recordRun({
     score: g.score,
     chainPeak: g.chainPeak,
-    roomReached: g.index + 1,
+    roomReached: g.ring + 1,
     reachedCore: phase === 'cleared',
     worldKills: g.environmentKills,
   })
@@ -398,7 +467,7 @@ const stepCore = (g, dt) => {
 }
 
 const stepFirstRoom = (g, dt) => {
-  if (g.index !== 0 || g.player.skills.length > 0) return
+  if (keyOf(g.x, g.y) !== keyOf(...g.map.start) || g.player.skills.length > 0) return
   const wallStands = g.cards.length > 0 && g.world.mat.some((m, i) => m === M.PEAT && i % 28 === 18)
   const fireLeft = g.world.burning > 0 || g.enemies.some(e => e.kind === 'spitter')
   g.rekindle = wallStands && !fireLeft ? g.rekindle + dt : 0
@@ -409,9 +478,11 @@ const stepFirstRoom = (g, dt) => {
 }
 
 const useDoors = (g, p) => {
-  const { doors } = g.rooms[g.index]
-  if (doors.right !== undefined && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, g.index + 1, 'left')
-  else if (doors.left !== undefined && p.x <= 0.5) walkThrough(g, g.index - 1, 'right')
+  const { doors } = g.rooms[keyOf(g.x, g.y)]
+  if (doors.right && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, 'right')
+  else if (doors.left && p.x <= 0.5) walkThrough(g, 'left')
+  else if (doors.down && p.y + p.h >= WORLD_PX - 0.5) walkThrough(g, 'down')
+  else if (doors.up && p.y <= 0.5) walkThrough(g, 'up')
 }
 
 const stepPlayer = (g, input, dt) => {
@@ -624,6 +695,7 @@ const reset = g => {
 }
 
 export const restart = reset
+export const depthHere = g => depthFor(g, g.ring)
 export const newRun = reset
 export const startFromTitle = reset
 export const returnToTitle = g => {
@@ -641,8 +713,8 @@ const stepTitle = (g, dt) => {
     ignite(g.world, 9, 10)
   }
   if (g.titleTime > 45) {
-    g.rooms[0] = null
-    enterRoom(g, 0)
+    delete g.rooms[keyOf(...g.map.start)]
+    enterRoom(g, ...g.map.start)
     g.titleTime = 0
     g.lit = false
   }
@@ -690,6 +762,13 @@ export const step = (g, input, dt) => {
     openSkills(g)
     return
   }
+  if (input.map && !g.wasMap) {
+    g.wasMap = true
+    g.menuHeld = { ...input }
+    openMap(g)
+    return
+  }
+  g.wasMap = input.map
   if (g.pendingOffers > 0) {
     g.pendingOffers -= 1
     openOffer(g)

@@ -4,7 +4,7 @@ import { burningAt, chargedAt, matAt } from './world.js'
 import { ENEMY_DEFS } from './enemies.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
-import { drawMenus, drawToast } from './screens.js'
+import { drawMapGrid, drawMenus, drawToast } from './screens.js'
 import { save } from './store.js'
 
 const GREEN = '#76d648'
@@ -19,7 +19,7 @@ const ROOM_PX = ROOM * BLOCK
 const TILE = {
   [M.BEDROCK]: 'bedrock', [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat',
   [M.WOOD]: 'wood', [M.METAL]: 'metal', [M.GATE]: 'gate', [M.SAND]: 'sand',
-  [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile', [M.ICE]: 'ice',
+  [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile', [M.ICE]: 'ice', [M.BRICK]: 'brick',
 }
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
@@ -266,16 +266,7 @@ const drawLeftHud = (ctx, g) => {
 const drawMinimap = (ctx, g, x) => {
   const span = 15 * 5 + 3
   box(ctx, x, ORIGIN.y, span, span)
-  for (let cy = 0; cy < 15; cy++) {
-    for (let cx = 0; cx < 15; cx++) {
-      const onLine = cy === 7 && cx < g.rooms.length
-      const here = onLine && cx === g.index
-      const seen = onLine && g.rooms[cx]?.visited
-      const isCore = cx === 7 && cy === 7
-      ctx.fillStyle = here ? COLOURS.white : seen ? GREEN : isCore ? DIM : '#123018'
-      ctx.fillRect(x + 2 + cx * 5, ORIGIN.y + 2 + cy * 5, 4, 4)
-    }
-  }
+  drawMapGrid(ctx, g, x + 2, ORIGIN.y + 2, 5)
 }
 
 const drawRightHud = (ctx, g) => {

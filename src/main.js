@@ -1,5 +1,5 @@
 import { TICK, VIEW } from './config.js'
-import { createGame, restart, step } from './game.js'
+import { createGame, depthHere, restart, step } from './game.js'
 import { draw } from './render.js'
 import { loadSprites } from './sprites.js'
 import { save } from './store.js'
@@ -18,6 +18,7 @@ const KEYS = {
   Enter: 'confirm',
   Escape: 'pause', KeyP: 'pause',
   Tab: 'skills', KeyI: 'skills',
+  KeyM: 'map',
 }
 
 await loadSprites()
@@ -32,8 +33,7 @@ const depthFromDigit = code => {
 
 const overrideDepth = depth => {
   state.depthOverride = depth
-  if (depth !== null) state.depth = depth
-  else state.depth = state.awake ? 0.25 + 0.75 * (state.index / (state.rooms.length - 1)) : state.index / (state.rooms.length - 1)
+  state.depth = depth ?? depthHere(state)
 }
 
 window.addEventListener('keydown', e => {

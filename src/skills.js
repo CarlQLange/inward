@@ -135,7 +135,7 @@ const frost = (g, p) => {
   g.pulse = Math.max(g.pulse, 0.4)
 }
 
-const BREAKS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.ICE, M.SAND, M.VOLATILE])
+const BREAKS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.ICE, M.SAND, M.VOLATILE, M.BRICK, M.SCRAP])
 
 export const quake = (g, count, power = 6) => {
   const loose = []
