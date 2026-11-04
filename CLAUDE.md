@@ -5,8 +5,9 @@ emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-There's one prototype room so far. The folder name is a placeholder: rename it
-before the first release.
+There's one prototype room so far. Carl has played it and is happy with the core
+of it. It's hard, and he's fine with that. The folder name is a placeholder:
+rename it before the first release.
 
 ## Running and testing
 
