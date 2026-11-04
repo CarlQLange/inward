@@ -43,7 +43,7 @@ export const TUNING = {
     smokeTolerance: 2,
   },
   crawler: { hp: 2, speed: 22, gravity: 500 },
-  spitter: { hp: 4, gravity: 500, every: 2.2, range: 120, shotSpeed: 140, wobble: 26, burst: 2 },
+  spitter: { hp: 4, gravity: 500, every: 2.2, range: 150, flights: [0.5, 0.7, 0.9, 1.1, 1.3], wobble: 20, burst: 2 },
   fish: { hp: 2, speed: 26, chase: 44, airDamageEvery: 1 },
   fireball: { gravity: 260, friendlyAfter: 0.25 },
   enemyIframes: 0.4,

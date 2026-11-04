@@ -65,6 +65,7 @@ window.game = {
   state,
   render,
   restart: () => restart(state),
+  tick: (input = {}) => step(state, input, TICK),
   sim: (seconds, input = {}) => {
     for (let t = 0; t < seconds; t += TICK) step(state, input, TICK)
     render()

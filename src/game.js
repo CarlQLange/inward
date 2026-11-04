@@ -258,25 +258,29 @@ const stepCrawler = (g, e, dt) => {
   move(g.world, e, dt)
 }
 
-const canSee = (w, a, b) => {
-  const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4)
-  for (let i = 1; i < steps; i++) {
-    const t = i / steps
-    if (solidAt(w, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) return false
+const launch = (from, target, flight) => ({
+  vx: (target.x - from.x) / flight,
+  vy: (target.y - from.y) / flight - 0.5 * TUNING.fireball.gravity * flight,
+})
+
+const arcIsClear = (world, from, { vx, vy }, flight) => {
+  for (let t = 0.03; t < flight; t += 0.03) {
+    const x = from.x + vx * t
+    const y = from.y + vy * t + 0.5 * TUNING.fireball.gravity * t * t
+    if (solidAt(world, x, y)) return false
   }
   return true
 }
 
-const spit = (g, e, target) => {
-  const S = TUNING.spitter
-  const from = { x: e.x + e.w / 2 - 2, y: e.y - 2 }
-  const dx = target.x - from.x + (Math.random() - 0.5) * S.wobble * 2
-  const dy = target.y - from.y
-  const flight = Math.max(0.35, Math.min(1, Math.hypot(dx, dy) / S.shotSpeed))
+const findFlight = (world, from, target) =>
+  TUNING.spitter.flights.find(flight => arcIsClear(world, from, launch(from, target, flight), flight))
+
+const spit = (g, from, target, flight) => {
+  const { vx, vy } = launch(from, target, flight)
   g.fireballs.push({
-    ...from, w: 4, h: 4,
-    vx: dx / flight,
-    vy: dy / flight - 0.5 * TUNING.fireball.gravity * flight,
+    x: from.x - 2, y: from.y - 2, w: 4, h: 4,
+    vx: vx + ((Math.random() - 0.5) * TUNING.spitter.wobble * 2) / flight,
+    vy,
     age: 0,
   })
 }
@@ -291,11 +295,12 @@ const stepSpitter = (g, e, dt) => {
   const them = centre(g.player)
   e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
-  const inRange = Math.hypot(them.x - me.x, them.y - me.y) < S.range
-  if (e.cooldown <= 0 && inRange && canSee(g.world, me, them)) {
-    spit(g, e, them)
-    e.cooldown = S.every
-  }
+  if (e.cooldown > 0 || Math.hypot(them.x - me.x, them.y - me.y) > S.range) return
+  const mouth = { x: me.x, y: e.y - 2 }
+  const flight = findFlight(g.world, mouth, them)
+  if (flight === undefined) return
+  spit(g, mouth, them, flight)
+  e.cooldown = S.every
 }
 
 const stepFish = (g, e, dt) => {
