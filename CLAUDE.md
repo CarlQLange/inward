@@ -5,8 +5,27 @@ emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-No code yet. Nothing has been played, so everything here is still untested.
-The folder name is a placeholder: rename it before the first release.
+There's one prototype room so far. The folder name is a placeholder: rename it
+before the first release.
+
+## Running and testing
+
+Serve the folder with the no-cache server and open `http://localhost:8765`:
+
+```bash
+python3 ~/.claude/skills/browser-game/scripts/serve.py 8765 .
+```
+
+In the page, `window.game` drives it without playing: `game.sim(seconds, input)`
+steps the simulation, `game.state` reads it, and `game.restart()` resets the room.
+
+## Technology
+
+Plain JavaScript modules with no build step, so a reload shows the latest code.
+The game draws to a low-resolution 2D canvas, and a WebGL pass presents it, which
+is where distance-from-core effects live. Sprites and tiles are small bitmaps
+written in code, which keeps them on the pixel grid. Tuning values live together
+in `src/config.js`.
 
 Mechanically it draws on the archived `magicschool` project, where everything
 has properties and changing one can trigger rules that change others. That game
@@ -69,6 +88,8 @@ effects must spread across blocks visibly and be readable without text.
   player, and one bright accent (yellow electricity) that makes an interaction
   easy to follow.
 - A bright green framed HUD. The HUD in the framed image is a rough placeholder.
+- More Game Boy at the outskirts, and more cool shaders as you get further in.
+  Certain skills can also bring shaders in.
 
 ## Ideas Carl is happy with so far
 

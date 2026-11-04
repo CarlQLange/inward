@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Core</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { display: grid; place-items: center; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; left: 12px; bottom: 12px; margin: 0;
+    font: 11px/1.5 ui-monospace, Menlo, monospace; color: #3f7a34; white-space: pre;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<pre id="hint">←→      move
+↑       aim up
+↓       aim down in air
+Z/space jump
+X       shoot
+C       skill
+1–9     distance to core
+R       restart
+H       hide this</pre>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

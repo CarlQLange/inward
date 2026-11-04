@@ -1,0 +1,45 @@
+import { BLOCK } from './config.js'
+
+const at = (x, row) => ({ x: x * BLOCK, row })
+
+export const FIRST_ROOM = {
+  map: [
+    '############################',
+    '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+    '#RRRRRRppppppppppRRRRRRRRRR#',
+    '#RRRR......w......pp......R#',
+    '#RRR.......w......pp......R#',
+    '#RR........w......pp......R#',
+    '#R.........w......pp......R#',
+    '#..........w......pp......R#',
+    '#..........w......ppRRRRRRR#',
+    '#..........w..sss.ppRRRRRRR#',
+    '#........mmmmmmmmmmmRRRRRRR#',
+    '#........pppppppppppRRRRRRR#',
+    '#...............RRRRRRRRRRR#',
+    '#....RRR...................#',
+    '#..........................#',
+    '#............RRR...........#',
+    '#RRR.....RRR..............G.',
+    '#.........................G.',
+    '#...................MMMMMMM#',
+    '#...........MMMMMMMMMRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRR~~~~~~~~~~~~MRRRRRR#',
+    '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+    '############################',
+  ],
+  spawn: at(3, 20),
+  card: at(23, 8),
+  enemies: [
+    { kind: 'crawler', ...at(10, 16) },
+    { kind: 'crawler', ...at(23, 18) },
+    { kind: 'spitter', ...at(13, 10) },
+    { kind: 'fish', ...at(12, 23) },
+    { kind: 'fish', ...at(16, 22) },
+  ],
+}
