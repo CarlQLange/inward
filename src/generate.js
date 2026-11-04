@@ -28,7 +28,7 @@ const walkFloors = (rand, range, pitChance) => {
     const gap = rand() < pitChance ? range(2, 3) : 0
     if (gap) pits.push({ from: end + 1, to: end + gap })
     x = end + gap + 1
-    floor = clamp(floor + range(-3, 3), HIGHEST_FLOOR, LOWEST_FLOOR)
+    floor = clamp(floor + range(gap ? -2 : -3, 3), HIGHEST_FLOOR, LOWEST_FLOOR)
   }
   return { segments, pits }
 }
@@ -150,8 +150,9 @@ const ROSTER = [
   { kind: 'slug', from: 0.25, weight: 2 },
 ]
 
-const pickFoe = (depth, rand) => {
-  const open = ROSTER.filter(r => depth >= r.from)
+const pickFoe = (depth, rand, enemies) => {
+  const spitters = enemies.filter(e => e.kind === 'spitter').length
+  const open = ROSTER.filter(r => depth >= r.from && (r.kind !== 'spitter' || spitters < 2))
   let roll = rand() * open.reduce((n, r) => n + r.weight, 0)
   return open.find(r => (roll -= r.weight) <= 0)?.kind ?? 'crawler'
 }
@@ -161,10 +162,10 @@ const place = (x, row, kind) => ({ kind, x: x * BLOCK, row })
 const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) => {
   const enemies = []
   for (const s of segments.slice(1)) {
-    const chance = 0.5 + depth * 0.4
+    const chance = 0.4 + depth * 0.3
     for (let n = 0; n < 2; n++) {
       if (rand() < chance * (n ? 0.5 : 1)) {
-        const kind = pickFoe(depth, rand)
+        const kind = pickFoe(depth, rand, enemies)
         const flying = kind === 'bat' || kind === 'spore'
         const x = range(s.from, Math.max(s.from, s.to - 1))
         enemies.push(place(x, flying ? s.floor - 4 : s.floor, kind))
@@ -212,6 +213,7 @@ const reachable = (grid, start) => {
         const nx = x + dx
         const ny = y + dy
         if (nx < 0 || nx >= ROOM || ny < 1 || ny >= ROOM || seen.has(`${nx},${ny}`)) continue
+        if (dy === -3 && Math.abs(dx) > 3) continue
         const { solid, ok } = at(nx, ny)
         if (!ok || !arcIsOpen(solid, x, y, nx, ny)) continue
         seen.add(`${nx},${ny}`)

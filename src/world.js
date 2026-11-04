@@ -13,7 +13,7 @@ export const burningAt = (w, x, y) => inside(x, y) && w.burn[idx(x, y)] > 0
 export const chargedAt = (w, x, y) => inside(x, y) && w.charge[idx(x, y)] > 0
 export const crushingAt = (w, x, y) => inside(x, y) && w.crushing[idx(x, y)] === 1
 
-export const createWorld = rows => {
+export const createWorld = (rows, overloaded = false) => {
   const size = ROOM * ROOM
   const mat = new Uint8Array(size)
   const life = new Float32Array(size)
@@ -36,6 +36,7 @@ export const createWorld = rows => {
     burning: 0,
     charged: 0,
     events: [],
+    overloaded,
   }
 }
 
@@ -68,17 +69,28 @@ export const setCell = (w, x, y, mat) => {
   if (inside(x, y)) place(w, idx(x, y), mat)
 }
 
+const flammabilityOf = (w, mat) => {
+  if (w.overloaded && mat === M.ROCK) return T.overloadBurn
+  return props(mat).flammability
+}
+
+const conductanceOf = (w, mat) => {
+  if (w.overloaded && (mat === M.ROCK || mat === M.MOSS || mat === M.PEAT)) return 1
+  return props(mat).conductance
+}
+
 export const ignite = (w, x, y) => {
   if (!inside(x, y)) return
   const i = idx(x, y)
-  const p = props(w.mat[i])
-  if (p.flammability && w.burn[i] <= 0) w.burn[i] = p.burnTime * (0.7 + Math.random() * 0.6)
+  if (flammabilityOf(w, w.mat[i]) && w.burn[i] <= 0) {
+    w.burn[i] = (props(w.mat[i]).burnTime ?? T.overloadBurnTime) * (0.7 + Math.random() * 0.6)
+  }
 }
 
 export const energize = (w, x, y, energy) => {
   if (!inside(x, y)) return
   const i = idx(x, y)
-  if (!props(w.mat[i]).conductance || w.refractory[i] > 0) return
+  if (!conductanceOf(w, w.mat[i]) || w.refractory[i] > 0) return
   conduct(w, i, energy)
   w.frontier.push({ x, y, energy })
 }
@@ -204,7 +216,7 @@ const explode = (w, x, y, reach) => {
 
 const burnOut = (w, x, y) => {
   const i = idx(x, y)
-  const { burnsTo, blast } = props(w.mat[i])
+  const { burnsTo = M.ASH, blast } = props(w.mat[i])
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
   if (blast) explode(w, x, y, blast)
 }
@@ -222,7 +234,7 @@ const stepFire = (w, dt, excite) => {
         const nx = x + dx
         const ny = y + dy
         const other = matAt(w, nx, ny)
-        const flam = props(other).flammability
+        const flam = flammabilityOf(w, other)
         if (flam && Math.random() < flam * excite * dt) ignite(w, nx, ny)
         if (other === M.WATER && !p.liquid && Math.random() < T.quench * dt) {
           w.burn[i] = 0
@@ -230,7 +242,7 @@ const stepFire = (w, dt, excite) => {
         }
         if (other === M.ICE && Math.random() < T.melt * dt) place(w, idx(nx, ny), M.WATER)
       }
-      if (Math.random() < p.smoke * dt) emitSmoke(w, x, y)
+      if (Math.random() < (p.smoke ?? 1) * dt) emitSmoke(w, x, y)
       if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY) {
         const quenched = N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.STEAM)
         if (!quenched) burnOut(w, x, y)
@@ -254,11 +266,11 @@ const stepCharge = (w, dt) => {
       const ny = y + dy
       if (!inside(nx, ny)) continue
       const n = idx(nx, ny)
-      const p = props(w.mat[n])
-      if (p.conductance && w.refractory[n] <= 0 && energy > p.conductance) {
+      const cost = conductanceOf(w, w.mat[n])
+      if (cost && w.refractory[n] <= 0 && energy > cost) {
         conduct(w, n, energy)
-        next.push({ x: nx, y: ny, energy: energy - p.conductance })
-      } else if (p.flammability && Math.random() < T.spark) {
+        next.push({ x: nx, y: ny, energy: energy - cost })
+      } else if (flammabilityOf(w, w.mat[n]) && Math.random() < T.spark) {
         ignite(w, nx, ny)
       }
     }

@@ -21,6 +21,9 @@ export const TUNING = {
     chargeRefractory: 0.9,
     crushDamage: 2,
     crushStun: 0.5,
+    overloadBurn: 0.14,
+    overloadBurnTime: 5,
+    overloadCrumble: 2.5,
   },
   player: {
     hp: 5,
@@ -62,7 +65,9 @@ export const TUNING = {
     levelGrowth: 3,
     environmentXp: 3,
     coreBonus: 1000,
-    bestKey: 'core-working-name-best',
+    corePull: 7,
+    bestKey: 'block-run-best',
+    wakeDepth: 0.25,
   },
   prices: { heart: 4, upgrade: 10 },
   enemies: {

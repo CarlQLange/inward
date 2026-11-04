@@ -3,7 +3,7 @@ import { M, props } from './materials.js'
 import { createWorld, ignite, matAt, puff, setCell, stepWorld, energize } from './world.js'
 import { FIRST_ROOM } from './room.js'
 import { generateRoom } from './generate.js'
-import { WORLD_PX, cell, centre, hitsSolid, inWater, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
+import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, TREES, muzzle, spillNapalm } from './skills.js'
@@ -58,12 +58,16 @@ const lean = g => {
   }
 }
 
+const depthOf = (g, index) => {
+  const distance = index / (R.rooms - 1)
+  return g.awake ? R.wakeDepth + (1 - R.wakeDepth) * distance : distance
+}
+
 const buildRoom = (g, index) => {
   const definition = index === 0 ? FIRST_ROOM : generateRoom(index, R.rooms, g.seed, lean(g))
   return {
-    depth: index / (R.rooms - 1),
     doors: definition.doors,
-    world: createWorld(definition.map),
+    world: createWorld(definition.map, index === R.rooms - 1),
     enemies: definition.enemies.map(createEnemy),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare),
@@ -97,7 +101,7 @@ const enterRoom = (g, index) => {
     cards: room.cards,
     wares: room.wares,
     pickups: room.pickups,
-    depth: g.depthOverride ?? room.depth,
+    depth: g.depthOverride ?? depthOf(g, index),
     shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [],
   })
 }
@@ -115,6 +119,8 @@ const walkThrough = (g, index, side) => {
 export const createGame = (depthOverride = null) => {
   const g = {
     depthOverride,
+    awake: false,
+    shownDepth: depthOverride ?? 0,
     seed: Math.floor(Math.random() * 1e9),
     cardPool: shuffled(ALL_SKILLS.filter(s => s !== 'bolt')),
     time: 0,
@@ -298,6 +304,8 @@ const collectCards = (g, p) => {
   g.pause = TUNING.cardPause
   g.pulse = 1
   g.shake = Math.max(g.shake, 3)
+  g.awake = true
+  g.depth = g.depthOverride ?? depthOf(g, g.index)
 }
 
 const talkToInhabitants = (g, p) => {
@@ -340,6 +348,21 @@ const usePickups = (g, p, dt) => {
   g.pickups = g.pickups.filter(c => !c.taken)
 }
 
+const stepCore = (g, dt) => {
+  for (const card of g.cards) {
+    if (card.kind !== 'core') continue
+    const dx = g.player.x - card.x
+    const dy = g.player.y - card.y
+    const length = Math.max(1, Math.hypot(dx, dy))
+    card.x += (dx / length) * R.corePull * dt
+    card.y += (dy / length) * R.corePull * dt
+  }
+  if (!g.world.overloaded || Math.random() > TUNING.world.overloadCrumble * dt) return
+  const x = 1 + Math.floor(Math.random() * 26)
+  const y = 1 + Math.floor(Math.random() * 26)
+  if (matAt(g.world, x, y) === M.ROCK && !props(matAt(g.world, x, y + 1)).solid) setCell(g.world, x, y, M.SAND)
+}
+
 const useDoors = (g, p) => {
   const { doors } = g.rooms[g.index]
   if (doors.right !== undefined && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, g.index + 1, 'left')
@@ -349,7 +372,10 @@ const useDoors = (g, p) => {
 const stepPlayer = (g, input, dt) => {
   const p = g.player
   const world = g.world
-  const swimming = inWater(world, p)
+  const middle = p.x + p.w / 2
+  const swimming = liquidAtPx(world, middle, p.y + p.h / 2)
+  const wading = liquidAtPx(world, middle, p.y + p.h - 1)
+  const headUnder = liquidAtPx(world, middle, p.y - 4)
   applyCrush(g, p)
   const stunned = p.stun > 0
   crouch(world, p, input.down && !input.jump && p.grounded && !swimming)
@@ -369,7 +395,11 @@ const stepPlayer = (g, input, dt) => {
   p.sinceGround = p.grounded ? 0 : p.sinceGround + dt
   p.sinceJump = input.jump && !p.wasJump ? 0 : p.sinceJump + dt
   if (!stunned && !p.crouching && p.sinceJump < P.buffer) {
-    if (swimming) {
+    if (wading && !headUnder) {
+      p.vy = -P.jump
+      p.jumpHeld = true
+      p.sinceJump = 1
+    } else if (swimming) {
       p.vy = -P.swimStroke
       p.sinceJump = 1
     } else if (p.sinceGround < P.coyote) {
@@ -522,6 +552,7 @@ const stepEffects = (g, dt) => {
   }
   g.popups = g.popups.filter(p => p.life > 0)
   g.pulse = Math.max(0, g.pulse - dt * 2.5)
+  g.shownDepth += (g.depth - g.shownDepth) * Math.min(1, dt * 1.6)
   g.shake = Math.max(0, g.shake - dt * 14)
   g.chainTime = Math.max(0, g.chainTime - dt)
   if (g.chainTime === 0) g.chain = 0
@@ -567,6 +598,7 @@ export const step = (g, input, dt) => {
   }
   stepWorld(g.world, dt, g.depth)
   handleWorldEvents(g)
+  stepCore(g, dt)
   stepPlayer(g, input, dt)
   if (g.phase !== 'playing') return
   stepEnemies(g, dt)

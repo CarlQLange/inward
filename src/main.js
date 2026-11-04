@@ -28,7 +28,8 @@ const depthFromDigit = code => {
 
 const overrideDepth = depth => {
   state.depthOverride = depth
-  state.depth = depth ?? state.rooms[state.index].depth
+  if (depth !== null) state.depth = depth
+  else state.depth = state.awake ? 0.25 + 0.75 * (state.index / (state.rooms.length - 1)) : state.index / (state.rooms.length - 1)
 }
 
 window.addEventListener('keydown', e => {
@@ -55,7 +56,7 @@ const present = createPresenter(document.getElementById('screen'))
 
 const render = () => {
   draw(ctx, state)
-  present(source, state)
+  present(source, { ...state, depth: state.shownDepth })
 }
 
 let last = performance.now()

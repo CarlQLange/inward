@@ -52,6 +52,8 @@ export const inWater = (world, e) => {
   return matAt(world, cell(c.x), cell(c.y)) === M.WATER
 }
 
+export const liquidAtPx = (world, px, py) => props(matAt(world, cell(px), cell(py))).liquid === true
+
 export const inCone = (from, aim, reach, width) => point => {
   const dx = point.x - from.x
   const dy = point.y - from.y
