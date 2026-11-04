@@ -35,7 +35,8 @@ def cut_out(rgb):
 
 
 def reduce(rgb, mask, width, height, colours):
-    image = Image.fromarray(rgb)
+    _, (ny, nx) = ndimage.distance_transform_edt(~mask, return_indices=True)
+    image = Image.fromarray(rgb[ny, nx])
     small = np.asarray(image.resize((width, height), Image.BOX))
     coverage = np.asarray(Image.fromarray(mask.astype(np.uint8) * 255).resize((width, height), Image.BOX))
     keep = coverage > 110
@@ -50,7 +51,14 @@ def fit(rgb, longest):
     return max(1, round(w * scale)), max(1, round(h * scale))
 
 
-def build(sheet, name, cell_size, longest, colours):
+def edged(tile):
+    pixels = np.asarray(tile).copy()
+    pixels[-1, :, :3] = pixels[-1, :, :3] * 0.5
+    pixels[:, -1, :3] = pixels[:, -1, :3] * 0.5
+    return Image.fromarray(pixels)
+
+
+def build(sheet, name, cell_size, longest, colours, finish=lambda sprite: sprite):
     rgb = np.asarray(Image.open(RAW / sheet).convert('RGB'))
     atlas = Image.new('RGBA', (cell_size * GRID, cell_size * GRID), (0, 0, 0, 0))
     for row in range(GRID):
@@ -60,12 +68,12 @@ def build(sheet, name, cell_size, longest, colours):
             sprite = reduce(cropped, mask, *size, colours)
             x = column * cell_size + (cell_size - size[0]) // 2
             y = row * cell_size + cell_size - size[1]
-            atlas.paste(sprite, (x, y))
+            atlas.paste(finish(sprite), (x, y))
     atlas.save(OUT / f'{name}.png')
 
 
 OUT.mkdir(exist_ok=True)
-CREATURE_SIZES = {i: 14 for i in range(16)} | {4: 12, 5: 12, 6: 14, 7: 12, 8: 14, 9: 16, 10: 16, 11: 16, 12: 16, 13: 28, 14: 16, 15: 16}
+CREATURE_SIZES = {i: 14 for i in range(16)} | {3: 20, 4: 13, 5: 13, 6: 14, 7: 12, 8: 15, 9: 16, 10: 15, 11: 15, 12: 15, 13: 28, 14: 15, 15: 16}
 build('creatures.png', 'creatures', 28, CREATURE_SIZES, 6)
 build('icons.png', 'icons', 16, 14, 5)
-build('tiles.png', 'tiles', 8, 8, 4)
+build('tiles.png', 'tiles', 8, 8, 4, edged)

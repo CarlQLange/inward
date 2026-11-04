@@ -1,6 +1,7 @@
 import { TICK, VIEW } from './config.js'
 import { createGame, restart, step } from './game.js'
 import { draw } from './render.js'
+import { loadSprites } from './sprites.js'
 import { createPresenter } from './present.js'
 
 const KEYS = {
@@ -12,7 +13,10 @@ const KEYS = {
   KeyX: 'shoot', KeyJ: 'shoot',
   KeyC: 'skill', KeyK: 'skill',
   KeyV: 'skill2', KeyL: 'skill2',
+  KeyB: 'skill3', KeyN: 'skill3',
 }
+
+await loadSprites()
 
 const held = {}
 const state = createGame()

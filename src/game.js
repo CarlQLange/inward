@@ -1,118 +1,34 @@
-import { BLOCK, ROOM, TUNING } from './config.js'
+import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, chargedAt, createWorld, crushingAt, energize, ignite, matAt, puff, setCell, stepWorld } from './world.js'
+import { createWorld, ignite, matAt, puff, setCell, stepWorld, energize } from './world.js'
 import { FIRST_ROOM } from './room.js'
 import { generateRoom } from './generate.js'
+import { WORLD_PX, cell, centre, hitsSolid, inWater, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
+import { applyCrush, applyHazards, burst, hurt } from './combat.js'
+import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
+import { SKILLS, TREES, muzzle, spillNapalm } from './skills.js'
 
 const P = TUNING.player
-const WORLD_PX = ROOM * BLOCK
-const SIZES = { crawler: [10, 7], spitter: [14, 10], fish: [10, 6] }
-const CARD_SIZES = { bolt: [8, 10], repel: [8, 10], core: [16, 16] }
-const MAGNETIC = new Set(['crawler'])
-const SKILL_KEYS = ['skill', 'skill2']
+const R = TUNING.run
+const CARD_SIZES = { core: [16, 16] }
+const SKILL_KEYS = ['skill', 'skill2', 'skill3']
+const ALL_SKILLS = Object.keys(SKILLS)
 
-const overlap = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+const shuffled = list => list.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 
-const centre = e => ({ x: e.x + e.w / 2, y: e.y + e.h / 2 })
-const cell = px => Math.floor(px / BLOCK)
-
-const solidAt = (w, px, py) => props(matAt(w, cell(px), cell(py))).solid === true
-
-const cellsUnder = ({ x, y, w, h }, margin = 0) => {
-  const out = []
-  for (let cy = cell(y - margin); cy <= cell(y + h - 0.01 + margin); cy++) {
-    for (let cx = cell(x - margin); cx <= cell(x + w - 0.01 + margin); cx++) out.push([cx, cy])
-  }
-  return out
-}
-
-const hitsSolid = (world, box) => cellsUnder(box).some(([x, y]) => props(matAt(world, x, y)).solid)
-
-const moveAxis = (world, e, axis, distance) => {
-  const sign = Math.sign(distance)
-  let left = Math.abs(distance)
-  while (left > 0) {
-    const step = Math.min(0.25, left)
-    const next = { ...e, [axis]: e[axis] + sign * step }
-    if (hitsSolid(world, next)) return true
-    e[axis] = next[axis]
-    left -= step
-  }
-  return false
-}
-
-const move = (world, e, dt) => {
-  e.hitWall = moveAxis(world, e, 'x', e.vx * dt)
-  if (e.hitWall) e.vx = 0
-  const blocked = moveAxis(world, e, 'y', e.vy * dt)
-  e.grounded = blocked && e.vy > 0
-  if (blocked) e.vy = 0
-}
-
-const pushOutOfSolid = (world, e) => {
-  for (let i = 0; i < 24 && hitsSolid(world, e); i++) e.y -= 1
-}
-
-const inWater = (world, e) => {
-  const c = centre(e)
-  return matAt(world, cell(c.x), cell(c.y)) === M.WATER
-}
-
-const burst = (g, x, y, colour, count) => {
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = 20 + Math.random() * 60
-    g.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.25 + Math.random() * 0.35, colour })
+const readBest = () => {
+  try {
+    return Number(localStorage.getItem(R.bestKey)) || 0
+  } catch {
+    return 0
   }
 }
 
-const hurt = (g, e, amount) => {
-  if (e.iframes > 0 || e.hp <= 0) return
-  e.hp -= amount
-  e.iframes = e === g.player ? P.iframes : TUNING.enemyIframes
-  const c = centre(e)
-  burst(g, c.x, c.y, e === g.player ? 'white' : 'pale', 5)
-}
-
-const applyCrush = (g, e) => {
-  if (!cellsUnder(e).some(([x, y]) => crushingAt(g.world, x, y))) return
-  hurt(g, e, TUNING.world.crushDamage)
-  e.stun = TUNING.world.crushStun
-}
-
-const applyHazards = (g, e, dt) => {
-  const world = g.world
-  const touching = cellsUnder(e, 1)
-  if (touching.some(([x, y]) => chargedAt(world, x, y))) {
-    hurt(g, e, 2)
-    e.stun = 0.7
-  }
-  if (touching.some(([x, y]) => burningAt(world, x, y))) hurt(g, e, 1)
-  const inSmoke = cellsUnder(e).some(([x, y]) => props(matAt(world, x, y)).harmful)
-  e.smoked = inSmoke ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
-  if (e.smoked > P.smokeTolerance) {
-    hurt(g, e, 1)
-    e.smoked = 0
-  }
-}
-
-const createEnemy = ({ kind, x, row }) => {
-  const [w, h] = SIZES[kind]
-  return {
-    kind, w, h,
-    x,
-    y: row * BLOCK - h,
-    vx: kind === 'crawler' ? TUNING.crawler.speed : 0,
-    vy: 0,
-    hp: TUNING[kind].hp,
-    iframes: 0,
-    stun: 0,
-    cooldown: 1,
-    facing: 1,
-    airTime: 0,
-    wander: Math.random() * 6,
-    shoved: 0,
+const saveBest = score => {
+  try {
+    localStorage.setItem(R.bestKey, String(score))
+  } catch {
+    return
   }
 }
 
@@ -120,46 +36,58 @@ const createPlayer = ({ x, row }) => ({
   x, y: row * BLOCK - P.height, w: 6, h: P.height,
   vx: 0, vy: 0, hp: P.hp, iframes: 0, stun: 0, facing: 1, crouching: false,
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
-  shotReady: 0, skills: [], aim: { x: 1, y: 0 }, drift: 0,
-  wasJump: false, wasSkills: [false, false],
+  shotReady: 0, skills: [], upgrades: new Set(), aim: { x: 1, y: 0 }, drift: 0,
+  wasJump: false, wasSkills: [false, false, false],
 })
 
-const createCard = ({ kind, x, row }) => {
-  const [w, h] = CARD_SIZES[kind]
-  return { kind, x, y: row * BLOCK - h - 1, w, h }
+const createCard = g => ({ kind, x, row }) => {
+  const resolved = kind === 'skill' ? g.cardPool.shift() ?? 'bolt' : kind
+  const [w, h] = CARD_SIZES[resolved] ?? [12, 12]
+  return { kind: resolved, x, y: row * BLOCK - h - 1, w, h }
 }
 
-const createRoom = (definition, depth) => ({
-  depth,
-  doors: definition.doors,
-  world: createWorld(definition.map),
-  enemies: definition.enemies.map(createEnemy),
-  cards: definition.cards.map(createCard),
-  visited: false,
-})
+const createWare = ({ kind, x, row }) => ({ kind, x, y: row * BLOCK - 13, w: 12, h: 12, price: TUNING.prices[kind] })
 
-const createRooms = seed => {
-  const total = TUNING.run.rooms
-  const definition = i => (i === 0 ? FIRST_ROOM : generateRoom(i, total, seed))
-  return Array.from({ length: total }, (_, i) => createRoom(definition(i), i / (total - 1)))
+const lean = g => {
+  const owned = new Set(g.player.skills.map(s => s.kind))
+  return {
+    metal: owned.has('repel') || owned.has('bolt'),
+    water: owned.has('bolt') || owned.has('frost'),
+    fuel: owned.has('ember') || owned.has('gust'),
+    scrap: owned.has('repel'),
+  }
+}
+
+const buildRoom = (g, index) => {
+  const definition = index === 0 ? FIRST_ROOM : generateRoom(index, R.rooms, g.seed, lean(g))
+  return {
+    depth: index / (R.rooms - 1),
+    doors: definition.doors,
+    world: createWorld(definition.map),
+    enemies: definition.enemies.map(createEnemy),
+    cards: definition.cards.map(createCard(g)),
+    wares: (definition.wares ?? []).map(createWare),
+    pickups: [],
+    visited: false,
+  }
 }
 
 const settleFlung = (g, f) => {
   const x = cell(f.x + 4)
   const y = cell(f.y + 4)
-  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => {
-    const m = matAt(g.world, x + dx, y + dy)
-    return !props(m).solid
-  })
-  if (spot) setCell(g.world, x + spot[0], y + spot[1], M.SCRAP)
+  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
+  if (!spot) return
+  setCell(g.world, x + spot[0], y + spot[1], M.SCRAP)
+  if (f.charged) energize(g.world, x + spot[0], y + spot[1], 30)
 }
 
 const leaveRoom = g => {
   g.flung.forEach(f => settleFlung(g, f))
-  Object.assign(g.rooms[g.index], { enemies: g.enemies, cards: g.cards })
+  Object.assign(g.rooms[g.index], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
 
 const enterRoom = (g, index) => {
+  g.rooms[index] ??= buildRoom(g, index)
   const room = g.rooms[index]
   room.visited = true
   Object.assign(g, {
@@ -167,8 +95,10 @@ const enterRoom = (g, index) => {
     world: room.world,
     enemies: room.enemies,
     cards: room.cards,
+    wares: room.wares,
+    pickups: room.pickups,
     depth: g.depthOverride ?? room.depth,
-    shots: [], fireballs: [], flung: [], bolts: [], particles: [],
+    shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [],
   })
 }
 
@@ -185,18 +115,137 @@ const walkThrough = (g, index, side) => {
 export const createGame = (depthOverride = null) => {
   const g = {
     depthOverride,
+    seed: Math.floor(Math.random() * 1e9),
+    cardPool: shuffled(ALL_SKILLS.filter(s => s !== 'bolt')),
     time: 0,
     phase: 'playing',
     phaseTime: 0,
     pause: 0,
     pulse: 0,
-    rooms: createRooms(Math.floor(Math.random() * 1e9)),
+    shake: 0,
+    rooms: new Array(R.rooms).fill(null),
     index: 0,
     player: createPlayer(FIRST_ROOM.spawn),
     flung: [],
+    score: 0,
+    best: readBest(),
+    chain: 0,
+    chainTime: 0,
+    xp: 0,
+    level: 1,
+    nextLevel: R.firstLevel,
+    gold: 0,
+    kills: 0,
+    environmentKills: 0,
+    offer: null,
+    pendingOffers: 0,
+    menuHeld: {},
   }
   enterRoom(g, 0)
   return g
+}
+
+const availableUpgrades = p =>
+  p.skills.flatMap(({ kind }) =>
+    TREES[kind].filter(node => !p.upgrades.has(node.id)).map(node => ({ type: 'upgrade', skill: kind, node })))
+
+const unownedSkills = g => {
+  const owned = new Set(g.player.skills.map(s => s.kind))
+  return ALL_SKILLS.filter(s => !owned.has(s))
+}
+
+const openOffer = (g, kinds = ['new', 'upgrade']) => {
+  const p = g.player
+  const options = []
+  const roomForSkill = p.skills.length < P.skillSlots && unownedSkills(g).length > 0
+  if (kinds.includes('new') && roomForSkill) options.push({ type: 'new' })
+  if (kinds.includes('upgrade')) options.push(...shuffled(availableUpgrades(p)).slice(0, 3 - options.length))
+  if (options.length === 0) {
+    p.hp = Math.min(P.hp, p.hp + 2)
+    g.score += 100
+    return
+  }
+  g.offer = { options, selected: 0, armed: false }
+}
+
+const chooseOption = (g, option) => {
+  const p = g.player
+  if (option.type === 'new') {
+    const kind = shuffled(unownedSkills(g))[0]
+    p.skills.push({ kind, ready: 0 })
+    g.cardPool = g.cardPool.filter(s => s !== kind)
+  } else {
+    p.upgrades.add(option.node.id)
+  }
+  g.offer = null
+  g.pulse = 1
+}
+
+const stepOffer = (g, input) => {
+  const offer = g.offer
+  const pressed = key => input[key] && !g.menuHeld[key]
+  if (!offer.armed) {
+    offer.armed = !input.jump && !input.shoot
+  } else {
+    if (pressed('left')) offer.selected = (offer.selected + offer.options.length - 1) % offer.options.length
+    if (pressed('right')) offer.selected = (offer.selected + 1) % offer.options.length
+    if (pressed('jump') || pressed('shoot')) chooseOption(g, offer.options[offer.selected])
+  }
+  g.menuHeld = { left: input.left, right: input.right, jump: input.jump, shoot: input.shoot }
+}
+
+const addPopup = (g, x, y, text, colour = 'white') => g.popups.push({ x, y, text, colour, life: 1.1 })
+
+const gainXp = (g, amount) => {
+  g.xp += amount
+  while (g.xp >= g.nextLevel) {
+    g.xp -= g.nextLevel
+    g.level += 1
+    g.nextLevel = R.firstLevel + (g.level - 1) * R.levelGrowth
+    g.pendingOffers += 1
+    g.player.hp = Math.min(P.hp, g.player.hp + 1)
+  }
+}
+
+const dropLoot = (g, e, count) => {
+  const c = centre(e)
+  for (let i = 0; i < count; i++) {
+    g.pickups.push({
+      kind: 'coin', x: c.x - 2, y: c.y - 2, w: 5, h: 5,
+      vx: (Math.random() - 0.5) * 80, vy: -60 - Math.random() * 60,
+    })
+  }
+  if (Math.random() < 0.12) g.pickups.push({ kind: 'heart', x: c.x - 3, y: c.y - 3, w: 7, h: 6, vx: 0, vy: -90 })
+}
+
+const onKill = (g, e) => {
+  onDeath(g, e)
+  const c = centre(e)
+  burst(g, c.x, c.y, 'pale', 10)
+  const def = ENEMY_DEFS[e.kind]
+  if (e.friendly) {
+    dropLoot(g, e, 5)
+    return
+  }
+  const environmental = e.lastSource !== 'player'
+  g.chain = g.chainTime > 0 ? g.chain + 1 : 1
+  g.chainTime = R.chainWindow
+  const points = def.value * g.chain * (environmental ? 2 : 1)
+  g.score += points
+  g.kills += 1
+  if (environmental) g.environmentKills += 1
+  gainXp(g, environmental ? R.environmentXp : 1)
+  addPopup(g, c.x, c.y - 6, g.chain > 1 ? `${points} X${g.chain}` : String(points), environmental ? 'charge' : 'white')
+  dropLoot(g, e, environmental ? 2 : 1)
+}
+
+const crouch = (world, p, wants) => {
+  const drop = P.height - P.crouchHeight
+  if (wants && !p.crouching) {
+    Object.assign(p, { y: p.y + drop, h: P.crouchHeight, crouching: true })
+  } else if (!wants && p.crouching && !hitsSolid(world, { x: p.x, y: p.y - drop, w: p.w, h: P.height })) {
+    Object.assign(p, { y: p.y - drop, h: P.height, crouching: false })
+  }
 }
 
 const aimFrom = (p, input) => {
@@ -207,102 +256,11 @@ const aimFrom = (p, input) => {
   return { x: x / length, y: y / length }
 }
 
-const muzzle = p => ({ x: p.x + p.w / 2, y: p.y + (p.crouching ? 4 : 5) })
-
-const crouch = (world, p, wants) => {
-  const drop = P.height - P.crouchHeight
-  if (wants && !p.crouching) {
-    Object.assign(p, { y: p.y + drop, h: P.crouchHeight, crouching: true })
-  } else if (!wants && p.crouching && !hitsSolid(world, { ...p, y: p.y - drop, h: P.height })) {
-    Object.assign(p, { y: p.y - drop, h: P.height, crouching: false })
-  }
-}
-
 const shoot = (g, p) => {
   const from = muzzle(p)
   g.shots.push({ x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: p.aim.x * P.shotSpeed, vy: p.aim.y * P.shotSpeed, life: P.shotLife })
   p.shotReady = P.shotEvery
 }
-
-const cast = (g, p) => {
-  const start = muzzle(p)
-  const { x: dx, y: dy } = p.aim
-  const points = [start]
-  let { x, y } = start
-  let struck = null
-  for (let travelled = 0; travelled < WORLD_PX * 1.5; travelled += 2) {
-    x += dx * 2
-    y += dy * 2
-    if (Math.floor(travelled / 10) !== Math.floor((travelled - 2) / 10)) {
-      points.push({ x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 6 })
-    }
-    struck = g.enemies.find(e => overlap(e, { x, y, w: 1, h: 1 }))
-    const m = matAt(g.world, cell(x), cell(y))
-    if (struck || props(m).solid || m === M.WATER) break
-  }
-  points.push({ x, y })
-  g.bolts.push({ points, life: 0.22 })
-  if (struck) {
-    hurt(g, struck, 2)
-    struck.stun = 1
-  }
-  const energy = TUNING.world.boltEnergy * (1 + g.depth / 2)
-  energize(g.world, cell(x), cell(y), energy)
-  ignite(g.world, cell(x), cell(y))
-  burst(g, x, y, 'charge', 8)
-  g.pulse = 1
-}
-
-const inCone = (from, aim, reach, width) => point => {
-  const dx = point.x - from.x
-  const dy = point.y - from.y
-  const along = dx * aim.x + dy * aim.y
-  const across = Math.abs(dx * aim.y - dy * aim.x)
-  return along > 0 && along <= reach && across <= width
-}
-
-const repel = (g, p) => {
-  const R = TUNING.skills.repel
-  const from = muzzle(p)
-  const covered = inCone(from, p.aim, R.reach, R.width)
-  const near = inCone(from, p.aim, R.recoilReach, R.width)
-  let recoil = false
-  for (let y = 0; y < ROOM; y++) {
-    for (let x = 0; x < ROOM; x++) {
-      const point = { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK }
-      const m = matAt(g.world, x, y)
-      if (m === M.METAL && near(point)) recoil = true
-      if (m !== M.SCRAP || !covered(point)) continue
-      setCell(g.world, x, y, M.EMPTY)
-      g.flung.push({ x: x * BLOCK, y: y * BLOCK, w: 8, h: 8, vx: p.aim.x * R.fling, vy: p.aim.y * R.fling - 40, age: 0 })
-    }
-  }
-  for (const e of g.enemies) {
-    if (!MAGNETIC.has(e.kind) || !covered(centre(e))) continue
-    e.vx = p.aim.x * R.shove
-    e.vy = p.aim.y * R.shove - 60
-    e.shoved = R.shoveTime
-  }
-  if (recoil) {
-    p.vx = -p.aim.x * R.recoil
-    p.vy = -p.aim.y * R.recoil
-    p.jumpHeld = false
-    p.drift = TUNING.player.drift
-  }
-  for (let i = 0; i < 14; i++) {
-    const spread = (Math.random() - 0.5) * 0.9
-    const speed = 90 + Math.random() * 120
-    g.particles.push({
-      x: from.x, y: from.y,
-      vx: (p.aim.x + spread * p.aim.y) * speed,
-      vy: (p.aim.y - spread * p.aim.x) * speed,
-      life: 0.3, colour: 'magnet',
-    })
-  }
-  g.pulse = Math.max(g.pulse, 0.6)
-}
-
-const SKILLS = { bolt: cast, repel }
 
 const useSkills = (g, p, input, stunned, dt) => {
   p.skills.forEach((skill, slot) => {
@@ -316,19 +274,70 @@ const useSkills = (g, p, input, stunned, dt) => {
   SKILL_KEYS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
 }
 
+const finishRun = (g, phase) => {
+  g.phase = phase
+  g.phaseTime = 0
+  g.newBest = g.score > g.best
+  if (g.newBest) {
+    g.best = g.score
+    saveBest(g.score)
+  }
+}
+
 const collectCards = (g, p) => {
   const touched = g.cards.find(c => overlap(p, c))
   if (!touched) return
   if (touched.kind === 'core') {
-    g.phase = 'cleared'
-    g.phaseTime = 0
+    g.score += R.coreBonus + p.hp * 100
+    finishRun(g, 'cleared')
     return
   }
-  if (p.skills.length >= SKILL_KEYS.length) return
   g.cards = g.cards.filter(c => c !== touched)
-  p.skills.push({ kind: touched.kind, ready: 0 })
+  if (p.skills.length < P.skillSlots) p.skills.push({ kind: touched.kind, ready: 0 })
+  else g.pendingOffers += 1
   g.pause = TUNING.cardPause
   g.pulse = 1
+  g.shake = Math.max(g.shake, 3)
+}
+
+const talkToInhabitants = (g, p) => {
+  for (const e of g.enemies) {
+    if (!e.friendly || e.spent || !overlap(p, e)) continue
+    if (e.kind === 'hermit' && availableUpgrades(p).length > 0) {
+      e.spent = true
+      openOffer(g, ['upgrade'])
+    }
+    if (e.kind === 'miner' && p.skills.length < P.skillSlots && unownedSkills(g).length > 0) {
+      e.spent = true
+      openOffer(g, ['new'])
+    }
+  }
+}
+
+const buyWares = (g, p) => {
+  const ware = g.wares.find(w => overlap(p, w) && g.gold >= w.price)
+  if (!ware) return
+  g.gold -= ware.price
+  g.wares = g.wares.filter(w => w !== ware)
+  if (ware.kind === 'heart') p.hp = Math.min(P.hp, p.hp + 2)
+  else g.pendingOffers += 1
+  g.pulse = Math.max(g.pulse, 0.5)
+}
+
+const usePickups = (g, p, dt) => {
+  for (const c of g.pickups) {
+    c.vy = Math.min(200, c.vy + 300 * dt)
+    moveAxis(g.world, c, 'x', c.vx * dt)
+    if (moveAxis(g.world, c, 'y', c.vy * dt)) {
+      c.vx *= 0.5
+      c.vy = 0
+    }
+    if (!overlap(p, { x: c.x - 3, y: c.y - 3, w: c.w + 6, h: c.h + 6 })) continue
+    c.taken = true
+    if (c.kind === 'coin') g.gold += 1
+    else p.hp = Math.min(P.hp, p.hp + 1)
+  }
+  g.pickups = g.pickups.filter(c => !c.taken)
 }
 
 const useDoors = (g, p) => {
@@ -387,144 +396,29 @@ const stepPlayer = (g, input, dt) => {
 
   applyHazards(g, p, dt)
   collectCards(g, p)
+  talkToInhabitants(g, p)
+  buyWares(g, p)
+  usePickups(g, p, dt)
   if (g.phase === 'playing') useDoors(g, p)
-  if (p.hp <= 0) {
-    g.phase = 'dead'
-    g.phaseTime = 0
+  if (p.hp <= 0 && g.phase === 'playing') {
+    finishRun(g, 'dead')
     burst(g, p.x, p.y, 'white', 24)
   }
-}
-
-const stepCrawler = (g, e, dt) => {
-  const C = TUNING.crawler
-  e.vy = Math.min(P.maxFall, e.vy + C.gravity * dt)
-  if (e.shoved > 0) {
-    e.shoved -= dt
-    move(g.world, e, dt)
-    if (e.hitWall) {
-      hurt(g, e, TUNING.flung.damage)
-      e.shoved = 0
-    }
-    return
-  }
-  if (e.stun > 0) {
-    e.vx = 0
-  } else {
-    e.vx = e.facing * C.speed
-    const ahead = e.x + (e.facing > 0 ? e.w + 1 : -1)
-    const noFloor = e.grounded && !solidAt(g.world, ahead, e.y + e.h + 2)
-    if (e.hitWall || noFloor) {
-      e.facing *= -1
-      e.vx = e.facing * C.speed
-    }
-  }
-  move(g.world, e, dt)
-}
-
-const launch = (from, target, flight) => ({
-  vx: (target.x - from.x) / flight,
-  vy: (target.y - from.y) / flight - 0.5 * TUNING.fireball.gravity * flight,
-})
-
-const arcIsClear = (world, from, { vx, vy }, flight) => {
-  for (let t = 0.03; t < flight; t += 0.03) {
-    const x = from.x + vx * t
-    const y = from.y + vy * t + 0.5 * TUNING.fireball.gravity * t * t
-    if (solidAt(world, x, y)) return false
-  }
-  return true
-}
-
-const findFlight = (world, from, target) =>
-  TUNING.spitter.flights.find(flight => arcIsClear(world, from, launch(from, target, flight), flight))
-
-const spit = (g, from, target, flight) => {
-  const { vx, vy } = launch(from, target, flight)
-  g.fireballs.push({
-    x: from.x - 2, y: from.y - 2, w: 4, h: 4,
-    vx: vx + ((Math.random() - 0.5) * TUNING.spitter.wobble * 2) / flight,
-    vy,
-    age: 0,
-  })
-}
-
-const stepSpitter = (g, e, dt) => {
-  const S = TUNING.spitter
-  e.vy = Math.min(P.maxFall, e.vy + S.gravity * dt)
-  e.vx = 0
-  move(g.world, e, dt)
-  if (e.stun > 0) return
-  const me = centre(e)
-  const them = centre(g.player)
-  e.facing = them.x < me.x ? -1 : 1
-  e.cooldown -= dt
-  if (e.cooldown > 0 || Math.hypot(them.x - me.x, them.y - me.y) > S.range) return
-  const mouth = { x: me.x, y: e.y - 2 }
-  const flight = findFlight(g.world, mouth, them)
-  if (flight === undefined) return
-  spit(g, mouth, them, flight)
-  e.cooldown = S.every
-}
-
-const stepFish = (g, e, dt) => {
-  const F = TUNING.fish
-  const world = g.world
-  if (!inWater(world, e)) {
-    e.vy = Math.min(P.maxFall, e.vy + 400 * dt)
-    e.vx *= 0.9
-    move(world, e, dt)
-    e.airTime += dt
-    if (e.airTime > F.airDamageEvery) {
-      hurt(g, e, 1)
-      e.airTime = 0
-    }
-    return
-  }
-  e.airTime = 0
-  if (e.stun > 0) return
-  const me = centre(e)
-  const them = centre(g.player)
-  const chasing = inWater(world, g.player)
-  e.wander += dt
-  const dx = chasing ? them.x - me.x : Math.cos(e.wander) * 20
-  const dy = chasing ? them.y - me.y : Math.sin(e.wander * 0.7) * 10
-  const length = Math.max(1, Math.hypot(dx, dy))
-  const speed = chasing ? F.chase : F.speed
-  const step = { ...e, x: e.x + (dx / length) * speed * dt, y: e.y + (dy / length) * speed * dt }
-  if (dx !== 0) e.facing = dx < 0 ? -1 : 1
-  if (inWater(world, step) && !hitsSolid(world, step)) {
-    e.x = step.x
-    e.y = step.y
-  }
-}
-
-const STEPPERS = { crawler: stepCrawler, spitter: stepSpitter, fish: stepFish }
-
-const spitterBursts = (g, e) => {
-  const c = centre(e)
-  const reach = TUNING.spitter.burst
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) ignite(g.world, cell(c.x) + dx, cell(c.y) + dy)
-  }
-  burst(g, c.x, c.y, 'fire', 16)
 }
 
 const stepEnemies = (g, dt) => {
   for (const e of g.enemies) {
     applyCrush(g, e)
     STEPPERS[e.kind](g, e, dt)
-    pushOutOfSolid(g.world, e)
+    if (e.kind !== 'worm') pushOutOfSolid(g.world, e)
+    clampToRoom(e)
     e.iframes -= dt
     e.stun -= dt
+    e.frozen -= dt
     applyHazards(g, e, dt)
-    if (e.stun <= 0 && overlap(e, g.player)) hurt(g, g.player, 1)
+    if (!e.friendly && e.stun <= 0 && overlap(e, g.player)) hurt(g, g.player, 1)
   }
-  for (const e of g.enemies) {
-    if (e.hp > 0) continue
-    if (e.kind === 'spitter') spitterBursts(g, e)
-    const c = centre(e)
-    burst(g, c.x, c.y, 'pale', 10)
-  }
+  for (const e of g.enemies) if (e.hp <= 0) onKill(g, e)
   g.enemies = g.enemies.filter(e => e.hp > 0)
 }
 
@@ -535,9 +429,9 @@ const stepShots = (g, dt) => {
     s.life -= dt
     const victim = g.enemies.find(e => overlap(s, e))
     if (victim) {
-      hurt(g, victim, 1)
+      hurt(g, victim, 1, 'player')
       s.life = 0
-    } else if (solidAt(g.world, s.x, s.y)) {
+    } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid) {
       burst(g, s.x, s.y, 'pale', 2)
       s.life = 0
     }
@@ -548,7 +442,11 @@ const stepShots = (g, dt) => {
 const landFireball = (g, f) => {
   const x = cell(f.x + 2)
   const y = cell(f.y + 2)
-  for (const [dx, dy] of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) ignite(g.world, x + dx, y + dy)
+  for (const [dx, dy] of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    ignite(g.world, x + dx, y + dy)
+    if (matAt(g.world, x + dx, y + dy) === M.ICE) setCell(g.world, x + dx, y + dy, M.WATER)
+  }
+  if (f.napalm) spillNapalm(g, x, y - 1)
   burst(g, f.x + 2, f.y + 2, 'fire', 6)
   f.age = -1
 }
@@ -559,20 +457,25 @@ const stepFireballs = (g, dt) => {
     f.vy += TUNING.fireball.gravity * dt
     f.x += f.vx * dt
     f.y += f.vy * dt
-    const m = matAt(g.world, cell(f.x + 2), cell(f.y + 2))
+    const x = cell(f.x + 2)
+    const y = cell(f.y + 2)
+    const m = matAt(g.world, x, y)
     if (m === M.WATER) {
-      puff(g.world, cell(f.x + 2), cell(f.y + 2) - 1, M.STEAM, TUNING.world.steamLife)
+      puff(g.world, x, y - 1, M.STEAM, TUNING.world.steamLife)
       f.age = -1
     } else if (props(m).solid) {
       landFireball(g, f)
-    } else if (overlap(f, g.player)) {
+    } else if (props(m).flammability) {
+      ignite(g.world, x, y)
+      f.age = -1
+    } else if (!f.friendly && overlap(f, g.player)) {
       hurt(g, g.player, 1)
       f.age = -1
-    } else if (f.age > TUNING.fireball.friendlyAfter) {
-      const victim = g.enemies.find(e => overlap(f, e))
+    } else if (f.friendly || f.age > TUNING.fireball.friendlyAfter) {
+      const victim = g.enemies.find(e => !e.friendly && overlap(f, e))
       if (victim) {
-        hurt(g, victim, 1)
-        f.age = -1
+        hurt(g, victim, 2, f.friendly ? 'player' : 'world')
+        landFireball(g, f)
       }
     }
   }
@@ -588,7 +491,7 @@ const stepFlung = (g, dt) => {
     const victim = g.enemies.find(e => overlap(f, e))
     if (victim) {
       hurt(g, victim, F.damage)
-      victim.stun = F.stun
+      victim.stun = Math.max(victim.stun, F.stun)
     }
     if (f.age > F.friendlyAfter && overlap(f, g.player)) {
       hurt(g, g.player, F.damage)
@@ -613,7 +516,25 @@ const stepEffects = (g, dt) => {
     p.life -= dt
   }
   g.particles = g.particles.filter(p => p.life > 0)
+  for (const p of g.popups) {
+    p.y -= 14 * dt
+    p.life -= dt
+  }
+  g.popups = g.popups.filter(p => p.life > 0)
   g.pulse = Math.max(0, g.pulse - dt * 2.5)
+  g.shake = Math.max(0, g.shake - dt * 14)
+  g.chainTime = Math.max(0, g.chainTime - dt)
+  if (g.chainTime === 0) g.chain = 0
+}
+
+const handleWorldEvents = g => {
+  for (const event of g.world.events) {
+    g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.5 + event.reach * 0.25 : 1)
+    if (event.type !== 'blast') continue
+    g.shake = Math.max(g.shake, 3 + event.reach * 2)
+    burst(g, (event.x + 0.5) * BLOCK, (event.y + 0.5) * BLOCK, 'fire', 8 + event.reach * 6)
+  }
+  g.world.events.length = 0
 }
 
 const reset = g => Object.assign(g, createGame(g.depthOverride))
@@ -623,22 +544,29 @@ export const restart = reset
 export const step = (g, input, dt) => {
   g.time += dt
   stepEffects(g, dt)
+  if (g.offer) {
+    stepOffer(g, input)
+    return
+  }
   if (g.pause > 0) {
     g.pause -= dt
+    return
+  }
+  if (g.pendingOffers > 0) {
+    g.pendingOffers -= 1
+    openOffer(g)
     return
   }
   if (g.phase !== 'playing') {
     g.phaseTime += dt
     stepWorld(g.world, dt, g.depth)
-    const wait = g.phase === 'dead' ? TUNING.deadPause : TUNING.clearedPause
-    if (g.phaseTime > wait) reset(g)
+    handleWorldEvents(g)
+    const confirm = input.jump || input.shoot
+    if ((g.phaseTime > 0.8 && confirm) || g.phaseTime > 12) reset(g)
     return
   }
   stepWorld(g.world, dt, g.depth)
-  if (g.world.gateOpened) {
-    g.world.gateOpened = false
-    g.pulse = 1
-  }
+  handleWorldEvents(g)
   stepPlayer(g, input, dt)
   if (g.phase !== 'playing') return
   stepEnemies(g, dt)

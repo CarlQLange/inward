@@ -16,13 +16,18 @@ export const crushingAt = (w, x, y) => inside(x, y) && w.crushing[idx(x, y)] ===
 export const createWorld = rows => {
   const size = ROOM * ROOM
   const mat = new Uint8Array(size)
-  rows.forEach((row, y) => [...row].forEach((c, x) => { mat[idx(x, y)] = parseMaterial(c) }))
+  const life = new Float32Array(size)
+  rows.forEach((row, y) => [...row].forEach((c, x) => {
+    const material = parseMaterial(c)
+    mat[idx(x, y)] = material
+    life[idx(x, y)] = props(material).startLife ?? 0
+  }))
   return {
     mat,
     burn: new Float32Array(size),
     charge: new Float32Array(size),
     refractory: new Float32Array(size),
-    life: new Float32Array(size),
+    life,
     moved: new Uint8Array(size),
     crushing: new Uint8Array(size),
     frontier: [],
@@ -30,7 +35,7 @@ export const createWorld = rows => {
     flip: 0,
     burning: 0,
     charged: 0,
-    gateOpened: false,
+    events: [],
   }
 }
 
@@ -83,7 +88,7 @@ const conduct = (w, i, energy) => {
   w.refractory[i] = T.chargeRefractory
   if (props(w.mat[i]).opensWhenCharged) {
     place(w, i, M.EMPTY)
-    w.gateOpened = true
+    w.events.push({ type: 'gate' })
   }
 }
 
@@ -121,14 +126,15 @@ const drainsToward = (w, x, y, d) => {
 
 const flow = (w, x, y) => {
   const i = idx(x, y)
-  if (isOpen(w, x, y + 1)) {
+  const sinksThroughOil = w.mat[i] === M.WATER && matAt(w, x, y + 1) === M.OIL
+  if (isOpen(w, x, y + 1) || sinksThroughOil) {
     swap(w, i, idx(x, y + 1))
     return
   }
   const side = Math.random() < 0.5 ? 1 : -1
   const dirs = [side, -side]
   const towardDrop = dirs.find(d => drainsToward(w, x, y, d))
-  const stacked = matAt(w, x, y - 1) === M.WATER
+  const stacked = matAt(w, x, y - 1) === w.mat[i]
   const spread = stacked ? dirs.find(d => isOpen(w, x + d, y)) : undefined
   const d = towardDrop ?? spread
   if (d !== undefined) swap(w, i, idx(x + d, y))
@@ -181,25 +187,26 @@ const emitSmoke = (w, x, y) => {
   if (spot) puff(w, x + spot[0], y + spot[1], M.SMOKE, T.smokeLife)
 }
 
-const explode = (w, x, y) => {
-  for (let dy = -T.blastReach; dy <= T.blastReach; dy++) {
-    for (let dx = -T.blastReach; dx <= T.blastReach; dx++) {
+const explode = (w, x, y, reach) => {
+  w.events.push({ type: 'blast', x, y, reach })
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
       const nx = x + dx
       const ny = y + dy
       if (!inside(nx, ny)) continue
       const n = idx(nx, ny)
       w.crushing[n] = 1
       ignite(w, nx, ny)
-      if (w.mat[n] === M.ROCK || w.mat[n] === M.SAND) place(w, n, M.EMPTY)
+      if (reach > 1 && (w.mat[n] === M.ROCK || w.mat[n] === M.SAND)) place(w, n, M.EMPTY)
     }
   }
 }
 
 const burnOut = (w, x, y) => {
   const i = idx(x, y)
-  const { burnsTo, explodes } = props(w.mat[i])
+  const { burnsTo, blast } = props(w.mat[i])
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
-  if (explodes) explode(w, x, y)
+  if (blast) explode(w, x, y, blast)
 }
 
 const stepFire = (w, dt, excite) => {
@@ -217,13 +224,14 @@ const stepFire = (w, dt, excite) => {
         const other = matAt(w, nx, ny)
         const flam = props(other).flammability
         if (flam && Math.random() < flam * excite * dt) ignite(w, nx, ny)
-        if (other === M.WATER && Math.random() < T.quench * dt) {
+        if (other === M.WATER && !p.liquid && Math.random() < T.quench * dt) {
           w.burn[i] = 0
           place(w, idx(nx, ny), M.STEAM, between(T.steamLife))
         }
+        if (other === M.ICE && Math.random() < T.melt * dt) place(w, idx(nx, ny), M.WATER)
       }
       if (Math.random() < p.smoke * dt) emitSmoke(w, x, y)
-      if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY && !w.moved[i]) {
+      if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY) {
         const quenched = N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.STEAM)
         if (!quenched) burnOut(w, x, y)
       }

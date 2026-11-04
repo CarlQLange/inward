@@ -15,52 +15,6 @@ const paint = (rows, colours, flip = false) => {
 
 const pair = (rows, colours) => [paint(rows, colours), paint(rows, colours, true)]
 
-const shaded = (dark, base, light) => ({ a: dark, b: base, c: light })
-
-const ROCK_A = [
-  'bbbbbbba', 'bcbbbbba', 'bbbbabba', 'bbbaabba',
-  'bbabbbba', 'bbbbbcba', 'bbbbbbba', 'aaaaaaaa',
-]
-const ROCK_B = [
-  'bbbabbba', 'bcbabbba', 'bbbbabba', 'aaabbbba',
-  'bbbbbbba', 'bbcbbbba', 'bbbbbbba', 'aaaaaaaa',
-]
-const MOSS = [
-  'ccbccbcc', 'cbbcbbba', 'bbbbabba', 'bbbaabba',
-  'bbabbbba', 'bbbbbbba', 'bbbbbbba', 'aaaaaaaa',
-]
-const PEAT = [
-  'bbbbabba', 'bcbbbbba', 'bbabbbba', 'bbbbbcba',
-  'babbbbba', 'bbbbabba', 'bcbbbbba', 'aaaaaaaa',
-]
-const WOOD = [
-  'abcbbcba', 'abcbbbba', 'abbbbcba', 'abcbbcba',
-  'abcbbbba', 'abbbbcba', 'abcbbcba', 'abcbbbba',
-]
-const METAL = [
-  'cccccccc', 'cabbbbab', 'cbbbbbbb', 'cbbbbbbb',
-  'cbbbbbbb', 'cbbbbbbb', 'cabbbbab', 'cbbbbbba',
-]
-const GATE = [
-  'abcabcab', 'abcabcab', 'abcabcab', 'abcabcab',
-  'abcabcab', 'abcabcab', 'abcabcab', 'aaaaaaaa',
-]
-const BEDROCK = [
-  'bbbbbbba', 'bbbbbbba', 'bbbbbbba', 'aaaaaaaa',
-  'bbbabbbb', 'bbbabbbb', 'bbbabbbb', 'aaaaaaaa',
-]
-const SAND = [
-  'bbcbbbbc', 'bbbbbabb', 'cbbbbbbb', 'bbbabbcb',
-  'bbbbbbbb', 'bcbbbabb', 'bbbbbbbb', 'bbabbbcb',
-]
-const SCRAP = [
-  'acccccca', 'cbbbbbba', 'cbabbabb', 'cbbbbbba',
-  'cbbbbbba', 'cbabbabb', 'cbbbbbba', 'abaaaaaa',
-]
-const VOLATILE = [
-  'abbbbbba', 'bcbbbbcb', 'bbcbbcbb', 'bbbccbbb',
-  'bbbccbbb', 'bbcbbcbb', 'bcbbbbcb', 'abbbbbba',
-]
 const ASH = [
   '........', '..c.....', '.....c..', '........',
   '...b....', '.c...b..', '........', '..b...c.',
@@ -82,93 +36,72 @@ const LEGS = {
   stepB: ['..W..W..', '..WW.W..', '...W.W..', '...WW...', '...WW...', '........'],
   jump: ['.WW..WW.', '.W....W.', '........', '........', '........', '........'],
 }
-
-const WHITE = { W: '#f4f8f2', K: '#10181a' }
-
 const CROUCH = [
   '...WW...', '..WWWW..', '..WKKW..', '..WWWW..', '.WWWWWW.',
   'W.WWWW.W', '.WW..WW.', '.WW..WW.', '........',
 ]
-
-const player = {
-  ...Object.fromEntries(
-    Object.entries(LEGS).map(([name, legs]) => [name, pair([...PLAYER_TOP, ...legs], WHITE)]),
-  ),
-  crouch: pair(CROUCH, WHITE),
-}
-
-const CRAWLER = [
-  [
-    '...bbbb...', '..bcbbbb..', '.bbkbbbbb.', '.bbbbbbbb.',
-    '.bbbbbbbb.', 'b.b.bb.b.b', '.b..b...b.',
-  ],
-  [
-    '...bbbb...', '..bcbbbb..', '.bbkbbbbb.', '.bbbbbbbb.',
-    '.bbbbbbbb.', '.b.b..b.b.', 'b...b..b..',
-  ],
-]
-const CRAWLER_C = { b: '#c9a24a', c: '#efd98a', k: '#10181a' }
-
-const SPITTER = [
-  '....bbbbbb....', '...bbbbbbbb...', '..bbbbbbbbbb..', '..bkkbbbbkkb..',
-  '..bbbbbbbbbb..', '...bbffffbb...', '..bbbffffbbb..', '.bbbbbbbbbbbb.',
-  '.b.bb.bb.bb.b.', 'b..b..b..b..b.',
-]
-const SPITTER_C = { b: '#c7825a', k: '#10181a', f: '#ff9a2e' }
-
-const FISH = [
-  ['....bbb...', 'b..bbbbb..', 'bbbbkbbbb.', 'bbbbbbbbb.', 'b..bbbbb..', '....bbb...'],
-]
-const FISH_C = { b: '#7fc9c0', k: '#10181a' }
-
-const CARD = [
-  'gggggggg', 'g......g', 'g...yy.g', 'g..yy..g', 'g.yyyy.g',
-  'g..yy..g', 'g.yy...g', 'g.y....g', 'g......g', 'gggggggg',
-]
-const CARD_C = { g: '#76d648', y: '#ffe84a' }
-
-const REPEL_CARD = [
-  'gggggggg', 'g......g', 'g.b..b.g', 'g.b..b.g', 'g.b..b.g',
-  'g.b..b.g', 'g..bb..g', 'g......g', 'g......g', 'gggggggg',
-]
-const REPEL_ICON = [
-  '................', '...bbbb..bbbb...', '...bbbb..bbbb...', '...bb......bb...',
-  '...bb......bb...', '...bb......bb...', '...bb......bb...', '...bb......bb...',
-  '...bb......bb...', '...bbb....bbb...', '....bbb..bbb....', '.....bbbbbb.....',
-  '......bbbb......', '................', '................', '................',
-]
-const BLUE = '#6fd0ff'
-
-const BOLT_ICON = [
-  '...........yyyy.', '..........yyyy..', '.........yyyy...', '........yyyy....',
-  '.......yyyy.....', '......yyyyyyyy..', '.....yyyyyyyy...', '.........yyy....',
-  '........yyy.....', '.......yyy......', '......yyy.......', '.....yyy........',
-  '....yy..........', '...yy...........', '..y.............', '................',
-]
-
+const WHITE = { W: '#f4f8f2', K: '#10181a' }
 const HEART = ['.gg.gg.', 'ggggggg', 'ggggggg', '.ggggg.', '..ggg..', '...g...']
 
+const TILE_INDEX = {
+  rock: [0, 1, 0, 1, 12], moss: [2], peat: [3], wood: [4], metal: [5], scrap: [6],
+  bedrock: [7], sand: [8], volatile: [9], gate: [11], ice: [15],
+}
+const ICON_INDEX = {
+  bolt: 0, repel: 1, ember: 2, frost: 7, hammer: 5, gust: 6, coin: 10, heart: 11, bomb: 9, rift: 15,
+}
+
+const loadImage = src => new Promise((resolve, reject) => {
+  const image = new Image()
+  image.onload = () => resolve(image)
+  image.onerror = reject
+  image.src = src
+})
+
+const cutTile = (atlas, index, size) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  canvas.getContext('2d').drawImage(atlas, (index % 4) * size, Math.floor(index / 4) * size, size, size, 0, 0, size, size)
+  return canvas
+}
+
+const flipped = source => {
+  const canvas = document.createElement('canvas')
+  canvas.width = source.width
+  canvas.height = source.height
+  const ctx = canvas.getContext('2d')
+  ctx.scale(-1, 1)
+  ctx.drawImage(source, -source.width, 0)
+  return canvas
+}
+
 export const SPRITES = {
-  tiles: {
-    rock: [paint(ROCK_A, shaded('#2d3a16', '#5f7128', '#8a9c3e')), paint(ROCK_B, shaded('#2d3a16', '#5f7128', '#8a9c3e'))],
-    moss: [paint(MOSS, shaded('#2d3a16', '#5f7128', '#a8c84a'))],
-    peat: [paint(PEAT, shaded('#2f3618', '#556427', '#6f7d33'))],
-    wood: [paint(WOOD, shaded('#3a2a14', '#7a5a2a', '#9d7a3e'))],
-    metal: [paint(METAL, shaded('#2a2e30', '#70767a', '#a4a9ac'))],
-    gate: [paint(GATE, shaded('#1c2022', '#70767a', '#b6bbbd'))],
-    bedrock: [paint(BEDROCK, shaded('#111a16', '#27332b', '#27332b'))],
-    sand: [paint(SAND, shaded('#8a7a44', '#c7b26a', '#e2d28c'))],
-    scrap: [paint(SCRAP, shaded('#2a2e30', '#8a6a4a', '#b6a080'))],
-    volatile: [paint(VOLATILE, shaded('#3a1440', '#8a3a9a', '#f07ae0'))],
-    ash: [paint(ASH, shaded('#000', '#5a5a52', '#8a8a80'))],
-  },
+  tiles: {},
+  extra: {},
+  creatures: [],
+  icons: {},
+  ash: paint(ASH, { b: '#5a5a52', c: '#8a8a80' }),
   flames: FLAMES.map(rows => paint(rows, { f: '#d9531c', g: '#ff9a2e', y: '#ffe84a' })),
-  player,
-  crawler: CRAWLER.map(rows => pair(rows, CRAWLER_C)),
-  spitter: pair(SPITTER, SPITTER_C),
-  fish: FISH.map(rows => pair(rows, FISH_C)),
-  cards: { bolt: paint(CARD, CARD_C), repel: paint(REPEL_CARD, { g: '#76d648', b: BLUE }) },
-  icons: { bolt: paint(BOLT_ICON, { y: '#ffe84a' }), repel: paint(REPEL_ICON, { b: BLUE }) },
+  player: {
+    ...Object.fromEntries(Object.entries(LEGS).map(([name, legs]) => [name, pair([...PLAYER_TOP, ...legs], WHITE)])),
+    crouch: pair(CROUCH, WHITE),
+  },
   heart: paint(HEART, { g: '#76d648' }),
   heartEmpty: paint(HEART, { g: '#26542a' }),
+}
+
+export const loadSprites = async () => {
+  const [tiles, creatures, icons] = await Promise.all(
+    ['tiles', 'creatures', 'icons'].map(name => loadImage(`assets/${name}.png`)),
+  )
+  for (const [name, indices] of Object.entries(TILE_INDEX)) {
+    SPRITES.tiles[name] = indices.map(i => cutTile(tiles, i, 8))
+  }
+  SPRITES.extra.bones = cutTile(tiles, 13, 8)
+  SPRITES.extra.fungus = cutTile(tiles, 14, 8)
+  SPRITES.creatures = Array.from({ length: 16 }, (_, i) => {
+    const sprite = cutTile(creatures, i, 28)
+    return [sprite, flipped(sprite)]
+  })
+  for (const [name, index] of Object.entries(ICON_INDEX)) SPRITES.icons[name] = cutTile(icons, index, 16)
 }
