@@ -5,9 +5,10 @@ emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-There's one prototype room so far. Carl has played it and is happy with the core
-of it. It's hard, and he's fine with that. The folder name is a placeholder:
-rename it before the first release.
+A full run now works: eight rooms in a line from the edge to the core. Carl played
+and liked the first room, and found it hard, which he's fine with. Everything added
+after that hasn't been played by a person. The folder name is a placeholder: rename
+it before the first release.
 
 ## Running and testing
 
@@ -18,15 +19,21 @@ python3 ~/.claude/skills/browser-game/scripts/serve.py 8765 .
 ```
 
 In the page, `window.game` drives it without playing: `game.sim(seconds, input)`
-steps the simulation, `game.state` reads it, and `game.restart()` resets the room.
+steps and draws, `game.tick(input)` steps without drawing (use this in long loops,
+since drawing thousands of frames crashes the pane), `game.state` reads it, and
+`game.restart()` starts a new run. Long scripted loops also need a time limit, or the
+browser tool gives up. Testing writes to the saved best score, so clear it afterwards.
+
+Regenerate the sprite atlases with
+`uv run --with pillow --with numpy --with scipy python art/process_art.py`.
 
 ## Technology
 
 Plain JavaScript modules with no build step, so a reload shows the latest code.
 The game draws to a low-resolution 2D canvas, and a WebGL pass presents it, which
-is where distance-from-core effects live. Sprites and tiles are small bitmaps
-written in code, which keeps them on the pixel grid. Tuning values live together
-in `src/config.js`.
+is where distance-from-core effects live. Tuning values live together in
+`src/config.js`. Tiles, creatures and icons are generated sheets in `art/raw/`,
+reduced to chunky atlases in `assets/`. The player and flames are bitmaps in code.
 
 Mechanically it draws on the archived `magicschool` project, where everything
 has properties and changing one can trigger rules that change others. That game
@@ -72,6 +79,7 @@ effects must spread across blocks visibly and be readable without text.
 - It may start from a few archetypes such as mage, fighter, and miner. It's
   unresolved whether you choose one on the first screen, since that would
   undercut seeming like a regular Metroidvania.
+- No sound.
 - Numbers in Carl's original note, such as room and maze sizes, were only there
   to convey the concept. He likes around 15×15 rooms for the map.
 - A run shouldn't truly dead-end much, if at all.
@@ -91,6 +99,26 @@ effects must spread across blocks visibly and be readable without text.
 - A bright green framed HUD. The HUD in the framed image is a rough placeholder.
 - More Game Boy at the outskirts, and more cool shaders as you get further in.
   Certain skills can also bring shaders in.
+
+## What's built, and not yet reviewed by Carl
+
+He asked to be surprised, so these were agent choices. Treat them as open to change.
+
+- The world is four-shade green until the first card, then colour floods in.
+- Six skills (bolt, repel, ember, frost, hammer, gust), each with two upgrades.
+  Three slots. Skills are only verbs on world rules, and no synergy is written anywhere.
+- Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, smoke,
+  steam, methane, and volatile crystal. New ones appear with depth.
+- Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
+  (electrifies water), worm (digs), guardian (stomps loose the ceiling).
+- Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
+- Score with chains. Kills by the world score double and give triple experience.
+- In the core room rock burns and conducts, and the core drifts toward you.
+- Rooms generate on entry and lean toward your skills, easing off with depth.
+
+Not built: rings, side routes, the 15×15 layout (rooms are a straight line along one
+row), and any design pass on archetypes. In a physics search using movement alone, 60
+of 61 generated rooms could be crossed, so rare rooms may need a skill or a restart.
 
 ## Ideas Carl is happy with so far
 
