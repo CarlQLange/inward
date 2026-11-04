@@ -20,9 +20,13 @@ export const TUNING = {
     chargeTime: 0.35,
     chargeRefractory: 0.9,
     boltEnergy: 44,
+    crushDamage: 2,
+    crushStun: 0.5,
   },
   player: {
     hp: 5,
+    height: 15,
+    crouchHeight: 8,
     run: 82,
     accel: 900,
     gravity: 560,

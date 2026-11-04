@@ -95,6 +95,7 @@ const drawOverlays = (ctx, world, time) => {
 }
 
 const legsFor = (p, time) => {
+  if (p.crouching) return 'crouch'
   if (!p.grounded) return 'jump'
   if (Math.abs(p.vx) < 8) return 'stand'
   return Math.floor(time * 10) % 2 ? 'stepA' : 'stepB'
@@ -109,7 +110,7 @@ const drawPlayer = (ctx, g) => {
   ctx.drawImage(frames[p.facing > 0 ? 0 : 1], x, y)
   ctx.fillStyle = COLOURS.white
   const ax = x + 4
-  const ay = y + 7
+  const ay = y + (p.crouching ? 5 : 6)
   for (let i = 3; i < 7; i++) {
     ctx.fillRect(Math.round(ax + p.aim.x * i), Math.round(ay + p.aim.y * i), 1, 1)
   }

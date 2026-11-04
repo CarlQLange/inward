@@ -1,6 +1,6 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, chargedAt, createWorld, energize, ignite, matAt, puff, stepWorld } from './world.js'
+import { burningAt, chargedAt, createWorld, crushingAt, energize, ignite, matAt, puff, stepWorld } from './world.js'
 import { FIRST_ROOM } from './room.js'
 
 const P = TUNING.player
@@ -71,6 +71,12 @@ const hurt = (g, e, amount) => {
   burst(g, c.x, c.y, e === g.player ? 'white' : 'pale', 5)
 }
 
+const applyCrush = (g, e) => {
+  if (!cellsUnder(e).some(([x, y]) => crushingAt(g.world, x, y))) return
+  hurt(g, e, TUNING.world.crushDamage)
+  e.stun = TUNING.world.crushStun
+}
+
 const applyHazards = (g, e, dt) => {
   const world = g.world
   const touching = cellsUnder(e, 1)
@@ -106,8 +112,8 @@ const createEnemy = ({ kind, x, row }) => {
 }
 
 const createPlayer = ({ x, row }) => ({
-  x, y: row * BLOCK - 15, w: 6, h: 15,
-  vx: 0, vy: 0, hp: P.hp, iframes: 0, stun: 0, facing: 1,
+  x, y: row * BLOCK - P.height, w: 6, h: P.height,
+  vx: 0, vy: 0, hp: P.hp, iframes: 0, stun: 0, facing: 1, crouching: false,
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
   shotReady: 0, boltReady: 0, hasCard: false, aim: { x: 1, y: 0 },
   wasJump: false, wasSkill: false,
@@ -138,18 +144,28 @@ const aimFrom = (p, input) => {
   return { x: x / length, y: y / length }
 }
 
+const muzzle = p => ({ x: p.x + p.w / 2, y: p.y + (p.crouching ? 4 : 5) })
+
+const crouch = (world, p, wants) => {
+  const drop = P.height - P.crouchHeight
+  if (wants && !p.crouching) {
+    Object.assign(p, { y: p.y + drop, h: P.crouchHeight, crouching: true })
+  } else if (!wants && p.crouching && !hitsSolid(world, { ...p, y: p.y - drop, h: P.height })) {
+    Object.assign(p, { y: p.y - drop, h: P.height, crouching: false })
+  }
+}
+
 const shoot = (g, p) => {
-  const c = centre(p)
-  g.shots.push({ x: c.x - 1, y: c.y - 3, w: 2, h: 2, vx: p.aim.x * P.shotSpeed, vy: p.aim.y * P.shotSpeed, life: P.shotLife })
+  const from = muzzle(p)
+  g.shots.push({ x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: p.aim.x * P.shotSpeed, vy: p.aim.y * P.shotSpeed, life: P.shotLife })
   p.shotReady = P.shotEvery
 }
 
 const cast = (g, p) => {
-  const start = centre(p)
+  const start = muzzle(p)
   const { x: dx, y: dy } = p.aim
-  const points = [{ x: start.x, y: start.y - 3 }]
-  let x = start.x
-  let y = start.y - 3
+  const points = [start]
+  let { x, y } = start
   let struck = null
   for (let travelled = 0; travelled < WORLD_PX * 1.5; travelled += 2) {
     x += dx * 2
@@ -179,10 +195,12 @@ const stepPlayer = (g, input, dt) => {
   const p = g.player
   const world = g.world
   const swimming = inWater(world, p)
+  applyCrush(g, p)
   const stunned = p.stun > 0
+  crouch(world, p, input.down && !input.jump && p.grounded && !swimming)
   const wish = stunned ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
   const top = P.run * (swimming ? P.swimRun : 1)
-  const towards = wish * top
+  const towards = p.crouching ? 0 : wish * top
   const change = P.accel * dt
   p.vx += Math.max(-change, Math.min(change, towards - p.vx))
   if (wish !== 0) p.facing = wish
@@ -194,7 +212,7 @@ const stepPlayer = (g, input, dt) => {
 
   p.sinceGround = p.grounded ? 0 : p.sinceGround + dt
   p.sinceJump = input.jump && !p.wasJump ? 0 : p.sinceJump + dt
-  if (!stunned && p.sinceJump < P.buffer) {
+  if (!stunned && !p.crouching && p.sinceJump < P.buffer) {
     if (swimming) {
       p.vy = -P.swimStroke
       p.sinceJump = 1
@@ -348,7 +366,9 @@ const spitterBursts = (g, e) => {
 
 const stepEnemies = (g, dt) => {
   for (const e of g.enemies) {
+    applyCrush(g, e)
     STEPPERS[e.kind](g, e, dt)
+    pushOutOfSolid(g.world, e)
     e.iframes -= dt
     e.stun -= dt
     applyHazards(g, e, dt)

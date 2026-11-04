@@ -77,9 +77,17 @@ const LEGS = {
 
 const WHITE = { W: '#f4f8f2', K: '#10181a' }
 
-const player = Object.fromEntries(
-  Object.entries(LEGS).map(([name, legs]) => [name, pair([...PLAYER_TOP, ...legs], WHITE)]),
-)
+const CROUCH = [
+  '...WW...', '..WWWW..', '..WKKW..', '..WWWW..', '.WWWWWW.',
+  'W.WWWW.W', '.WW..WW.', '.WW..WW.', '........',
+]
+
+const player = {
+  ...Object.fromEntries(
+    Object.entries(LEGS).map(([name, legs]) => [name, pair([...PLAYER_TOP, ...legs], WHITE)]),
+  ),
+  crouch: pair(CROUCH, WHITE),
+}
 
 const CRAWLER = [
   [

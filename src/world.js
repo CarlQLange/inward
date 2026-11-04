@@ -11,6 +11,7 @@ const between = ([lo, hi]) => lo + Math.random() * (hi - lo)
 export const matAt = (w, x, y) => (inside(x, y) ? w.mat[idx(x, y)] : M.BEDROCK)
 export const burningAt = (w, x, y) => inside(x, y) && w.burn[idx(x, y)] > 0
 export const chargedAt = (w, x, y) => inside(x, y) && w.charge[idx(x, y)] > 0
+export const crushingAt = (w, x, y) => inside(x, y) && w.crushing[idx(x, y)] === 1
 
 export const createWorld = rows => {
   const size = ROOM * ROOM
@@ -23,6 +24,7 @@ export const createWorld = rows => {
     refractory: new Float32Array(size),
     life: new Float32Array(size),
     moved: new Uint8Array(size),
+    crushing: new Uint8Array(size),
     frontier: [],
     clocks: { fluid: 0, fire: 0, charge: 0 },
     flip: 0,
@@ -90,7 +92,9 @@ const fall = (w, x, y) => {
     return
   }
   if (isOpen(w, x, y + 1) || sinks) {
+    const heavy = props(w.mat[i]).solid === true
     swap(w, i, idx(x, y + 1))
+    if (heavy) w.crushing[idx(x, y + 1)] = 1
     return
   }
   if (!props(w.mat[i]).slides) return
@@ -143,6 +147,7 @@ const ageOut = (w, i, dt) => {
 
 const stepFluids = (w, dt) => {
   w.moved.fill(0)
+  w.crushing.fill(0)
   w.flip ^= 1
   const column = k => (w.flip ? k : ROOM - 1 - k)
   for (let y = ROOM - 2; y >= 1; y--) {

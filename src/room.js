@@ -33,7 +33,7 @@ export const FIRST_ROOM = {
     '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
     '############################',
   ],
-  spawn: at(3, 20),
+  spawn: at(5, 20),
   card: at(23, 8),
   enemies: [
     { kind: 'crawler', ...at(10, 16) },
