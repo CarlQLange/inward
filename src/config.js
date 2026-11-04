@@ -104,6 +104,7 @@ export const TUNING = {
     magnetReach: 70,
     crownScore: 5,
     collapseEvery: 4,
+    arenaLimit: 45,
     altarPrice: 2,
     shockShot: 12,
     acidShot: 0.35,

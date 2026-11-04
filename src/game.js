@@ -756,7 +756,8 @@ const stepRoomEvents = (g, dt) => {
     const hostile = g.enemies.some(e => !e.friendly && !e.ally)
     const inside = g.player.x > 32 && g.player.x < WORLD_PX - 40 && g.player.y > 8 && g.player.y < WORLD_PX - 24
     if (!room.sealed && hostile && inside) sealRoom(g, room)
-    if (room.sealed && !hostile) unsealRoom(g, room)
+    if (room.sealed) room.sealedFor = (room.sealedFor ?? 0) + dt
+    if (room.sealed && (!hostile || room.sealedFor > R.arenaLimit)) unsealRoom(g, room)
   }
   if (room.event === 'collapse' && !room.cleared) {
     room.clock = (room.clock ?? 0) + dt
