@@ -11,7 +11,22 @@ const between = ([lo, hi]) => lo + Math.random() * (hi - lo)
 export const matAt = (w, x, y) => (inside(x, y) ? w.mat[idx(x, y)] : M.BEDROCK)
 export const burningAt = (w, x, y) => inside(x, y) && w.burn[idx(x, y)] > 0
 export const chargedAt = (w, x, y) => inside(x, y) && w.charge[idx(x, y)] > 0
+export const lavaAt = (w, x, y) => inside(x, y) && w.mat[idx(x, y)] === M.LAVA
 export const crushingAt = (w, x, y) => inside(x, y) && w.crushing[idx(x, y)] === 1
+
+export const restoreWorld = (encoded, overloaded, drains) => {
+  const world = createWorld([], overloaded)
+  ;[...encoded].forEach((c, i) => {
+    const material = c.charCodeAt(0) - 48
+    world.mat[i] = material
+    const { startLife, expires } = props(material)
+    world.life[i] = startLife ?? (expires ? 3 : 0)
+  })
+  world.drains = drains
+  return world
+}
+
+export const encodeWorld = w => String.fromCharCode(...w.mat.map(m => m + 48))
 
 export const createWorld = (rows, overloaded = false) => {
   const size = ROOM * ROOM
@@ -70,6 +85,8 @@ export const setCell = (w, x, y, mat) => {
   if (inside(x, y)) place(w, idx(x, y), mat)
 }
 
+const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.SCRAP]
+
 const flammabilityOf = (w, mat) => {
   if (w.overloaded && mat === M.ROCK) return T.overloadBurn
   return props(mat).flammability
@@ -99,8 +116,17 @@ export const energize = (w, x, y, energy) => {
 
 const note = (w, tag, mat) => w.notes?.add(`${tag}:${mat}`)
 
+const bubble = (w, i) => {
+  if (w.mat[i] !== M.WATER || Math.random() > T.bubble) return
+  const above = i - ROOM
+  if (w.mat[above] !== M.EMPTY) return
+  note(w, 'bubble', M.WATER)
+  place(w, above, M.METHANE, 10)
+}
+
 const conduct = (w, i, energy) => {
   note(w, 'conduct', w.mat[i])
+  bubble(w, i)
   w.charge[i] = T.chargeTime
   w.refractory[i] = T.chargeRefractory
   if (props(w.mat[i]).opensWhenCharged) {
@@ -170,7 +196,38 @@ const rise = (w, x, y) => {
 
 const ageOut = (w, i, dt) => {
   w.life[i] -= dt
-  if (w.life[i] <= 0) place(w, i, M.EMPTY)
+  if (w.life[i] > 0) return
+  const condenses = w.mat[i] === M.STEAM && props(w.mat[i - ROOM] ?? M.EMPTY).solid === true && Math.random() < T.rain
+  if (condenses) note(w, 'rain', M.STEAM)
+  place(w, i, condenses ? M.WATER : M.EMPTY)
+}
+
+const stepLava = (w, x, y, dt) => {
+  const i = idx(x, y)
+  for (const [dx, dy] of N4) {
+    const nx = x + dx
+    const ny = y + dy
+    const other = matAt(w, nx, ny)
+    if (other === M.WATER) {
+      note(w, 'cool', M.LAVA)
+      place(w, idx(nx, ny), M.STEAM, between(T.steamLife))
+      place(w, i, M.ROCK)
+      return true
+    }
+    if (other === M.ICE) place(w, idx(nx, ny), M.WATER)
+    if (props(other).flammability && Math.random() < T.lavaBurn * dt * 8) ignite(w, nx, ny)
+  }
+  return Math.random() > T.lavaFlow
+}
+
+const growMoss = w => {
+  const x = 1 + Math.floor(Math.random() * (ROOM - 2))
+  const y = 1 + Math.floor(Math.random() * (ROOM - 2))
+  if (w.mat[idx(x, y)] !== M.ROCK || Math.random() > T.growth * ROOM) return
+  const around = N4.map(([dx, dy]) => matAt(w, x + dx, y + dy))
+  if (!around.includes(M.WATER) || !around.includes(M.EMPTY)) return
+  note(w, 'grow', M.MOSS)
+  place(w, idx(x, y), M.MOSS)
 }
 
 const stepFluids = (w, dt) => {
@@ -187,7 +244,9 @@ const stepFluids = (w, dt) => {
       const p = props(w.mat[i])
       if (p.expires && !p.gas) ageOut(w, i, dt)
       if (p.falls && w.mat[i] !== M.EMPTY) fall(w, x, y)
-      else if (p.liquid) flow(w, x, y)
+      else if (p.hot) {
+        if (!stepLava(w, x, y, dt)) flow(w, x, y)
+      } else if (p.liquid) flow(w, x, y)
     }
   }
   for (let y = 1; y < ROOM - 1; y++) {
@@ -206,7 +265,7 @@ const emitSmoke = (w, x, y) => {
   if (spot) puff(w, x + spot[0], y + spot[1], M.SMOKE, T.smokeLife)
 }
 
-const explode = (w, x, y, reach) => {
+export const explode = (w, x, y, reach) => {
   w.events.push({ type: 'blast', x, y, reach })
   for (let dy = -reach; dy <= reach; dy++) {
     for (let dx = -reach; dx <= reach; dx++) {
@@ -216,7 +275,7 @@ const explode = (w, x, y, reach) => {
       const n = idx(nx, ny)
       w.crushing[n] = 1
       ignite(w, nx, ny)
-      if (reach > 1 && [M.ROCK, M.SAND, M.BRICK].includes(w.mat[n])) place(w, n, M.EMPTY)
+      if (reach > 1 && BLAST_BREAKS.includes(w.mat[n])) place(w, n, M.EMPTY)
     }
   }
 }
@@ -233,6 +292,7 @@ const burnOut = (w, x, y) => {
 }
 
 const stepFire = (w, dt, excite) => {
+  growMoss(w)
   let burning = 0
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {

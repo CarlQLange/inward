@@ -1,6 +1,6 @@
 import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { createWorld, ignite, matAt, puff, setCell, stepWorld, energize } from './world.js'
+import { createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld } from './world.js'
 import { FIRST_ROOM } from './room.js'
 import { generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, ringOf } from './map.js'
@@ -8,8 +8,8 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap,
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, spillNapalm } from './skills.js'
-import { closeMenu, dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
-import { knownNotes, persist, recordRun, save } from './store.js'
+import { dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
+import { clearRun, knownNotes, loadRun, persist, recordRun, save, saveRun } from './store.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -24,7 +24,7 @@ const createPlayer = ({ x, row }) => ({
   vx: 0, vy: 0, hp: P.hp, iframes: 0, stun: 0, facing: 1, crouching: false,
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
   shotReady: 0, skills: [], upgrades: new Set(), aim: { x: 1, y: 0 }, drift: 0,
-  wasJump: false, wasSkills: [false, false, false],
+  wasJump: false, wasSkills: [false, false, false], bombs: P.startBombs, wasBomb: false,
 })
 
 const createCard = g => ({ kind, x, row }) => {
@@ -102,7 +102,11 @@ const buildRoom = (g, x, y) => {
     x, y, ring, links,
     doors: definition.doors,
     world,
-    enemies: definition.enemies.map(createEnemy).map(e => ({ ...e, cooldown: e.cooldown + R.entryGrace })),
+    enemies: definition.enemies.map(createEnemy).map(e => ({
+      ...e,
+      cooldown: e.cooldown + R.entryGrace,
+      hp: e.friendly ? e.hp : Math.ceil(e.hp * (1 + ring * R.hpPerRing)),
+    })),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare),
     pickups: [],
@@ -156,8 +160,9 @@ const walkThrough = (g, dir) => {
   const here = g.rooms[keyOf(g.x, g.y)]
   const [nx, ny] = here.links[dir].to
   leaveRoom(g)
-  persist()
   enterRoom(g, nx, ny)
+  g.hinted = false
+  storeRun(g)
   const p = g.player
   const door = g.rooms[keyOf(nx, ny)].doors[OPPOSITE[dir]]
   if (dir === 'right' || dir === 'left') {
@@ -169,6 +174,35 @@ const walkThrough = (g, dir) => {
     p.y = dir === 'down' ? 1 : WORLD_PX - p.h - 1
     p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
   }
+}
+
+const RUN_FIELDS = [
+  'seed', 'map', 'x', 'y', 'awake', 'roomsSeen', 'deepestRing', 'cardPool', 'score', 'chainPeak',
+  'xp', 'level', 'nextLevel', 'gold', 'kills', 'environmentKills', 'pendingOffers',
+]
+
+const packRoom = room => ({
+  x: room.x, y: room.y, ring: room.ring, doors: room.doors, visited: room.visited,
+  enemies: room.enemies, cards: room.cards, wares: room.wares, pickups: room.pickups,
+  drains: room.world.drains, world: encodeWorld(room.world),
+})
+
+const unpackRoom = (packed, map) => ({
+  ...packed,
+  links: map.links[keyOf(packed.x, packed.y)] ?? {},
+  world: restoreWorld(packed.world, packed.ring === CORE_RING, packed.drains),
+})
+
+const storeRun = g => {
+  if (g.phase !== 'playing') return
+  leaveRoom(g)
+  g.flung = []
+  saveRun({
+    ...Object.fromEntries(RUN_FIELDS.map(f => [f, g[f]])),
+    player: { ...g.player, upgrades: [...g.player.upgrades] },
+    rooms: Object.fromEntries(Object.entries(g.rooms).map(([key, room]) => [key, packRoom(room)])),
+  })
+  persist()
 }
 
 const showToast = (g, title, text) => { g.toast = { title, text, life: R.toastLife } }
@@ -321,6 +355,7 @@ const dropLoot = (g, e, count) => {
     })
   }
   if (Math.random() < 0.12) g.pickups.push({ kind: 'heart', x: c.x - 3, y: c.y - 3, w: 7, h: 6, vx: 0, vy: -90 })
+  if (Math.random() < R.bombDropChance) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
 }
 
 const onKill = (g, e) => {
@@ -382,6 +417,7 @@ const useSkills = (g, p, input, stunned, dt) => {
 }
 
 const finishRun = (g, phase) => {
+  clearRun()
   g.phase = phase
   g.phaseTime = 0
   g.newBest = recordRun({
@@ -431,6 +467,7 @@ const buyWares = (g, p) => {
   g.gold -= ware.price
   g.wares = g.wares.filter(w => w !== ware)
   if (ware.kind === 'heart') p.hp = Math.min(P.hp, p.hp + 2)
+  else if (ware.kind === 'bomb') p.bombs += 1
   else g.pendingOffers += 1
   g.pulse = Math.max(g.pulse, 0.5)
 }
@@ -446,6 +483,7 @@ const usePickups = (g, p, dt) => {
     if (!overlap(p, { x: c.x - 3, y: c.y - 3, w: c.w + 6, h: c.h + 6 })) continue
     c.taken = true
     if (c.kind === 'coin') g.gold += 1
+    else if (c.kind === 'bomb') p.bombs += 1
     else p.hp = Math.min(P.hp, p.hp + 1)
   }
   g.pickups = g.pickups.filter(c => !c.taken)
@@ -464,6 +502,53 @@ const stepCore = (g, dt) => {
   const x = 1 + Math.floor(Math.random() * 26)
   const y = 1 + Math.floor(Math.random() * 26)
   if (matAt(g.world, x, y) === M.ROCK && !props(matAt(g.world, x, y + 1)).solid) setCell(g.world, x, y, M.SAND)
+}
+
+const LOCK_HINTS = {
+  [M.PEAT]: ['PEAT PLUG', 'FIRE WILL CLEAR THIS.'],
+  [M.GATE]: ['METAL GATE', 'OPENS WHEN CHARGED. A BOMB ALSO WORKS.'],
+  [M.BRICK]: ['BRICKWORK', 'NEEDS A HAMMER OR A BLAST.'],
+  [M.ICE]: ['ICE PLUG', 'MELT IT, BREAK IT, OR BLOW IT UP.'],
+  [M.SCRAP]: ['SCRAP HEAP', 'THROW IT, BREAK IT, OR BLOW IT UP.'],
+}
+
+const doorPoint = (dir, door) => ({
+  left: [BLOCK, (door.row + 1) * BLOCK],
+  right: [WORLD_PX - BLOCK, (door.row + 1) * BLOCK],
+  up: [(door.col + 1) * BLOCK, BLOCK],
+  down: [(door.col + 1) * BLOCK, WORLD_PX - BLOCK],
+}[dir])
+
+const doorCell = (dir, door) => ({
+  left: [1, door.row], right: [26, door.row], up: [door.col, 1], down: [door.col, 26],
+}[dir])
+
+const stepLockHints = g => {
+  if (g.hinted) return
+  const room = g.rooms[keyOf(g.x, g.y)]
+  const c = centre(g.player)
+  for (const [dir, door] of Object.entries(room.doors)) {
+    const hint = LOCK_HINTS[matAt(g.world, ...doorCell(dir, door))]
+    if (!hint) continue
+    const [dx, dy] = doorPoint(dir, door)
+    if (Math.hypot(c.x - dx, c.y - dy) > R.hintReach) continue
+    showToast(g, hint[0], hint[1])
+    g.hinted = true
+    return
+  }
+}
+
+const throwBomb = (g, p, input) => {
+  const pressed = input.bomb && !p.wasBomb
+  p.wasBomb = input.bomb
+  if (!pressed || p.bombs <= 0) return
+  p.bombs -= 1
+  const from = muzzle(p)
+  g.fireballs.push({
+    x: from.x - 2, y: from.y - 2, w: 4, h: 4,
+    vx: p.aim.x * 150, vy: p.aim.y * 150 - 70,
+    age: 0, friendly: true, bomb: true,
+  })
 }
 
 const stepFirstRoom = (g, dt) => {
@@ -537,6 +622,7 @@ const stepPlayer = (g, input, dt) => {
   p.shotReady -= dt
   if (!stunned && input.shoot && p.shotReady <= 0) shoot(g, p)
   useSkills(g, p, input, stunned, dt)
+  if (!stunned) throwBomb(g, p, input)
   p.iframes -= dt
   p.stun -= dt
 
@@ -588,6 +674,11 @@ const stepShots = (g, dt) => {
 const landFireball = (g, f) => {
   const x = cell(f.x + 2)
   const y = cell(f.y + 2)
+  if (f.bomb) {
+    explode(g.world, x, y, 2)
+    f.age = -1
+    return
+  }
   for (const [dx, dy] of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) {
     ignite(g.world, x + dx, y + dy)
     if (matAt(g.world, x + dx, y + dy) === M.ICE) setCell(g.world, x + dx, y + dy, M.WATER)
@@ -606,7 +697,7 @@ const stepFireballs = (g, dt) => {
     const x = cell(f.x + 2)
     const y = cell(f.y + 2)
     const m = matAt(g.world, x, y)
-    if (m === M.WATER) {
+    if (m === M.WATER && !f.bomb) {
       puff(g.world, x, y - 1, M.STEAM, TUNING.world.steamLife)
       f.age = -1
     } else if (props(m).solid) {
@@ -689,6 +780,7 @@ const handleWorldEvents = g => {
 }
 
 const reset = g => {
+  clearRun()
   Object.assign(g, createGame(g.depthOverride))
   g.player.wasJump = true
   g.player.shotReady = 0.2
@@ -698,7 +790,25 @@ export const restart = reset
 export const depthHere = g => depthFor(g, g.ring)
 export const newRun = reset
 export const startFromTitle = reset
+export const saveAndQuit = g => {
+  storeRun(g)
+  Object.assign(g, createGame(g.depthOverride, 'title'))
+}
+export const continueRun = g => {
+  const saved = loadRun()
+  if (!saved) {
+    reset(g)
+    return
+  }
+  const fresh = createRun(g.depthOverride)
+  const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => [key, unpackRoom(room, saved.map)]))
+  const player = { ...saved.player, upgrades: new Set(saved.player.upgrades), wasJump: true }
+  Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best })
+  enterRoom(g, saved.x, saved.y)
+  g.shownDepth = g.depth
+}
 export const returnToTitle = g => {
+  clearRun()
   persist()
   Object.assign(g, createGame(g.depthOverride, 'title'))
 }
@@ -753,7 +863,7 @@ export const step = (g, input, dt) => {
   if (g.phase !== 'playing') return
   if (pausePressed) {
     g.menuHeld = { ...input }
-    persist()
+    storeRun(g)
     openPause(g)
     return
   }
@@ -778,6 +888,7 @@ export const step = (g, input, dt) => {
   handleWorldEvents(g)
   stepCore(g, dt)
   stepFirstRoom(g, dt)
+  stepLockHints(g)
   stepPlayer(g, input, dt)
   if (g.phase !== 'playing') return
   stepEnemies(g, dt)

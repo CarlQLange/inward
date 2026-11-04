@@ -76,11 +76,11 @@ const drawLiquids = (ctx, world, time) => {
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
-      if (m !== M.WATER && m !== M.OIL) continue
-      ctx.fillStyle = m === M.WATER ? 'rgba(16, 72, 84, 0.78)' : 'rgba(58, 34, 62, 0.92)'
+      if (m !== M.WATER && m !== M.OIL && m !== M.LAVA) continue
+      ctx.fillStyle = { [M.WATER]: 'rgba(16, 72, 84, 0.78)', [M.OIL]: 'rgba(58, 34, 62, 0.92)', [M.LAVA]: '#d9481c' }[m]
       ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
       if (matAt(world, x, y - 1) === m) continue
-      ctx.fillStyle = m === M.WATER ? '#3f9aa2' : '#a06ab0'
+      ctx.fillStyle = { [M.WATER]: '#3f9aa2', [M.OIL]: '#a06ab0', [M.LAVA]: '#ffd24a' }[m]
       for (let i = 0; i < BLOCK; i++) {
         const lift = Math.sin(time * 2.4 + (x * BLOCK + i) * 0.55) > 0.2 ? 0 : 1
         ctx.fillRect(x * BLOCK + i, y * BLOCK + lift, 1, 1)
@@ -219,7 +219,7 @@ const drawCards = (ctx, g) => {
 
 const drawWares = (ctx, g) => {
   for (const w of g.wares) {
-    drawIcon(ctx, w.kind === 'heart' ? 'heart' : 'rift', w.x, w.y, 12)
+    drawIcon(ctx, { heart: 'heart', bomb: 'bomb' }[w.kind] ?? 'rift', w.x, w.y, 12)
     drawText(ctx, w.price, w.x + 2, w.y - 7, g.gold >= w.price ? COLOURS.charge : COLOURS.pale)
   }
 }
@@ -282,6 +282,8 @@ const drawRightHud = (ctx, g) => {
   y += 9
   drawIcon(ctx, 'coin', x, y - 1, 7)
   drawText(ctx, g.gold, x + 10, y, COLOURS.charge)
+  drawIcon(ctx, 'bomb', x + 28, y - 1, 7)
+  drawText(ctx, g.player.bombs, x + 38, y, COLOURS.pale)
   const level = `L${g.level}`
   drawText(ctx, level, x + span - textWidth(level), y, GREEN)
   y += 8

@@ -1,7 +1,7 @@
 export const M = Object.freeze({
   EMPTY: 0, BEDROCK: 1, ROCK: 2, MOSS: 3, PEAT: 4, WOOD: 5, METAL: 6,
   GATE: 7, SAND: 8, ASH: 9, WATER: 10, SMOKE: 11, STEAM: 12, SCRAP: 13, VOLATILE: 14,
-  ICE: 15, OIL: 16, METHANE: 17, BRICK: 18,
+  ICE: 15, OIL: 16, METHANE: 17, BRICK: 18, LAVA: 19,
 })
 
 const PROPS = {
@@ -18,6 +18,7 @@ const PROPS = {
   [M.VOLATILE]: { solid: true, flammability: 3, burnTime: 0.3, burnsTo: M.EMPTY, smoke: 0.5, blast: 2 },
   [M.ICE]: { solid: true, melts: true },
   [M.BRICK]: { solid: true },
+  [M.LAVA]: { liquid: true, hot: true },
   [M.OIL]: { liquid: true, flammability: 2, burnTime: 1.6, burnsTo: M.EMPTY, smoke: 1 },
   [M.METHANE]: { gas: true, expires: true, flammability: 6, burnTime: 0.12, burnsTo: M.EMPTY, smoke: 0, blast: 1, startLife: 40 },
   [M.ASH]: { falls: true, expires: true },
@@ -31,12 +32,12 @@ export const props = mat => PROPS[mat]
 export const MATERIAL_NAMES = {
   [M.BEDROCK]: 'BEDROCK', [M.ROCK]: 'ROCK', [M.MOSS]: 'MOSS', [M.PEAT]: 'PEAT', [M.WOOD]: 'WOOD',
   [M.METAL]: 'METAL', [M.SCRAP]: 'SCRAP', [M.SAND]: 'SAND', [M.WATER]: 'WATER', [M.OIL]: 'OIL',
-  [M.ICE]: 'ICE', [M.SMOKE]: 'SMOKE', [M.STEAM]: 'STEAM', [M.METHANE]: 'MARSH GAS', [M.BRICK]: 'BRICKWORK', [M.VOLATILE]: 'VOLATILE CRYSTAL',
+  [M.ICE]: 'ICE', [M.SMOKE]: 'SMOKE', [M.STEAM]: 'STEAM', [M.METHANE]: 'MARSH GAS', [M.BRICK]: 'BRICKWORK', [M.LAVA]: 'LAVA', [M.GATE]: 'METAL GATE', [M.VOLATILE]: 'VOLATILE CRYSTAL',
 }
 
 const LEGEND = {
   '.': M.EMPTY, '#': M.BEDROCK, R: M.ROCK, m: M.MOSS, p: M.PEAT, w: M.WOOD,
-  M: M.METAL, G: M.GATE, s: M.SAND, '~': M.WATER, S: M.SCRAP, V: M.VOLATILE, I: M.ICE, o: M.OIL, g: M.METHANE, B: M.BRICK,
+  M: M.METAL, G: M.GATE, s: M.SAND, '~': M.WATER, S: M.SCRAP, V: M.VOLATILE, I: M.ICE, o: M.OIL, g: M.METHANE, B: M.BRICK, L: M.LAVA,
 }
 
 export const parseMaterial = char => LEGEND[char]

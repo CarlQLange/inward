@@ -122,7 +122,10 @@ const frost = (g, p) => {
       g.world.notes?.add(`freeze:${M.WATER}`)
       setCell(g.world, x, y, M.ICE)
     }
-    else if (g.world.burn[y * 28 + x] > 0) g.world.burn[y * 28 + x] = 0
+    else if (m === M.LAVA) {
+      g.world.notes?.add(`cool:${M.LAVA}`)
+      setCell(g.world, x, y, M.ROCK)
+    } else if (g.world.burn[y * 28 + x] > 0) g.world.burn[y * 28 + x] = 0
     else if (m === M.STEAM) setCell(g.world, x, y, M.WATER)
     else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x, y, M.SAND)
   })

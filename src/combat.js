@@ -1,6 +1,6 @@
 import { TUNING } from './config.js'
 import { props } from './materials.js'
-import { burningAt, chargedAt, crushingAt, matAt } from './world.js'
+import { burningAt, chargedAt, crushingAt, lavaAt, matAt } from './world.js'
 import { cellsUnder, centre } from './physics.js'
 
 export const burst = (g, x, y, colour, count) => {
@@ -37,6 +37,7 @@ export const applyHazards = (g, e, dt) => {
   }
   const burning = cellsUnder({ x: e.x, y: e.y, w: e.w, h: e.h + 1 })
   if (!e.fireproof && burning.some(([x, y]) => burningAt(world, x, y))) hurt(g, e, 1)
+  if (burning.some(([x, y]) => lavaAt(world, x, y))) hurt(g, e, 2)
   const inSmoke = cellsUnder(e).some(([x, y]) => props(matAt(world, x, y)).harmful)
   e.smoked = inSmoke ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
   if (e.smoked > TUNING.player.smokeTolerance) {

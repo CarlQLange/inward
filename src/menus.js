@@ -1,7 +1,7 @@
 import { TUNING } from './config.js'
-import { knownNotes, persist, save } from './store.js'
-import { SKILL_DETAILS, SKILL_NAMES, TREES } from './skills.js'
-import { newRun, returnToTitle, startFromTitle } from './game.js'
+import { hasRun, knownNotes, persist, save } from './store.js'
+import { SKILL_DETAILS, SKILL_NAMES } from './skills.js'
+import { continueRun, newRun, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
 const P = TUNING.player
 
@@ -75,6 +75,7 @@ export const openTitle = g => openMenu(g, {
   page: 'title',
   back: false,
   items: [
+    ...(hasRun() ? [{ label: 'CONTINUE', run: continueRun }] : []),
     { label: 'NEW RUN', run: startFromTitle },
     { label: 'FIELD NOTES', run: openNotes },
     { label: 'RECORDS', run: openRecords },
@@ -93,6 +94,7 @@ export const openPause = g => openMenu(g, {
     { label: 'FIELD NOTES', run: openNotes },
     { label: 'CONTROLS', run: openControls },
     { label: 'OPTIONS', run: openOptions },
+    { label: 'SAVE AND QUIT', run: saveAndQuit },
     {
       label: 'ABANDON RUN',
       run: gm => openMenu(gm, {
@@ -116,8 +118,6 @@ export const openSummary = g => openMenu(g, {
     { label: 'BACK TO TITLE', run: returnToTitle },
   ],
 })
-
-const describeSkill = kind => ({ icon: kind, name: SKILL_NAMES[kind], text: SKILL_DETAILS[kind] })
 
 export const dropCard = (g, kind) => {
   const p = g.player
@@ -159,8 +159,6 @@ export const cardFor = option =>
     ? { name: 'NEW SKILL', text: 'SOMETHING UNKNOWN', sub: 'RANDOM', mystery: true }
     : { icon: option.skill, name: option.node.name, text: option.node.text, sub: SKILL_NAMES[option.skill] }
 
-export const skillCard = describeSkill
-
 const pressedFrom = (g, input) => key => input[key] && !g.menuHeld[key]
 
 export const stepMenus = (g, input) => {
@@ -185,4 +183,3 @@ export const stepMenus = (g, input) => {
 }
 
 export const slotsFull = p => p.skills.length >= P.skillSlots
-export const treeFor = kind => TREES[kind]

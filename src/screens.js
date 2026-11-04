@@ -58,18 +58,18 @@ const drawTitle = (ctx, g, menu) => {
   const lift = Math.round(Math.sin(g.time * 1.3) * 2)
   centred(ctx, 'CORE', ORIGIN.y + 36 + lift, WHITE, 6)
   centred(ctx, 'REACH THE CENTRE', ORIGIN.y + 76, DIM)
-  panel(ctx, CENTRE - 56, ORIGIN.y + 92, 112, 68)
+  panel(ctx, CENTRE - 56, ORIGIN.y + 92, 112, 12 + menu.items.length * 11)
   drawList(ctx, menu, ORIGIN.y + 100)
-  if (save.best > 0) centred(ctx, `BEST ${save.best}`, ORIGIN.y + 170, YELLOW)
+  if (save.best > 0) centred(ctx, `BEST ${save.best}`, ORIGIN.y + 180, YELLOW)
   centred(ctx, 'ARROWS AND Z', ORIGIN.y + 212, FAINT)
 }
 
 const drawPause = (ctx, menu) => {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
   ctx.fillRect(0, 0, VIEW.w, VIEW.h)
-  panel(ctx, CENTRE - 60, ORIGIN.y + 50, 120, 112)
-  centred(ctx, menu.title, ORIGIN.y + 58, GREEN, 2)
-  drawList(ctx, menu, ORIGIN.y + 80)
+  panel(ctx, CENTRE - 60, ORIGIN.y + 42, 120, 136)
+  centred(ctx, menu.title, ORIGIN.y + 50, GREEN, 2)
+  drawList(ctx, menu, ORIGIN.y + 72)
 }
 
 const drawConfirm = (ctx, menu) => {
@@ -92,6 +92,7 @@ const CONTROLS = [
   ['Z OR SPACE', 'JUMP, LEAP OUT OF LIQUID'],
   ['X', 'SHOOT'],
   ['C V B', 'SKILLS'],
+  ['F', 'THROW A BOMB'],
   ['TAB', 'SKILLS PAGE'],
   ['M', 'MAP'],
   ['ESC OR P', 'PAUSE'],
@@ -158,9 +159,9 @@ const drawSkills = (ctx, g, menu) => {
 
 const MATERIAL_ORDER = [
   M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.METAL, M.SCRAP, M.SAND, M.WATER,
-  M.OIL, M.ICE, M.SMOKE, M.STEAM, M.METHANE, M.VOLATILE, M.BEDROCK,
+  M.OIL, M.LAVA, M.ICE, M.SMOKE, M.STEAM, M.METHANE, M.VOLATILE, M.BRICK, M.GATE, M.BEDROCK,
 ]
-const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS']]
+const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS TO ROCK'], ['bubble', 'SPLITS INTO GAS'], ['grow', 'GROWS NEAR WATER'], ['rain', 'RAINS BACK DOWN']]
 
 const noteLines = () => {
   const materials = MATERIAL_ORDER.filter(m => knownNotes.has(`seen:${m}`)).map(m => ({
@@ -179,8 +180,9 @@ const noteLines = () => {
 const TILE_NAME = {
   [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat', [M.WOOD]: 'wood', [M.METAL]: 'metal',
   [M.SCRAP]: 'scrap', [M.SAND]: 'sand', [M.ICE]: 'ice', [M.VOLATILE]: 'volatile', [M.BEDROCK]: 'bedrock',
+  [M.BRICK]: 'brick', [M.GATE]: 'gate',
 }
-const SWATCH = { [M.WATER]: '#10606e', [M.OIL]: '#5a3a64', [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#a878c8' }
+const SWATCH = { [M.LAVA]: '#ff7a1c', [M.WATER]: '#10606e', [M.OIL]: '#5a3a64', [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#a878c8' }
 
 const drawNotes = (ctx, menu) => {
   sheet(ctx, menu.title)
@@ -290,12 +292,12 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
 }
 
 const LOCK_CELL = {
-  left: d => [0, d.row], right: d => [ROOM - 1, d.row], up: d => [d.col, 0], down: d => [d.col, ROOM - 1],
+  left: d => [1, d.row], right: d => [ROOM - 2, d.row], up: d => [d.col, 1], down: d => [d.col, ROOM - 2],
 }
 
 const lockStands = (room, dir) => {
   const [x, y] = LOCK_CELL[dir](room.doors[dir])
-  return room.world.mat[y * ROOM + x] !== M.EMPTY
+  return [M.PEAT, M.GATE, M.BRICK, M.ICE, M.SCRAP].includes(room.world.mat[y * ROOM + x])
 }
 
 const drawMap = (ctx, g, menu) => {

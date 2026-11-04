@@ -11,7 +11,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const WATER_BOTTOM = 25
 const LOWEST_FLOOR = 23
 const HIGHEST_FLOOR = 9
-const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I'])
+const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B'])
 
 const walkFloors = (rand, range, pitChance) => {
   const segments = []
@@ -72,13 +72,14 @@ const carve = (grid, floors, range) => {
 
 const surfaceOf = (floors, pit) => Math.max(floors[pit.from - 1], floors[pit.to + 1]) + 1
 
-const fillPits = (grid, pits, floors, oilChance, rand) => {
+const fillPits = (grid, pits, floors, oilChance, lavaChance, rand) => {
   for (const pit of pits) {
     const surface = surfaceOf(floors, pit)
+    pit.lava = rand() < lavaChance
     for (let x = pit.from; x <= pit.to; x++) {
-      for (let y = surface; y <= WATER_BOTTOM; y++) grid[y][x] = '~'
+      for (let y = surface; y <= WATER_BOTTOM; y++) grid[y][x] = pit.lava ? 'L' : '~'
     }
-    if (rand() < oilChance) {
+    if (!pit.lava && rand() < oilChance) {
       for (let x = pit.from; x <= pit.to; x++) grid[surface][x] = 'o'
     }
   }
@@ -173,6 +174,7 @@ const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) 
     }
   }
   for (const pit of pits) {
+    if (pit.lava) continue
     enemies.push(place(pit.from, WATER_BOTTOM - 1, depth > 0.25 && rand() < 0.5 ? 'jelly' : 'fish'))
   }
   if (depth > 0.4) {
@@ -187,7 +189,7 @@ const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) 
 
 const standing = (grid, extra) => (x, y) => {
   const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || SOLID.has(grid[b][a])
-  const wet = (a, b) => grid[b]?.[a] === '~' || grid[b]?.[a] === 'o'
+  const wet = (a, b) => ['~', 'o', 'L'].includes(grid[b]?.[a])
   const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || extra.has(`${x},${y}`)
   return { solid, ok: !solid(x, y) && !solid(x, y - 1) && stands }
 }
@@ -331,7 +333,7 @@ const attempt = ({ seed, depth, links, lean, special }) => {
   const layout = walkFloors(rand, range, 0.45 + (lean.water ? help * 0.3 : 0))
   const floors = floorsByColumn(layout)
   const ceilings = carve(grid, floors, range)
-  fillPits(grid, layout.pits, floors, depth > 0.2 || lean.fuel ? 0.35 + (lean.fuel ? help * 0.3 : 0) : 0, rand)
+  fillPits(grid, layout.pits, floors, depth > 0.2 || lean.fuel ? 0.35 + (lean.fuel ? help * 0.3 : 0) : 0, depth > 0.5 ? depth * 0.5 : 0, rand)
   addLedges(grid, floors, ceilings, range, rand, range(2, 4))
   dress(grid, layout, floors, ceilings, depth, lean, rand, range)
   const enemies = populate(layout, depth, lean, rand, range, grid, ceilings)
@@ -364,8 +366,9 @@ const attempt = ({ seed, depth, links, lean, special }) => {
   }
   if (special.mole) {
     enemies.push(place(mark(midway, 0), midway.floor, 'mole'))
-    wares.push({ kind: 'heart', x: mark(midway, 2) * BLOCK, row: midway.floor })
-    if (midway.to - midway.from >= 4) wares.push({ kind: 'upgrade', x: mark(midway, 4) * BLOCK, row: midway.floor })
+    wares.push({ kind: 'bomb', x: mark(midway, 2) * BLOCK, row: midway.floor })
+    if (midway.to - midway.from >= 4) wares.push({ kind: 'heart', x: mark(midway, 4) * BLOCK, row: midway.floor })
+    if (midway.to - midway.from >= 5) wares.push({ kind: 'upgrade', x: mark(midway, 5) * BLOCK, row: midway.floor })
   }
   if (special.hermit) enemies.push(place(mark(first, 2), first.floor, 'hermit'))
   if (special.miner) enemies.push(place(mark(last, 2), last.floor, 'miner'))

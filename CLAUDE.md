@@ -5,9 +5,9 @@ emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-A full run now works: eight rooms in a line from the edge to the core. Carl played
-and liked the first room, and found it hard, which he's fine with. Everything added
-after that hasn't been played by a person. The folder name is a placeholder: rename
+A full run works on a 15×15 map of rings around the core. Carl has played an earlier
+version and called it really cool, and asked for an easier start and more menus. The
+ring map, locks, bombs, saves and newest materials haven't been played by a person. The folder name is a placeholder: rename
 it before the first release.
 
 ## Running and testing
@@ -120,7 +120,8 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
 - Score with chains. Kills by the world score double and give triple experience.
 - In the core room rock burns and conducts, and the core drifts toward you.
-- Rooms generate on entry and lean toward your skills, easing off with depth.
+- Rooms generate on entry, check they can be crossed, and lean toward your skills, easing
+  off with depth.
 - Title screen with the first room burning behind it, pause menu, skills page with
   each tree, controls, options (shader strength, screen shake, forget everything),
   records, and an end-of-run summary.
@@ -132,9 +133,17 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   left, another spitter drops in.
 - The title says CORE, which is a placeholder like the folder name.
 
-Not built: rings, side routes, the 15×15 layout (rooms are a straight line along one
-row), and any design pass on archetypes. In a physics search using movement alone, 60
-of 61 generated rooms could be crossed, so rare rooms may need a skill or a restart.
+- The map: rings are loops, one edge of each inner ring is broken so some routes dead-end,
+  and gates lead inward. Outer gates are often open, inner ones nearly always locked, by
+  peat, metal gate, brickwork, ice or scrap. Outer locks lean toward your skills. Each ring
+  always has one gate that's open or peat with a spitter beside it.
+- Bombs (F) open any lock. You start with one, and they drop and are sold.
+- Runs save at every door and on pausing, with Continue on the title. Death clears it.
+- Lava, water that gives off gas when charged, steam that rains back down, moss that
+  creeps along wet rock. Foes gain health with each ring.
+
+Not built: a design pass on archetypes, and tuning for a long run, which has never been
+played end to end by a person. The starting room is always on the top edge.
 
 ## Ideas Carl is happy with so far
 

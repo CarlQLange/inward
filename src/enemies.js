@@ -1,5 +1,5 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
-import { M, props } from './materials.js'
+import { M } from './materials.js'
 import { energize, ignite, matAt, puff, setCell } from './world.js'
 import { cell, cellsUnder, centre, hitsSolid, inWater, move, solidAt, WORLD_PX } from './physics.js'
 import { burst, hurt } from './combat.js'
@@ -288,5 +288,3 @@ export const clampToRoom = e => {
   e.x = Math.max(0, Math.min(ROOM * BLOCK - e.w, e.x))
   e.y = Math.max(0, Math.min(ROOM * BLOCK - e.h, e.y))
 }
-
-export const isFlammableGas = m => props(m).gas === true && Boolean(props(m).flammability)

@@ -39,6 +39,34 @@ export const persist = () => {
   }
 }
 
+const RUN_KEY = 'block-run-current'
+
+export const saveRun = run => {
+  try {
+    localStorage.setItem(RUN_KEY, JSON.stringify(run))
+  } catch {
+    return
+  }
+}
+
+export const loadRun = () => {
+  try {
+    return JSON.parse(localStorage.getItem(RUN_KEY))
+  } catch {
+    return null
+  }
+}
+
+export const clearRun = () => {
+  try {
+    localStorage.removeItem(RUN_KEY)
+  } catch {
+    return
+  }
+}
+
+export const hasRun = () => loadRun() !== null
+
 export const recordRun = ({ score, chainPeak, roomReached, reachedCore, worldKills }) => {
   const newBest = score > save.best
   Object.assign(save, {

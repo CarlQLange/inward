@@ -19,6 +19,7 @@ const KEYS = {
   Escape: 'pause', KeyP: 'pause',
   Tab: 'skills', KeyI: 'skills',
   KeyM: 'map',
+  KeyF: 'bomb',
 }
 
 await loadSprites()
