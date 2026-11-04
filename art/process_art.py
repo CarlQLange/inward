@@ -76,4 +76,8 @@ OUT.mkdir(exist_ok=True)
 CREATURE_SIZES = {i: 14 for i in range(16)} | {3: 20, 4: 13, 5: 13, 6: 14, 7: 12, 8: 15, 9: 16, 10: 15, 11: 15, 12: 15, 13: 28, 14: 15, 15: 16}
 build('creatures.png', 'creatures', 28, CREATURE_SIZES, 6)
 build('icons.png', 'icons', 16, 14, 5)
+build('icons2.png', 'icons2', 16, 14, 5)
+build('icons3.png', 'icons3', 16, 14, 5)
+build('icons4.png', 'icons4', 16, 14, 5)
+build('creatures2.png', 'creatures2', 28, {i: 15 for i in range(16)}, 6)
 build('tiles.png', 'tiles', 8, 8, 4, edged)

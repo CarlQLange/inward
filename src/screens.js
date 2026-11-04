@@ -7,6 +7,7 @@ import { knownNotes, save } from './store.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
+import { RELIC_BY_ID } from './relics.js'
 
 const GREEN = '#76d648'
 const DIM = '#3d7a3c'
@@ -91,7 +92,7 @@ const CONTROLS = [
   ['DOWN', 'CROUCH, OR AIM DOWN IN AIR'],
   ['Z OR SPACE', 'JUMP, LEAP OUT OF LIQUID'],
   ['X', 'SHOOT'],
-  ['C V B', 'SKILLS'],
+  ['C V B N', 'SKILLS'],
   ['F', 'THROW A BOMB'],
   ['TAB', 'SKILLS PAGE'],
   ['M', 'MAP'],
@@ -134,34 +135,56 @@ const drawSkills = (ctx, g, menu) => {
   sheet(ctx, menu.title)
   const p = g.player
   for (let slot = 0; slot < TUNING.player.skillSlots; slot++) {
-    const top = ORIGIN.y + 34 + slot * 52
+    const top = ORIGIN.y + 32 + slot * 26
     const skill = p.skills[slot]
-    panel(ctx, ORIGIN.x + 14, top, 24, 24, skill ? GREEN : FAINT)
-    drawText(ctx, 'CVB'[slot], ORIGIN.x + 24, top + 28, skill ? GREEN : FAINT)
+    const on = slot === menu.slot && skill
+    panel(ctx, ORIGIN.x + 12, top, 22, 22, on ? YELLOW : skill ? GREEN : FAINT)
+    drawText(ctx, 'CVBN'[slot], ORIGIN.x + 38, top + 2, skill ? (on ? YELLOW : GREEN) : FAINT)
     if (!skill) {
-      drawText(ctx, 'EMPTY', ORIGIN.x + 46, top + 2, FAINT)
+      drawText(ctx, 'EMPTY', ORIGIN.x + 38, top + 10, FAINT)
       continue
     }
-    ctx.drawImage(SPRITES.icons[skill.kind], ORIGIN.x + 18, top + 4)
-    drawText(ctx, SKILL_NAMES[skill.kind], ORIGIN.x + 46, top, WHITE)
-    wrapText(SKILL_DETAILS[skill.kind], 40).forEach((line, n) => drawText(ctx, line, ORIGIN.x + 46, top + 7 + n * 6, PALE))
-    TREES[skill.kind].forEach((node, n) => {
-      const owned = p.upgrades.has(node.id)
-      const y = top + 22 + n * 12
-      ctx.fillStyle = owned ? YELLOW : FAINT
-      ctx.fillRect(ORIGIN.x + 46, y + 1, 3, 3)
-      drawText(ctx, node.name, ORIGIN.x + 52, y, owned ? YELLOW : DIM)
-      drawText(ctx, node.text, ORIGIN.x + 52, y + 6, owned ? PALE : FAINT)
-    })
+    ctx.drawImage(SPRITES.icons[skill.kind], ORIGIN.x + 15, top + 3)
+    drawText(ctx, SKILL_NAMES[skill.kind], ORIGIN.x + 38, top + 10, on ? YELLOW : WHITE)
   }
+  const chosen = p.skills[menu.slot]
+  if (chosen) {
+    const left = ORIGIN.x + 92
+    wrapText(SKILL_DETAILS[chosen.kind], 28).forEach((line, n) => drawText(ctx, line, left, ORIGIN.y + 34 + n * 7, PALE))
+    TREES[chosen.kind].forEach((node, n) => {
+      const owned = p.upgrades.has(node.id)
+      const y = ORIGIN.y + 64 + n * 28
+      ctx.fillStyle = owned ? YELLOW : FAINT
+      ctx.fillRect(left, y + 1, 3, 3)
+      drawText(ctx, node.name, left + 6, y, owned ? YELLOW : DIM)
+      wrapText(node.text, 26).forEach((line, m) => drawText(ctx, line, left + 6, y + 7 + m * 6, owned ? PALE : DIM))
+    })
+  } else {
+    drawText(ctx, 'NOTHING LEARNED YET', ORIGIN.x + 92, ORIGIN.y + 60, DIM)
+  }
+  drawList(ctx, menu, ORIGIN.y + 196)
+}
+
+const drawRelics = (ctx, g, menu) => {
+  sheet(ctx, menu.title)
+  const owned = [...g.player.relics].map(id => RELIC_BY_ID[id])
+  const perPage = 10
+  menu.scroll = Math.min(menu.scroll, Math.max(0, owned.length - perPage))
+  if (owned.length === 0) centred(ctx, 'YOU CARRY NOTHING YET.', ORIGIN.y + 90, DIM)
+  owned.slice(menu.scroll, menu.scroll + perPage).forEach((relic, i) => {
+    const y = ORIGIN.y + 34 + i * 16
+    ctx.drawImage(SPRITES.icons[relic.icon], ORIGIN.x + 14, y - 2)
+    drawText(ctx, relic.name, ORIGIN.x + 34, y, WHITE)
+    drawText(ctx, relic.text, ORIGIN.x + 34, y + 6, PALE)
+  })
   drawList(ctx, menu, ORIGIN.y + 196)
 }
 
 const MATERIAL_ORDER = [
   M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.METAL, M.SCRAP, M.SAND, M.WATER,
-  M.OIL, M.LAVA, M.ICE, M.SMOKE, M.STEAM, M.METHANE, M.VOLATILE, M.BRICK, M.GATE, M.BEDROCK,
+  M.OIL, M.LAVA, M.ACID, M.VINE, M.SOURCE, M.ICE, M.SMOKE, M.STEAM, M.METHANE, M.VOLATILE, M.BRICK, M.GATE, M.BEDROCK,
 ]
-const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS TO ROCK'], ['bubble', 'SPLITS INTO GAS'], ['grow', 'GROWS NEAR WATER'], ['rain', 'RAINS BACK DOWN']]
+const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS TO ROCK'], ['bubble', 'SPLITS INTO GAS'], ['grow', 'GROWS NEAR WATER'], ['rain', 'RAINS BACK DOWN'], ['dissolve', 'DISSOLVES IN ACID']]
 
 const noteLines = () => {
   const materials = MATERIAL_ORDER.filter(m => knownNotes.has(`seen:${m}`)).map(m => ({
@@ -182,7 +205,7 @@ const TILE_NAME = {
   [M.SCRAP]: 'scrap', [M.SAND]: 'sand', [M.ICE]: 'ice', [M.VOLATILE]: 'volatile', [M.BEDROCK]: 'bedrock',
   [M.BRICK]: 'brick', [M.GATE]: 'gate',
 }
-const SWATCH = { [M.LAVA]: '#ff7a1c', [M.WATER]: '#10606e', [M.OIL]: '#5a3a64', [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#a878c8' }
+const SWATCH = { [M.ACID]: '#7fd03a', [M.VINE]: '#4f9c3a', [M.SOURCE]: '#70767a', [M.LAVA]: '#ff7a1c', [M.WATER]: '#10606e', [M.OIL]: '#5a3a64', [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#a878c8' }
 
 const drawNotes = (ctx, menu) => {
   sheet(ctx, menu.title)
@@ -274,11 +297,13 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
     for (let x = 0; x < 15; x++) {
       const room = g.rooms[keyOf(x, y)]
       const seen = room?.visited
+      const known = seen || g.player.relics.has('eye')
       const here = x === g.x && y === g.y
       const core = x === 7 && y === 7
       ctx.fillStyle = here ? WHITE : seen ? GREEN : core ? YELLOW : MAP_RINGS[ringOf(x, y)]
       ctx.fillRect(left + x * pitch, top + y * pitch, cellSize, cellSize)
-      if (!seen) continue
+      if (!seen && !known) continue
+      if (!room) continue
       for (const [dir, link] of Object.entries(room.links)) {
         const [dx, dy] = STEPS[dir]
         const lock = link.lock && room.doors[dir] && lockStands(room, dir)
@@ -311,6 +336,7 @@ const drawMap = (ctx, g, menu) => {
 
 const PAGES = {
   map: (ctx, g, menu) => drawMap(ctx, g, menu),
+  relics: (ctx, g, menu) => drawRelics(ctx, g, menu),
   title: (ctx, g, menu) => drawTitle(ctx, g, menu),
   pause: (ctx, g, menu) => drawPause(ctx, menu),
   confirm: (ctx, g, menu) => drawConfirm(ctx, menu),
@@ -320,7 +346,7 @@ const PAGES = {
   skills: (ctx, g, menu) => drawSkills(ctx, g, menu),
   notes: (ctx, g, menu) => drawNotes(ctx, menu),
   summary: (ctx, g, menu) => drawSummary(ctx, g, menu),
-  offer: (ctx, g, menu) => drawCards(ctx, menu, menu.items.map(item => cardFor(item.option))),
+  offer: (ctx, g, menu) => drawCards(ctx, menu, menu.items.map(item => item.card ?? cardFor(item.option))),
   swap: (ctx, g, menu) => drawCards(ctx, menu, menu.items.map(item => item.card)),
 }
 

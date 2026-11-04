@@ -11,7 +11,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const WATER_BOTTOM = 25
 const LOWEST_FLOOR = 23
 const HIGHEST_FLOOR = 9
-const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B'])
+const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B', 'W'])
 
 const walkFloors = (rand, range, pitChance) => {
   const segments = []
@@ -85,7 +85,7 @@ const fillPits = (grid, pits, floors, oilChance, lavaChance, rand) => {
   }
 }
 
-const addLedges = (grid, floors, ceilings, range, rand, count) => {
+const addLedges = (grid, floors, ceilings, range, rand, count, theme) => {
   for (let i = 0; i < count; i++) {
     const length = range(3, 5)
     const x = range(2, ROOM - 3 - length)
@@ -93,22 +93,22 @@ const addLedges = (grid, floors, ceilings, range, rand, count) => {
     const y = low - range(3, 5)
     const roof = Math.max(...ceilings.slice(x, x + length))
     if (y <= roof + 3) continue
-    const material = rand() < 0.65 ? 'w' : 'R'
+    const material = rand() < 0.7 ? theme.ledge : 'R'
     for (let d = 0; d < length; d++) if (grid[y][x + d] === '.') grid[y][x + d] = material
   }
 }
 
-const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, range) => {
+const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, range, theme) => {
   const help = 1 - depth
   for (const s of segments) {
-    for (let x = s.from; x <= s.to; x++) if (rand() < 0.55) grid[s.floor][x] = 'm'
+    for (let x = s.from; x <= s.to; x++) if (rand() < 0.6) grid[s.floor][x] = theme.top
   }
   for (let x = 1; x < ROOM - 1; x++) {
     const roof = ceilings[x] - 1
     if (roof < 1 || grid[roof][x] !== 'R') continue
     if (rand() < 0.5 + (lean.fuel ? help * 0.3 : 0)) grid[roof][x] = 'p'
     if (roof > 1 && grid[roof - 1][x] === 'R' && rand() < 0.25) grid[roof - 1][x] = 'p'
-    if (depth > 0.35 && rand() < depth * 0.14) grid[roof][x] = 'V'
+    if (rand() < (theme.volatile ?? 0) + (depth > 0.35 ? depth * 0.1 : 0)) grid[roof][x] = 'V'
   }
   for (let run = range(1, 2); run > 0; run--) {
     const x = range(4, ROOM - 7)
@@ -132,7 +132,7 @@ const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, ra
     for (let y = left; y <= surface + 1; y++) grid[y][pit.from - 1] = 'M'
     for (let x = pit.from - 1; x >= 1 && floors[x] === left; x--) grid[left][x] = 'M'
   }
-  if (depth > 0.45) {
+  if (rand() < (theme.gas ?? 0) + (depth > 0.45 ? 0.5 : 0)) {
     for (let pocket = range(1, 3); pocket > 0; pocket--) {
       const cx = range(4, ROOM - 5)
       const top = ceilings[cx]
@@ -143,31 +143,33 @@ const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, ra
   }
 }
 
-const ROSTER = [
-  { kind: 'crawler', from: 0, weight: 3 },
-  { kind: 'spitter', from: 0.2, weight: 2 },
-  { kind: 'bat', from: 0.2, weight: 2 },
-  { kind: 'spore', from: 0.25, weight: 2 },
-  { kind: 'slug', from: 0.25, weight: 2 },
+export const THEMES = [
+  { name: 'THE MOSS CAVES', top: 'm', ledge: 'w', skin: null, pits: 0, roster: ['crawler', 'crawler', 'spitter', 'bat'] },
+  { name: 'THE DROWNED HALLS', top: 'm', ledge: 'R', skin: 'brick', pits: 0.3, oil: 0.2, roster: ['crawler', 'slug', 'bat', 'imp', 'gasbag'] },
+  { name: 'THE PEAT BOG', top: 'p', ledge: 'w', skin: 'fungus', pits: 0.1, oil: 0.3, roster: ['spitter', 'spore', 'slug', 'gasbag', 'emberbat'] },
+  { name: 'THE OLD WORKINGS', top: 'M', ledge: 'M', skin: 'brick', pits: -0.1, gas: 0.5, scrap: 0.4, roster: ['turret', 'crawler', 'bomber', 'crab', 'gasbag'] },
+  { name: 'THE FOUNDRY', top: 'M', ledge: 'M', skin: 'charred', pits: 0.15, lava: 0.7, scrap: 0.3, roster: ['turret', 'emberbat', 'bomber', 'crab', 'slime'] },
+  { name: 'THE ICE SHAFTS', top: 'I', ledge: 'I', skin: 'ice', pits: 0.2, roster: ['imp', 'imp', 'crab', 'slime', 'bat'] },
+  { name: 'THE CRYSTAL HOLLOW', top: 'R', ledge: 'V', skin: 'crystal', pits: 0.1, gas: 0.6, volatile: 0.2, roster: ['spore', 'emberbat', 'bomber', 'turret', 'slime'] },
+  { name: 'THE CORE', top: 'R', ledge: 'R', skin: 'charred', pits: 0, lava: 0.5, volatile: 0.1, roster: ['emberbat', 'bomber', 'turret', 'crab', 'slime', 'imp'] },
 ]
 
-const pickFoe = (depth, rand, enemies) => {
+const pickFoe = (theme, rand, enemies) => {
   const spitters = enemies.filter(e => e.kind === 'spitter').length
-  const open = ROSTER.filter(r => depth >= r.from && (r.kind !== 'spitter' || spitters < 2))
-  let roll = rand() * open.reduce((n, r) => n + r.weight, 0)
-  return open.find(r => (roll -= r.weight) <= 0)?.kind ?? 'crawler'
+  const open = theme.roster.filter(kind => kind !== 'spitter' || spitters < 2)
+  return open[Math.floor(rand() * open.length)] ?? 'crawler'
 }
 
 const place = (x, row, kind) => ({ kind, x: x * BLOCK, row })
 
-const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) => {
+const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings, theme, floors) => {
   const enemies = []
   for (const s of segments.slice(1)) {
     const chance = 0.25 + depth * 0.45
     for (let n = 0; n < 2; n++) {
       if (rand() < chance * (n ? 0.5 : 1)) {
-        const kind = pickFoe(depth, rand, enemies)
-        const flying = kind === 'bat' || kind === 'spore'
+        const kind = pickFoe(theme, rand, enemies)
+        const flying = ['bat', 'spore', 'emberbat', 'gasbag'].includes(kind)
         const x = range(s.from, Math.max(s.from, s.to - 1))
         enemies.push(place(x, flying ? s.floor - 4 : s.floor, kind))
       }
@@ -182,7 +184,7 @@ const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) 
     enemies.push(place(x, Math.min(ROOM - 2, ceilings[x]), 'worm'))
   }
   for (const s of segments.slice(1, -1)) {
-    if (rand() < (lean.scrap ? 0.9 : 0.5)) grid[s.floor - 1][range(s.from, s.to)] = 'S'
+    if (rand() < (lean.scrap ? 0.9 : 0.5) + (theme.scrap ?? 0)) grid[s.floor - 1][range(s.from, s.to)] = 'S'
   }
   return enemies
 }
@@ -322,7 +324,48 @@ const applyLocks = (grid, links, doors, layout, enemies) => {
   }
 }
 
-const attempt = ({ seed, depth, links, lean, special }) => {
+const addVault = (grid, floors, ceilings, range) => {
+  for (let tries = 0; tries < 30; tries++) {
+    const x = range(3, ROOM - 8)
+    const y = range(2, ROOM - 7)
+    const clear = () => {
+      for (let cy = y - 1; cy <= y + 4; cy++) {
+        for (let cx = x - 1; cx <= x + 5; cx++) if (grid[cy]?.[cx] !== 'R') return false
+      }
+      return true
+    }
+    if (!clear()) continue
+    for (let cy = y; cy <= y + 2; cy++) for (let cx = x; cx <= x + 3; cx++) grid[cy][cx] = '.'
+    return { x: x + 1, row: y + 3 }
+  }
+  return null
+}
+
+const EVENT_SETUP = {
+  flood: (grid, layout, ceilings, range) => {
+    for (let n = 0; n < 2; n++) {
+      const x = range(3, ROOM - 4)
+      const y = Math.max(1, ceilings[x] - 1)
+      grid[y][x] = 'W'
+    }
+  },
+  gasworks: (grid, layout, ceilings, range) => {
+    for (let n = 0; n < 6; n++) {
+      const cx = range(3, ROOM - 4)
+      const top = ceilings[cx]
+      for (let y = top; y < top + 3; y++) for (let x = cx - 2; x <= cx + 2; x++) if (grid[y]?.[x] === '.') grid[y][x] = 'g'
+    }
+  },
+  collapse: (grid, layout, ceilings) => {
+    for (let x = 1; x < ROOM - 1; x++) {
+      const y = ceilings[x] - 1
+      if (y > 1 && grid[y][x] === 'R') grid[y][x] = 'p'
+      if (y > 2 && grid[y - 1][x] === 'R') grid[y - 1][x] = 's'
+    }
+  },
+}
+
+const attempt = ({ seed, depth, links, lean, special, theme }) => {
   const rand = seeded(seed)
   const range = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1))
   const help = 1 - depth
@@ -330,13 +373,14 @@ const attempt = ({ seed, depth, links, lean, special }) => {
   const grid = Array.from({ length: ROOM }, (_, y) =>
     Array.from({ length: ROOM }, (_, x) => (x === 0 || y === 0 || x === ROOM - 1 || y === ROOM - 1 ? '#' : 'R')))
 
-  const layout = walkFloors(rand, range, 0.45 + (lean.water ? help * 0.3 : 0))
+  const layout = walkFloors(rand, range, clamp(0.45 + (theme.pits ?? 0) + (lean.water ? help * 0.3 : 0), 0, 0.95))
   const floors = floorsByColumn(layout)
   const ceilings = carve(grid, floors, range)
-  fillPits(grid, layout.pits, floors, depth > 0.2 || lean.fuel ? 0.35 + (lean.fuel ? help * 0.3 : 0) : 0, depth > 0.5 ? depth * 0.5 : 0, rand)
-  addLedges(grid, floors, ceilings, range, rand, range(2, 4))
-  dress(grid, layout, floors, ceilings, depth, lean, rand, range)
-  const enemies = populate(layout, depth, lean, rand, range, grid, ceilings)
+  fillPits(grid, layout.pits, floors, (theme.oil ?? 0) + (lean.fuel ? help * 0.3 : 0.1), theme.lava ?? 0, rand)
+  addLedges(grid, floors, ceilings, range, rand, range(2, 5), theme)
+  dress(grid, layout, floors, ceilings, depth, lean, rand, range, theme)
+  const enemies = populate(layout, depth, lean, rand, range, grid, ceilings, theme, floors)
+  EVENT_SETUP[special.event]?.(grid, layout, ceilings, range)
 
   const { doors, anchors } = addDoors(grid, links, layout, floors)
   addVerticalDoors(grid, links, layout, floors, doors, anchors, rand)
@@ -369,6 +413,21 @@ const attempt = ({ seed, depth, links, lean, special }) => {
     wares.push({ kind: 'bomb', x: mark(midway, 2) * BLOCK, row: midway.floor })
     if (midway.to - midway.from >= 4) wares.push({ kind: 'heart', x: mark(midway, 4) * BLOCK, row: midway.floor })
     if (midway.to - midway.from >= 5) wares.push({ kind: 'upgrade', x: mark(midway, 5) * BLOCK, row: midway.floor })
+    wares.push({ kind: 'relic', x: mark(first, 1) * BLOCK, row: first.floor })
+  }
+  if (special.event === 'nest') enemies.push(place(Math.max(midway.from, midway.to - 2), midway.floor, 'nest'))
+  if (special.event === 'altar') cards.push({ kind: 'altar', x: mark(midway, 1) * BLOCK, row: midway.floor })
+  if (special.event === 'chest') {
+    const x = mark(midway, 1)
+    if (rand() < 0.3) enemies.push(place(x, midway.floor, 'mimic'))
+    else cards.push({ kind: 'chest', x: x * BLOCK, row: midway.floor })
+  }
+  if (special.event === 'vault') {
+    const vault = addVault(grid, floors, ceilings, range)
+    if (vault) cards.push({ kind: 'chest', x: vault.x * BLOCK, row: vault.row })
+  }
+  if (special.event === 'arena') {
+    for (const s of layout.segments.slice(1)) enemies.push(place(s.from, s.floor, pickFoe(theme, rand, enemies)))
   }
   if (special.hermit) enemies.push(place(mark(first, 2), first.floor, 'hermit'))
   if (special.miner) enemies.push(place(mark(last, 2), last.floor, 'miner'))
@@ -384,10 +443,10 @@ const attempt = ({ seed, depth, links, lean, special }) => {
 
 const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }
 
-export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {} }) => {
-  let result = attempt({ seed, depth, links, lean, special })
+export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {}, theme = THEMES[0] }) => {
+  let result = attempt({ seed, depth, links, lean, special, theme })
   for (let tries = 1; tries < 60 && !result.ok; tries++) {
-    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special })
+    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special, theme })
   }
   return { ...result.definition, passed: result.ok }
 }

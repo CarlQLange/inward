@@ -1,7 +1,7 @@
 import { TUNING } from './config.js'
 import { props } from './materials.js'
-import { burningAt, chargedAt, crushingAt, lavaAt, matAt } from './world.js'
-import { cellsUnder, centre } from './physics.js'
+import { acidAt, burningAt, chargedAt, crushingAt, explode, lavaAt, matAt, vineAt } from './world.js'
+import { cell, cellsUnder, centre } from './physics.js'
 
 export const burst = (g, x, y, colour, count) => {
   for (let i = 0; i < count; i++) {
@@ -18,6 +18,10 @@ export const hurt = (g, e, amount, source = 'world') => {
   e.iframes = isPlayer ? TUNING.player.iframes : TUNING.enemyIframes
   if (!isPlayer) e.lastSource = source
   if (isPlayer) g.shake = Math.max(g.shake, 2)
+  if (isPlayer && e.relics.has('plate')) {
+    const here = centre(e)
+    explode(g.world, cell(here.x), cell(here.y), 1)
+  }
   const c = centre(e)
   burst(g, c.x, c.y, isPlayer ? 'white' : 'pale', 5)
 }
@@ -37,9 +41,11 @@ export const applyHazards = (g, e, dt) => {
   }
   const burning = cellsUnder({ x: e.x, y: e.y, w: e.w, h: e.h + 1 })
   if (!e.fireproof && burning.some(([x, y]) => burningAt(world, x, y))) hurt(g, e, 1)
-  if (burning.some(([x, y]) => lavaAt(world, x, y))) hurt(g, e, 2)
+  if (!e.fireproof && burning.some(([x, y]) => lavaAt(world, x, y))) hurt(g, e, 2)
+  if (burning.some(([x, y]) => acidAt(world, x, y))) hurt(g, e, 1)
+  if (world.thorns && e !== g.player && cellsUnder(e).some(([x, y]) => vineAt(world, x, y))) hurt(g, e, 1)
   const inSmoke = cellsUnder(e).some(([x, y]) => props(matAt(world, x, y)).harmful)
-  e.smoked = inSmoke ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
+  e.smoked = inSmoke && !e.smokeproof ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
   if (e.smoked > TUNING.player.smokeTolerance) {
     hurt(g, e, 1)
     e.smoked = 0

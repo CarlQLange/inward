@@ -12,6 +12,8 @@ export const matAt = (w, x, y) => (inside(x, y) ? w.mat[idx(x, y)] : M.BEDROCK)
 export const burningAt = (w, x, y) => inside(x, y) && w.burn[idx(x, y)] > 0
 export const chargedAt = (w, x, y) => inside(x, y) && w.charge[idx(x, y)] > 0
 export const lavaAt = (w, x, y) => inside(x, y) && w.mat[idx(x, y)] === M.LAVA
+export const acidAt = (w, x, y) => inside(x, y) && w.mat[idx(x, y)] === M.ACID
+export const vineAt = (w, x, y) => inside(x, y) && w.mat[idx(x, y)] === M.VINE
 export const crushingAt = (w, x, y) => inside(x, y) && w.crushing[idx(x, y)] === 1
 
 export const restoreWorld = (encoded, overloaded, drains) => {
@@ -81,10 +83,11 @@ export const puff = (w, x, y, mat, range) => {
   if (matAt(w, x, y) === M.EMPTY) place(w, idx(x, y), mat, between(range))
 }
 
-export const setCell = (w, x, y, mat) => {
-  if (inside(x, y)) place(w, idx(x, y), mat)
+export const setCell = (w, x, y, mat, life = 0) => {
+  if (inside(x, y)) place(w, idx(x, y), mat, life)
 }
 
+const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE])
 const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.SCRAP]
 
 const flammabilityOf = (w, mat) => {
@@ -220,6 +223,48 @@ const stepLava = (w, x, y, dt) => {
   return Math.random() > T.lavaFlow
 }
 
+const stepAcid = (w, x, y) => {
+  const i = idx(x, y)
+  for (const [dx, dy] of N4) {
+    const nx = x + dx
+    const ny = y + dy
+    const other = matAt(w, nx, ny)
+    if (other === M.WATER) {
+      place(w, i, M.WATER)
+      return true
+    }
+    if (ACID_EATS.has(other) && Math.random() < T.acidEat) {
+      note(w, 'dissolve', other)
+      place(w, idx(nx, ny), M.EMPTY)
+      if (Math.random() < T.acidSpent) {
+        place(w, i, M.EMPTY)
+        return true
+      }
+    }
+  }
+  return false
+}
+
+const stepSource = (w, x, y, dt) => {
+  const i = idx(x, y)
+  w.life[i] -= dt
+  if (w.life[i] <= 0 || matAt(w, x, y + 1) !== M.EMPTY || Math.random() > T.sourceFlow) return
+  place(w, idx(x, y + 1), M.WATER)
+}
+
+const growVine = (w, x, y) => {
+  const i = idx(x, y)
+  if (w.life[i] <= 0) return
+  const options = [[0, -1], [0, -1], [0, -1], [1, 0], [-1, 0]].filter(([dx, dy]) => matAt(w, x + dx, y + dy) === M.EMPTY)
+  if (options.length === 0) {
+    w.life[i] = 0
+    return
+  }
+  const [dx, dy] = options[Math.floor(Math.random() * options.length)]
+  place(w, idx(x + dx, y + dy), M.VINE, w.life[i] - 1)
+  w.life[i] = 0
+}
+
 const growMoss = w => {
   const x = 1 + Math.floor(Math.random() * (ROOM - 2))
   const y = 1 + Math.floor(Math.random() * (ROOM - 2))
@@ -246,7 +291,11 @@ const stepFluids = (w, dt) => {
       if (p.falls && w.mat[i] !== M.EMPTY) fall(w, x, y)
       else if (p.hot) {
         if (!stepLava(w, x, y, dt)) flow(w, x, y)
-      } else if (p.liquid) flow(w, x, y)
+      } else if (p.corrosive) {
+        if (!stepAcid(w, x, y)) flow(w, x, y)
+      } else if (p.source) stepSource(w, x, y, dt)
+      else if (p.climbable) growVine(w, x, y)
+      else if (p.liquid) flow(w, x, y)
     }
   }
   for (let y = 1; y < ROOM - 1; y++) {
@@ -283,7 +332,8 @@ export const explode = (w, x, y, reach) => {
 const burnOut = (w, x, y) => {
   const i = idx(x, y)
   const mat = w.mat[i]
-  const { burnsTo = M.ASH, blast } = props(mat)
+  const { burnsTo = M.ASH, blast: own } = props(mat)
+  const blast = own ?? (w.tinder && mat === M.VINE ? 1 : 0)
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
   if (blast) {
     note(w, 'blast', mat)

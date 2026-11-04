@@ -111,12 +111,21 @@ effects must spread across blocks visibly and be readable without text.
 He asked to be surprised, so these were agent choices. Treat them as open to change.
 
 - The world is four-shade green until the first card, then colour floods in.
-- Six skills (bolt, repel, ember, frost, hammer, gust), each with two upgrades.
-  Three slots. Skills are only verbs on world rules, and no synergy is written anywhere.
-- Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, smoke,
-  steam, methane, and volatile crystal. New ones appear with depth.
+- 28 skills with three upgrades each, and four slots. Carl called the first six boring, so
+  they now span movement (blink, grapple, dash, rewind), terrain (mason, seed, spring,
+  acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror), helpers
+  (drone, rod, mine) and skills acting on skills (echo, pact). Skills are verbs on world
+  rules, and no synergy is written anywhere.
+- 27 relics, from chests, altars, mimics and the shop. They change your gun, your movement
+  and what can hurt you, such as fire immunity making fire a toy.
+- Eight region themes change materials, tiles and foes. Room events: arena, flood,
+  gasworks, collapse, vault, nest, altar and chests. Elite foes can burn, shock or be armoured.
+- Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, lava, acid,
+  vine, brick, smoke, steam, methane, and volatile crystal.
 - Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
-  (electrifies water), worm (digs), guardian (stomps loose the ceiling).
+  (electrifies water), worm (digs), guardian (stomps loose the ceiling), turret, bomber, imp
+  (freezes water), ember bat (lights things), slime (leaves acid), shield crab, nest, mimic,
+  gasbag. Foes can be charmed and then fight each other.
 - Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
 - Score with chains. Kills by the world score double and give triple experience.
 - In the core room rock burns and conducts, and the core drifts toward you.

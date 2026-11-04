@@ -48,7 +48,10 @@ const TILE_INDEX = {
   bedrock: [7], sand: [8], volatile: [9], gate: [11], ice: [15],
 }
 const ICON_INDEX = {
-  bolt: 0, repel: 1, ember: 2, frost: 7, hammer: 5, gust: 6, coin: 10, heart: 11, bomb: 9, rift: 15,
+  icons: { bolt: 0, repel: 1, ember: 2, spring: 3, seed: 4, hammer: 5, gust: 6, frost: 7, acid: 8, bomb: 9, coin: 10, heart: 11, rift: 15 },
+  icons2: { blink: 0, grapple: 1, dash: 2, rewind: 3, mason: 4, melt: 5, alchemy: 6, well: 7, swap: 8, stop: 9, charm: 10, decoy: 11, drone: 12, rod: 13, mine: 14, roar: 15 },
+  icons3: { mirror: 0, echo: 1, pact: 2, fireboots: 3, rubber: 4, gills: 5, springs: 6, claws: 7, feather: 8, coinmagnet: 9, sack: 10, hands: 11, battery: 12, plate: 13, phoenix: 14, incendiary: 15 },
+  icons4: { shock: 0, frostshot: 1, pierce: 2, spread: 3, ricochet: 4, stomp: 5, chest: 6, altar: 7, gem: 8, skull: 9, crown: 10, acidskull: 11, wind: 12, dice: 13, eye: 14, chain: 15 },
 }
 
 const loadImage = src => new Promise((resolve, reject) => {
@@ -91,17 +94,23 @@ export const SPRITES = {
 }
 
 export const loadSprites = async () => {
-  const [tiles, creatures, icons] = await Promise.all(
-    ['tiles', 'creatures', 'icons'].map(name => loadImage(`assets/${name}.png`)),
-  )
+  const sheets = ['tiles', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4']
+  const loaded = Object.fromEntries(await Promise.all(sheets.map(async name => [name, await loadImage(`assets/${name}.png`)])))
+  const { tiles, creatures, creatures2 } = loaded
   for (const [name, indices] of Object.entries(TILE_INDEX)) {
     SPRITES.tiles[name] = indices.map(i => cutTile(tiles, i, 8))
   }
   SPRITES.extra.bones = cutTile(tiles, 13, 8)
   SPRITES.extra.fungus = cutTile(tiles, 14, 8)
-  SPRITES.creatures = Array.from({ length: 16 }, (_, i) => {
-    const sprite = cutTile(creatures, i, 28)
+  SPRITES.extra.charred = cutTile(tiles, 10, 8)
+  SPRITES.extra.brick = cutTile(tiles, 12, 8)
+  SPRITES.extra.ice = cutTile(tiles, 15, 8)
+  SPRITES.extra.crystal = cutTile(tiles, 9, 8)
+  SPRITES.creatures = [creatures, creatures2].flatMap(sheet => Array.from({ length: 16 }, (_, i) => {
+    const sprite = cutTile(sheet, i, 28)
     return [sprite, flipped(sprite)]
-  })
-  for (const [name, index] of Object.entries(ICON_INDEX)) SPRITES.icons[name] = cutTile(icons, index, 16)
+  }))
+  for (const [sheet, names] of Object.entries(ICON_INDEX)) {
+    for (const [name, index] of Object.entries(names)) SPRITES.icons[name] = cutTile(loaded[sheet], index, 16)
+  }
 }

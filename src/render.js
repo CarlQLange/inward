@@ -6,6 +6,9 @@ import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMapGrid, drawMenus, drawToast } from './screens.js'
 import { save } from './store.js'
+import { RELIC_BY_ID } from './relics.js'
+import { THEMES } from './generate.js'
+import { keyOf } from './map.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -19,7 +22,7 @@ const ROOM_PX = ROOM * BLOCK
 const TILE = {
   [M.BEDROCK]: 'bedrock', [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat',
   [M.WOOD]: 'wood', [M.METAL]: 'metal', [M.GATE]: 'gate', [M.SAND]: 'sand',
-  [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile', [M.ICE]: 'ice', [M.BRICK]: 'brick',
+  [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile', [M.ICE]: 'ice', [M.BRICK]: 'brick', [M.SOURCE]: 'metal',
 }
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
@@ -42,9 +45,10 @@ const makeBackdrop = () => {
 
 const backdrop = makeBackdrop()
 
-const tileFor = (name, x, y, depth) => {
+const tileFor = (name, x, y, depth, skin) => {
   const h = hash(x, y)
   if (name === 'rock') {
+    if (skin && h % 5 !== 0) return SPRITES.extra[skin]
     if (depth > 0.5 && h % 6 === 0) return SPRITES.extra.fungus
     if (h % 13 === 0) return SPRITES.extra.bones
   }
@@ -56,14 +60,14 @@ const isBuried = (world, x, y) =>
   [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
     .every(([dx, dy]) => props(matAt(world, x + dx, y + dy)).solid)
 
-const drawSolids = (ctx, world, depth) => {
+const drawSolids = (ctx, world, depth, skin) => {
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
       if (m === M.ASH) ctx.drawImage(SPRITES.ash, x * BLOCK, y * BLOCK)
       const name = TILE[m]
       if (!name) continue
-      ctx.drawImage(tileFor(name, x, y, depth), x * BLOCK, y * BLOCK)
+      ctx.drawImage(tileFor(name, x, y, depth, skin), x * BLOCK, y * BLOCK)
       if (isBuried(world, x, y)) {
         ctx.fillStyle = 'rgba(5, 12, 10, 0.72)'
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
@@ -76,11 +80,18 @@ const drawLiquids = (ctx, world, time) => {
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
-      if (m !== M.WATER && m !== M.OIL && m !== M.LAVA) continue
-      ctx.fillStyle = { [M.WATER]: 'rgba(16, 72, 84, 0.78)', [M.OIL]: 'rgba(58, 34, 62, 0.92)', [M.LAVA]: '#d9481c' }[m]
+      if (m === M.VINE) {
+        ctx.fillStyle = '#4f9c3a'
+        ctx.fillRect(x * BLOCK + 3, y * BLOCK, 2, BLOCK)
+        ctx.fillStyle = '#8ad05a'
+        ctx.fillRect(x * BLOCK + (hash(x, y) % 2 ? 1 : 5), y * BLOCK + hash(y, x) % 6, 2, 2)
+        continue
+      }
+      if (m !== M.WATER && m !== M.OIL && m !== M.LAVA && m !== M.ACID) continue
+      ctx.fillStyle = { [M.WATER]: 'rgba(16, 72, 84, 0.78)', [M.OIL]: 'rgba(58, 34, 62, 0.92)', [M.LAVA]: '#d9481c', [M.ACID]: 'rgba(90, 190, 40, 0.85)' }[m]
       ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
       if (matAt(world, x, y - 1) === m) continue
-      ctx.fillStyle = { [M.WATER]: '#3f9aa2', [M.OIL]: '#a06ab0', [M.LAVA]: '#ffd24a' }[m]
+      ctx.fillStyle = { [M.WATER]: '#3f9aa2', [M.OIL]: '#a06ab0', [M.LAVA]: '#ffd24a', [M.ACID]: '#c8ff5a' }[m]
       for (let i = 0; i < BLOCK; i++) {
         const lift = Math.sin(time * 2.4 + (x * BLOCK + i) * 0.55) > 0.2 ? 0 : 1
         ctx.fillRect(x * BLOCK + i, y * BLOCK + lift, 1, 1)
@@ -149,6 +160,8 @@ const enemyFrame = (e, time) => {
   return SPRITES.creatures[sprite[index]][e.facing > 0 ? 0 : 1]
 }
 
+const ELITE_COLOURS = { burning: COLOURS.fire, charged: COLOURS.charge, armoured: COLOURS.pale }
+
 const drawEnemies = (ctx, g) => {
   for (const e of g.enemies) {
     if (e.iframes > 0 && Math.floor(g.time * 20) % 2) continue
@@ -160,6 +173,12 @@ const drawEnemies = (ctx, g) => {
       ctx.fillStyle = 'rgba(160, 230, 255, 0.5)'
       ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h)
     }
+    if (e.elite || e.ally) {
+      ctx.strokeStyle = e.ally ? COLOURS.gas : ELITE_COLOURS[e.elite]
+      ctx.lineWidth = 1
+      ctx.strokeRect(Math.round(e.x) - 0.5, Math.round(e.y) - 0.5, e.w + 1, e.h + 1)
+    }
+    if (e.lit) drawText(ctx, '!', e.x + e.w / 2 - 1, e.y - 8, COLOURS.fire)
     if (e.friendly && !e.spent && e.kind !== 'mole') {
       const bob = Math.round(Math.sin(g.time * 4))
       drawText(ctx, '?', e.x + e.w / 2 - 1, e.y - 8 + bob, COLOURS.charge)
@@ -168,7 +187,7 @@ const drawEnemies = (ctx, g) => {
 }
 
 const drawBolt = (ctx, bolt) => {
-  ctx.fillStyle = COLOURS.charge
+  ctx.fillStyle = COLOURS[bolt.colour] ?? COLOURS.charge
   bolt.points.slice(1).forEach((b, i) => {
     const a = bolt.points[i]
     const steps = Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)))
@@ -183,7 +202,7 @@ const drawProjectiles = (ctx, g) => {
   ctx.fillStyle = COLOURS.white
   for (const s of g.shots) ctx.fillRect(Math.round(s.x), Math.round(s.y), s.w, s.h)
   for (const f of g.fireballs) {
-    ctx.fillStyle = Math.floor(g.time * 14) % 2 ? COLOURS.fire : COLOURS.charge
+    ctx.fillStyle = f.acid ? '#8ae04a' : f.bomb ? COLOURS.pale : f.pellet ? COLOURS.magnet : Math.floor(g.time * 14) % 2 ? COLOURS.fire : COLOURS.charge
     ctx.fillRect(Math.round(f.x), Math.round(f.y), f.w, f.h)
   }
   for (const p of g.particles) {
@@ -210,6 +229,10 @@ const drawCards = (ctx, g) => {
       drawIcon(ctx, 'rift', card.x, card.y, 16)
       continue
     }
+    if (card.kind === 'chest' || card.kind === 'altar') {
+      drawIcon(ctx, card.kind, card.x, card.y, 12)
+      continue
+    }
     ctx.strokeStyle = GREEN
     ctx.lineWidth = 1
     ctx.strokeRect(card.x + 0.5, card.y + bob + 0.5, card.w - 1, card.h - 1)
@@ -219,13 +242,35 @@ const drawCards = (ctx, g) => {
 
 const drawWares = (ctx, g) => {
   for (const w of g.wares) {
-    drawIcon(ctx, { heart: 'heart', bomb: 'bomb' }[w.kind] ?? 'rift', w.x, w.y, 12)
+    drawIcon(ctx, { heart: 'heart', bomb: 'bomb' }[w.kind] ?? (w.relic ? RELIC_BY_ID[w.relic].icon : 'rift'), w.x, w.y, 12)
     drawText(ctx, w.price, w.x + 2, w.y - 7, g.gold >= w.price ? COLOURS.charge : COLOURS.pale)
   }
 }
 
 const drawPickups = (ctx, g) => {
   for (const c of g.pickups) drawIcon(ctx, c.kind, Math.round(c.x), Math.round(c.y), c.w)
+}
+
+const EFFECT_SPRITE = { decoy: 28, rod: 29, mine: 30, drone: 27, well: 31 }
+
+const drawEffects = (ctx, g) => {
+  for (const f of g.effects) {
+    if (f.kind === 'mirror') {
+      const c = g.player
+      ctx.strokeStyle = COLOURS.magnet
+      ctx.lineWidth = 1
+      ctx.strokeRect(Math.round(c.x) - 6.5, Math.round(c.y) - 6.5, c.w + 13, c.h + 13)
+      continue
+    }
+    const sprite = EFFECT_SPRITE[f.kind]
+    if (sprite === undefined) continue
+    ctx.drawImage(SPRITES.creatures[sprite][0], Math.round(f.x + 4 - 14), Math.round(f.y + (f.kind === 'well' ? 14 : 16) - 28))
+    if (f.kind === 'well') {
+      ctx.strokeStyle = COLOURS.gas
+      const r = 8 + Math.sin(g.time * 12) * 3
+      ctx.strokeRect(Math.round(f.x - r) + 0.5, Math.round(f.y - r) + 0.5, r * 2, r * 2)
+    }
+  }
 }
 
 const drawFlung = (ctx, g) => {
@@ -245,7 +290,7 @@ const box = (ctx, x, y, w, h, colour = GREEN) => {
 const drawLeftHud = (ctx, g) => {
   const x = 33
   for (let slot = 0; slot < TUNING.player.skillSlots; slot++) {
-    const top = ORIGIN.y + slot * 40
+    const top = ORIGIN.y + slot * 38
     const skill = g.player.skills[slot]
     box(ctx, x, top, 32, 32)
     if (skill) ctx.drawImage(SPRITES.icons[skill.kind], x + 8, top + 8)
@@ -254,13 +299,14 @@ const drawLeftHud = (ctx, g) => {
       ctx.fillStyle = ready * 6 > i ? GREEN : DIM
       ctx.fillRect(x + i * 5 + 1, top + 34, 4, 2)
     }
-    drawText(ctx, 'CVB'[slot], x - 7, top + 2, skill ? GREEN : DIM)
+    drawText(ctx, 'CVBN'[slot], x - 7, top + 2, skill ? GREEN : DIM)
   }
   for (let i = 0; i < TUNING.player.hp; i++) {
-    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + i * 8, ORIGIN.y + 122)
+    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + i * 8, ORIGIN.y + 154)
   }
-  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 134, DIM)
-  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 142, DIM)
+  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 164, DIM)
+  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 172, DIM)
+  drawText(ctx, 'M MAP', x - 7, ORIGIN.y + 180, DIM)
 }
 
 const drawMinimap = (ctx, g, x) => {
@@ -296,7 +342,13 @@ const drawRightHud = (ctx, g) => {
     const text = `CHAIN X${g.chain}`
     drawText(ctx, text, x, y, COLOURS.charge)
     ctx.fillStyle = COLOURS.charge
-    ctx.fillRect(x, y + 7, Math.floor((span * g.chainTime) / TUNING.run.chainWindow), 1)
+    ctx.fillRect(x, y + 7, Math.min(span, Math.floor((span * g.chainTime) / TUNING.run.chainWindow)), 1)
+  }
+  y += 12
+  let n = 0
+  for (const id of g.player.relics) {
+    drawIcon(ctx, RELIC_BY_ID[id].icon, x + (n % 8) * 10, y + Math.floor(n / 8) * 10, 9)
+    n += 1
   }
 }
 
@@ -313,11 +365,12 @@ export const draw = (ctx, g) => {
   ctx.rect(0, 0, ROOM_PX, ROOM_PX)
   ctx.clip()
   ctx.drawImage(backdrop, 0, 0)
-  drawSolids(ctx, g.world, g.depth)
+  drawSolids(ctx, g.world, g.depth, THEMES[g.rooms[keyOf(g.x, g.y)]?.theme]?.skin)
   drawCards(ctx, g)
   drawWares(ctx, g)
   drawPickups(ctx, g)
   drawFlung(ctx, g)
+  drawEffects(ctx, g)
   drawEnemies(ctx, g)
   if (g.phase !== 'dead' && g.phase !== 'title') drawPlayer(ctx, g)
   drawLiquids(ctx, g.world, g.time)

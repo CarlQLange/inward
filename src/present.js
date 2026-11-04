@@ -17,6 +17,7 @@ uniform vec4 room;
 uniform float time;
 uniform float depth;
 uniform float pulse;
+uniform float stop;
 
 const vec3 GB0 = vec3(0.059, 0.200, 0.098);
 const vec3 GB1 = vec3(0.188, 0.384, 0.188);
@@ -90,6 +91,8 @@ void main() {
   colour += vec3(0.08, 0.32, 0.38) * core * (0.5 + 0.5 * sin(time * 1.7)) * pow(max(0.0, 1.0 - reach * 2.0), 2.0) * 0.7;
   colour *= 1.0 - deep * 0.3 * reach * reach;
 
+  float stopped = luma(colour);
+  colour = mix(colour, vec3(stopped * 0.75, stopped * 0.95, stopped * 1.25), stop * 0.85);
   gl_FragColor = vec4(colour, 1.0);
 }`
 
@@ -148,6 +151,7 @@ export const createPresenter = canvas => {
   const time = uniform('time')
   const depth = uniform('depth')
   const pulse = uniform('pulse')
+  const stop = uniform('stop')
 
   const resize = () => {
     fitCanvas(canvas)
@@ -161,6 +165,7 @@ export const createPresenter = canvas => {
     gl.uniform1f(time, state.time)
     gl.uniform1f(depth, state.depth)
     gl.uniform1f(pulse, state.pulse)
+    gl.uniform1f(stop, state.stop ?? 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 }

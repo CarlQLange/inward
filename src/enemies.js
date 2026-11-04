@@ -1,9 +1,10 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M } from './materials.js'
-import { energize, ignite, matAt, puff, setCell } from './world.js'
+import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { cell, cellsUnder, centre, hitsSolid, inWater, move, solidAt, WORLD_PX } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { quake } from './skills.js'
+import { decoyFor } from './effects.js'
 
 const P = TUNING.player
 const E = TUNING.enemies
@@ -18,6 +19,15 @@ export const ENEMY_DEFS = {
   jelly: { size: [12, 12], hp: 2, value: 30, insulated: true, sprite: [14] },
   worm: { size: [14, 14], hp: 5, value: 50, sprite: [15] },
   guardian: { size: [24, 28], hp: 24, value: 500, magnetic: true, heavy: true, sprite: [13] },
+  turret: { size: [12, 12], hp: 3, value: 30, magnetic: true, heavy: true, sprite: [16] },
+  bomber: { size: [12, 10], hp: 1, value: 20, magnetic: true, sprite: [17] },
+  imp: { size: [10, 12], hp: 2, value: 20, sprite: [18] },
+  emberbat: { size: [12, 9], hp: 1, value: 25, fireproof: true, sprite: [19] },
+  slime: { size: [12, 8], hp: 3, value: 20, sprite: [20] },
+  crab: { size: [14, 10], hp: 3, value: 30, shielded: true, magnetic: true, sprite: [21] },
+  nest: { size: [14, 12], hp: 8, value: 80, heavy: true, sprite: [22] },
+  mimic: { size: [12, 10], hp: 5, value: 60, sprite: [25] },
+  gasbag: { size: [12, 12], hp: 1, value: 15, sprite: [26] },
   mole: { size: [12, 14], hp: 3, value: 0, friendly: true, sprite: [10] },
   hermit: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [11] },
   miner: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [12] },
@@ -32,10 +42,33 @@ export const ENEMY_TRAITS = {
   slug: 'LEAVES A TRAIL OF OIL.',
   jelly: 'SHOCKS THE WATER AROUND IT.',
   worm: 'EATS THROUGH TERRAIN TOWARD YOU.',
+  turret: 'FIRES IN STRAIGHT LINES. MAGNETS MOVE ITS SHOTS.',
+  bomber: 'LIGHTS ITS FUSE WHEN YOU ARE CLOSE.',
+  imp: 'FREEZES WATER AND PUTS OUT FIRE.',
+  emberbat: 'LIGHTS EVERYTHING IT FLIES PAST.',
+  slime: 'LEAVES ACID BEHIND IT.',
+  crab: 'ITS SHIELD STOPS SHOTS FROM THE FRONT.',
+  nest: 'KEEPS BREEDING UNTIL DESTROYED.',
+  mimic: 'NOT EVERY CHEST IS A CHEST.',
+  gasbag: 'LEAKS MARSH GAS. BURSTS WHEN KILLED.',
   guardian: 'ITS STOMP LOOSENS THE CEILING.',
   mole: 'SELLS THINGS. CARRIES COIN.',
   hermit: 'TEACHES WHAT YOU ALREADY KNOW.',
   miner: 'TEACHES SOMETHING NEW.',
+}
+
+export const foeOf = (g, e) => {
+  if (e.ally) {
+    const others = g.enemies.filter(o => o !== e && !o.friendly && !o.ally)
+    const closest = others.sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0]
+    return closest ? centre(closest) : centre(g.player)
+  }
+  const decoy = decoyFor(g)
+  if (decoy) {
+    const reach = decoy.loud ? 400 : TUNING.skills.decoy.range
+    if (Math.hypot(decoy.x - e.x, decoy.y - e.y) < reach) return { x: decoy.x + 4, y: decoy.y + 8 }
+  }
+  return centre(g.player)
 }
 
 const shoved = (g, e, dt) => {
@@ -90,7 +123,7 @@ const spitter = (g, e, dt) => {
   move(g.world, e, dt)
   if (e.stun > 0) return
   const me = centre(e)
-  const them = centre(g.player)
+  const them = foeOf(g, e)
   e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
   e.frame = e.cooldown < 0.4 || e.cooldown > S.every - 0.3 ? 1 : 0
@@ -102,7 +135,7 @@ const spitter = (g, e, dt) => {
   g.fireballs.push({
     x: mouth.x - 2, y: mouth.y - 2, w: 4, h: 4,
     vx: vx + ((Math.random() - 0.5) * S.wobble * (1 + calm * S.calmWobble) * 2) / flight,
-    vy, age: 0,
+    vy, age: 0, friendly: Boolean(e.ally),
   })
   e.cooldown = S.every * (1 + calm * S.calmDelay)
 }
@@ -123,8 +156,8 @@ const swim = (g, e, dt, speed, chaseSpeed) => {
   e.airTime = 0
   if (e.stun > 0) return
   const me = centre(e)
-  const them = centre(g.player)
-  const chasing = inWater(world, g.player)
+  const them = foeOf(g, e)
+  const chasing = inWater(world, g.player) || Boolean(e.ally)
   e.wander += dt
   const dx = chasing ? them.x - me.x : Math.cos(e.wander) * 20
   const dy = chasing ? them.y - me.y : Math.sin(e.wander * 0.7) * 10
@@ -158,7 +191,7 @@ const flyToward = (g, e, dt, speed, weave) => {
     return
   }
   const me = centre(e)
-  const them = centre(g.player)
+  const them = foeOf(g, e)
   e.wander += dt
   const dx = them.x - me.x
   const dy = them.y - me.y + Math.sin(e.wander * 3) * weave
@@ -225,6 +258,144 @@ const guardian = (g, e, dt) => {
   }
 }
 
+const lineClear = (world, a, b) => {
+  const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4)
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps
+    if (solidAt(world, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) return false
+  }
+  return true
+}
+
+const turret = (g, e, dt) => {
+  const T = E.turret
+  if (e.stun > 0) return
+  const me = centre(e)
+  const them = foeOf(g, e)
+  e.facing = them.x < me.x ? -1 : 1
+  e.cooldown -= dt
+  const d = Math.hypot(them.x - me.x, them.y - me.y)
+  if (e.cooldown > 0 || d > T.range || !lineClear(g.world, me, them)) return
+  e.cooldown = T.every
+  g.fireballs.push({
+    x: me.x, y: me.y, w: 3, h: 3, vx: ((them.x - me.x) / d) * T.speed, vy: ((them.y - me.y) / d) * T.speed,
+    age: 0, straight: true, pellet: true, friendly: Boolean(e.ally),
+  })
+}
+
+const bomber = (g, e, dt) => {
+  const B = E.bomber
+  walker(B.speed)(g, e, dt)
+  const me = centre(e)
+  const them = foeOf(g, e)
+  if (e.stun <= 0 && !e.lit) e.facing = them.x < me.x ? -1 : 1
+  if (!e.lit && Math.hypot(them.x - me.x, them.y - me.y) < B.trigger) e.lit = B.fuse
+  if (!e.lit) return
+  e.lit -= dt
+  burst(g, me.x, e.y, 'fire', 1)
+  if (e.lit <= 0) e.hp = 0
+}
+
+const imp = (g, e, dt) => {
+  const I = E.imp
+  if (shoved(g, e, dt)) return
+  e.vy = Math.min(P.maxFall, e.vy + E.gravity * dt)
+  if (e.stun <= 0) {
+    const me = centre(e)
+    const them = foeOf(g, e)
+    e.facing = them.x < me.x ? -1 : 1
+    e.vx = e.facing * I.speed
+    e.cooldown -= dt
+    if (e.cooldown <= 0 && e.grounded) {
+      e.vy = -I.hop
+      e.cooldown = I.every
+    }
+  } else e.vx = 0
+  move(g.world, e, dt)
+  for (const [x, y] of cellsUnder({ x: e.x, y: e.y, w: e.w, h: e.h + 2 })) {
+    const m = matAt(g.world, x, y)
+    if (m === M.WATER) setCell(g.world, x, y, M.ICE)
+    if (g.world.burn[y * ROOM + x] > 0) g.world.burn[y * ROOM + x] = 0
+  }
+}
+
+const emberbat = (g, e, dt) => {
+  const awake = Math.hypot(g.player.x - e.x, g.player.y - e.y) < E.emberbat.wakes || e.awake
+  e.awake = awake
+  if (!awake) return
+  flyToward(g, e, dt, E.emberbat.speed, 26)
+  const c = centre(e)
+  e.cooldown -= dt
+  if (e.cooldown > 0) return
+  e.cooldown = 0.25
+  ignite(g.world, cell(c.x), cell(c.y))
+  ignite(g.world, cell(c.x), cell(e.y + e.h + 2))
+  burst(g, c.x, c.y, 'fire', 1)
+}
+
+const slime = (g, e, dt) => {
+  walker(E.slime.speed)(g, e, dt)
+  e.cooldown -= dt
+  if (e.cooldown > 0 || e.stun > 0) return
+  e.cooldown = E.slime.every
+  const c = centre(e)
+  puff(g.world, cell(c.x), cell(e.y + e.h - 1), M.ACID, [1, 1])
+}
+
+const crab = (g, e, dt) => {
+  walker(E.crab.speed)(g, e, dt)
+  const them = foeOf(g, e)
+  if (e.stun <= 0 && e.shoved <= 0) e.facing = them.x < centre(e).x ? -1 : 1
+}
+
+const nest = (g, e, dt) => {
+  const N = E.nest
+  e.vy = Math.min(P.maxFall, e.vy + E.gravity * dt)
+  move(g.world, e, dt)
+  if (e.stun > 0 || Math.hypot(g.player.x - e.x, g.player.y - e.y) > N.reach) return
+  e.cooldown -= dt
+  if (e.cooldown > 0) return
+  e.cooldown = N.every
+  if (g.enemies.filter(o => o.spawned).length >= N.limit) return
+  const kind = Math.random() < 0.5 ? 'bat' : 'crawler'
+  const baby = createEnemy({ kind, x: e.x, row: 0 })
+  baby.y = e.y - baby.h - 2
+  baby.spawned = true
+  baby.awake = true
+  g.spawns.push(baby)
+  burst(g, e.x + e.w / 2, e.y, 'gas', 6)
+}
+
+const mimic = (g, e, dt) => {
+  const M_ = E.mimic
+  e.vy = Math.min(P.maxFall, e.vy + E.gravity * dt)
+  const near = Math.hypot(g.player.x - e.x, g.player.y - e.y) < M_.wakes
+  if (near || e.hp < ENEMY_DEFS.mimic.hp) e.awake = true
+  if (!e.awake || e.stun > 0) {
+    e.vx = 0
+    move(g.world, e, dt)
+    return
+  }
+  const them = foeOf(g, e)
+  e.facing = them.x < centre(e).x ? -1 : 1
+  e.vx = e.facing * M_.speed
+  e.cooldown -= dt
+  if (e.grounded && e.cooldown <= 0) {
+    e.vy = -M_.hop
+    e.cooldown = 0.7
+  }
+  move(g.world, e, dt)
+}
+
+const gasbag = (g, e, dt) => {
+  flyToward(g, e, dt, E.gasbag.speed, 6)
+  e.cooldown -= dt
+  if (e.cooldown > 0) return
+  e.cooldown = E.gasbag.every
+  const c = centre(e)
+  puff(g.world, cell(c.x), cell(c.y + 8), M.METHANE, [4, 7])
+}
+
 const idle = (g, e, dt) => {
   if (shoved(g, e, dt)) return
   e.vx = 0
@@ -235,6 +406,7 @@ const idle = (g, e, dt) => {
 
 export const STEPPERS = {
   crawler: walker(E.crawler.speed), spitter, fish, jelly, bat, spore, slug, worm, guardian,
+  turret, bomber, imp, emberbat, slime, crab, nest, mimic, gasbag,
   mole: idle, hermit: idle, miner: idle,
 }
 
@@ -256,6 +428,15 @@ export const onDeath = (g, e) => {
   if (e.kind === 'slug') {
     for (const dx of [-1, 0, 1]) puff(g.world, x + dx, y, M.OIL, [1, 1])
   }
+  if (e.kind === 'slime') {
+    for (const dx of [-1, 0, 1]) puff(g.world, x + dx, y, M.ACID, [1, 1])
+  }
+  if (e.kind === 'gasbag') {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) < 4) puff(g.world, x + dx, y + dy, M.METHANE, [8, 12])
+  }
+  if (e.kind === 'bomber') explode(g.world, x, y, 2)
+  if (e.detonates) explode(g.world, x, y, 2)
+  if (e.shatters) explode(g.world, x, y, 1)
   if (e.kind === 'guardian') {
     for (let i = 0; i < 40; i++) burst(g, e.x + Math.random() * e.w, e.y + Math.random() * e.h, 'white', 2)
     g.shake = 10
@@ -275,6 +456,8 @@ export const createEnemy = ({ kind, x, row }) => {
     heavy: def.heavy === true,
     friendly: def.friendly === true,
     insulated: def.insulated === true,
+    fireproof: def.fireproof === true,
+    shielded: def.shielded === true,
     iframes: 0, stun: 0, frozen: 0, shoved: 0, frame: 0,
     cooldown: 1 + Math.random(),
     facing: Math.random() < 0.5 ? 1 : -1,

@@ -63,9 +63,10 @@ const openOptions = g => openMenu(g, {
   ],
 })
 
-const openPage = page => g => openMenu(g, { page, title: page.toUpperCase().replace('-', ' '), items: [back] })
+const openPage = page => g => openMenu(g, { page, title: page.toUpperCase().replace('-', ' '), scroll: 0, slot: 0, items: [back] })
 
 export const openSkills = openPage('skills')
+export const openRelics = openPage('relics')
 export const openMap = g => openMenu(g, { page: 'map', title: 'MAP', items: [back] })
 const openControls = openPage('controls')
 const openRecords = openPage('records')
@@ -90,6 +91,7 @@ export const openPause = g => openMenu(g, {
   items: [
     { label: 'RESUME', run: closeMenu },
     { label: 'SKILLS', run: openSkills },
+    { label: 'RELICS', run: openRelics },
     { label: 'MAP', run: openMap },
     { label: 'FIELD NOTES', run: openNotes },
     { label: 'CONTROLS', run: openControls },
@@ -134,7 +136,7 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
     subtitle: SKILL_DETAILS[kind],
     items: [
       ...p.skills.map((skill, slot) => ({
-        card: { icon: skill.kind, name: `DROP ${SKILL_NAMES[skill.kind]}`, text: 'YOU CAN PICK IT UP AGAIN', sub: 'CVB'[slot] },
+        card: { icon: skill.kind, name: `DROP ${SKILL_NAMES[skill.kind]}`, text: 'IT STAYS HERE', sub: 'CVBN'[slot] },
         run: gm => {
           dropCard(gm, skill.kind)
           p.skills[slot] = { kind, ready: 0 }
@@ -172,7 +174,12 @@ export const stepMenus = (g, input) => {
     const count = menu.items.length
     if (pressed(previous)) menu.selected = (menu.selected + count - 1) % count
     if (pressed(next)) menu.selected = (menu.selected + 1) % count
-    if (menu.page === 'notes') {
+    if (menu.page === 'skills') {
+      const slots = g.player.skills.length || 1
+      if (pressed('up')) menu.slot = (menu.slot + slots - 1) % slots
+      if (pressed('down')) menu.slot = (menu.slot + 1) % slots
+    }
+    if (menu.page === 'notes' || menu.page === 'relics') {
       if (pressed('up')) menu.scroll = Math.max(0, menu.scroll - 1)
       if (pressed('down')) menu.scroll += 1
     }

@@ -14,7 +14,8 @@ const KEYS = {
   KeyX: 'shoot', KeyJ: 'shoot',
   KeyC: 'skill', KeyK: 'skill',
   KeyV: 'skill2', KeyL: 'skill2',
-  KeyB: 'skill3', KeyN: 'skill3',
+  KeyB: 'skill3',
+  KeyN: 'skill4',
   Enter: 'confirm',
   Escape: 'pause', KeyP: 'pause',
   Tab: 'skills', KeyI: 'skills',
@@ -63,7 +64,7 @@ const render = () => {
   const { shaders } = save.settings
   const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
-  present(source, { ...state, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse })
+  present(source, { ...state, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse, stop: state.timeStop > 0 ? 1 : 0 })
 }
 
 let last = performance.now()
