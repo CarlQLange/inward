@@ -5,12 +5,13 @@ import { SPRITES } from './sprites.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
-const COLOURS = { white: '#f4f8f2', pale: '#c9d4c0', fire: '#ff9a2e', charge: '#ffe84a' }
+const COLOURS = { white: '#f4f8f2', pale: '#c9d4c0', fire: '#ff9a2e', charge: '#ffe84a', magnet: '#6fd0ff' }
 const BACKGROUND = '#07100e'
 
 const TILE = {
   [M.BEDROCK]: 'bedrock', [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat',
   [M.WOOD]: 'wood', [M.METAL]: 'metal', [M.GATE]: 'gate', [M.SAND]: 'sand', [M.ASH]: 'ash',
+  [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile',
 }
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
@@ -157,10 +158,23 @@ const drawProjectiles = (ctx, g) => {
   g.bolts.forEach(b => drawBolt(ctx, b))
 }
 
-const drawCard = (ctx, g) => {
-  if (g.card.taken) return
+const drawCards = (ctx, g) => {
   const bob = Math.round(Math.sin(g.time * 3))
-  ctx.drawImage(SPRITES.card, g.card.x, g.card.y + bob)
+  for (const card of g.cards) {
+    if (card.kind !== 'core') {
+      ctx.drawImage(SPRITES.cards[card.kind], card.x, card.y + bob)
+      continue
+    }
+    const pulse = Math.round(2 + Math.sin(g.time * 4) * 2)
+    ctx.fillStyle = COLOURS.white
+    ctx.fillRect(card.x - pulse, card.y - pulse, card.w + pulse * 2, card.h + pulse * 2)
+    ctx.fillStyle = BACKGROUND
+    ctx.fillRect(card.x + 4, card.y + 4, card.w - 8, card.h - 8)
+  }
+}
+
+const drawFlung = (ctx, g) => {
+  for (const f of g.flung) ctx.drawImage(SPRITES.tiles.scrap[0], Math.round(f.x), Math.round(f.y))
 }
 
 const box = (ctx, x, y, w, h) => {
@@ -171,15 +185,19 @@ const box = (ctx, x, y, w, h) => {
 
 const drawLeftHud = (ctx, g) => {
   const x = 33
-  box(ctx, x, ORIGIN.y, 36, 36)
-  if (g.player.hasCard) ctx.drawImage(SPRITES.boltIcon, x + 10, ORIGIN.y + 10)
-  const ready = g.player.hasCard ? 1 - Math.max(0, g.player.boltReady) / TUNING.player.boltEvery : 0
-  for (let i = 0; i < 6; i++) {
-    ctx.fillStyle = ready * 6 > i ? GREEN : DIM
-    ctx.fillRect(x + i * 6, ORIGIN.y + 40, 4, 3)
+  for (let slot = 0; slot < 2; slot++) {
+    const top = ORIGIN.y + slot * 46
+    const skill = g.player.skills[slot]
+    box(ctx, x, top, 36, 36)
+    if (skill) ctx.drawImage(SPRITES.icons[skill.kind], x + 10, top + 10)
+    const ready = skill ? 1 - Math.max(0, skill.ready) / TUNING.skills[skill.kind].every : 0
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = ready * 6 > i ? GREEN : DIM
+      ctx.fillRect(x + i * 6, top + 39, 4, 3)
+    }
   }
   for (let i = 0; i < TUNING.player.hp; i++) {
-    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 4 + i * 9, ORIGIN.y + 48)
+    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 4 + i * 9, ORIGIN.y + 94)
   }
 }
 
@@ -189,12 +207,13 @@ const drawMinimap = (ctx, g) => {
   const span = 15 * pitch + 3
   const x = VIEW.w - 101 + Math.floor((101 - span) / 2)
   box(ctx, x, ORIGIN.y, span, span)
-  const ring = Math.round(g.depth * 7)
   for (let cy = 0; cy < 15; cy++) {
     for (let cx = 0; cx < 15; cx++) {
+      const onLine = cy === 7 && cx < g.rooms.length
+      const here = onLine && cx === g.index
+      const seen = onLine && g.rooms[cx].visited
       const isCore = cx === 7 && cy === 7
-      const here = cx === ring && cy === 7
-      ctx.fillStyle = here ? COLOURS.white : isCore ? GREEN : '#123018'
+      ctx.fillStyle = here ? COLOURS.white : seen ? GREEN : isCore ? DIM : '#123018'
       ctx.fillRect(x + 2 + cx * pitch, ORIGIN.y + 2 + cy * pitch, size, size)
     }
   }
@@ -219,7 +238,8 @@ export const draw = (ctx, g) => {
   ctx.clip()
   ctx.drawImage(backdrop, 0, 0)
   drawSolids(ctx, g.world)
-  drawCard(ctx, g)
+  drawCards(ctx, g)
+  drawFlung(ctx, g)
   drawEnemies(ctx, g)
   if (g.phase !== 'dead') drawPlayer(ctx, g)
   drawWater(ctx, g.world, g.time)

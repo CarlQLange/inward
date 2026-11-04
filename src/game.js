@@ -1,11 +1,15 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, chargedAt, createWorld, crushingAt, energize, ignite, matAt, puff, stepWorld } from './world.js'
+import { burningAt, chargedAt, createWorld, crushingAt, energize, ignite, matAt, puff, setCell, stepWorld } from './world.js'
 import { FIRST_ROOM } from './room.js'
+import { generateRoom } from './generate.js'
 
 const P = TUNING.player
 const WORLD_PX = ROOM * BLOCK
 const SIZES = { crawler: [10, 7], spitter: [14, 10], fish: [10, 6] }
+const CARD_SIZES = { bolt: [8, 10], repel: [8, 10], core: [16, 16] }
+const MAGNETIC = new Set(['crawler'])
+const SKILL_KEYS = ['skill', 'skill2']
 
 const overlap = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
@@ -108,6 +112,7 @@ const createEnemy = ({ kind, x, row }) => {
     facing: 1,
     airTime: 0,
     wander: Math.random() * 6,
+    shoved: 0,
   }
 }
 
@@ -115,26 +120,84 @@ const createPlayer = ({ x, row }) => ({
   x, y: row * BLOCK - P.height, w: 6, h: P.height,
   vx: 0, vy: 0, hp: P.hp, iframes: 0, stun: 0, facing: 1, crouching: false,
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
-  shotReady: 0, boltReady: 0, hasCard: false, aim: { x: 1, y: 0 },
-  wasJump: false, wasSkill: false,
+  shotReady: 0, skills: [], aim: { x: 1, y: 0 }, drift: 0,
+  wasJump: false, wasSkills: [false, false],
 })
 
-export const createGame = (depth = TUNING.startDepth) => ({
+const createCard = ({ kind, x, row }) => {
+  const [w, h] = CARD_SIZES[kind]
+  return { kind, x, y: row * BLOCK - h - 1, w, h }
+}
+
+const createRoom = (definition, depth) => ({
   depth,
-  time: 0,
-  phase: 'playing',
-  phaseTime: 0,
-  pause: 0,
-  pulse: 0,
-  world: createWorld(FIRST_ROOM.map),
-  player: createPlayer(FIRST_ROOM.spawn),
-  enemies: FIRST_ROOM.enemies.map(createEnemy),
-  card: { x: FIRST_ROOM.card.x, y: FIRST_ROOM.card.row * BLOCK - 11, w: 8, h: 10, taken: false },
-  shots: [],
-  fireballs: [],
-  bolts: [],
-  particles: [],
+  doors: definition.doors,
+  world: createWorld(definition.map),
+  enemies: definition.enemies.map(createEnemy),
+  cards: definition.cards.map(createCard),
+  visited: false,
 })
+
+const createRooms = seed => {
+  const total = TUNING.run.rooms
+  const definition = i => (i === 0 ? FIRST_ROOM : generateRoom(i, total, seed))
+  return Array.from({ length: total }, (_, i) => createRoom(definition(i), i / (total - 1)))
+}
+
+const settleFlung = (g, f) => {
+  const x = cell(f.x + 4)
+  const y = cell(f.y + 4)
+  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => {
+    const m = matAt(g.world, x + dx, y + dy)
+    return !props(m).solid
+  })
+  if (spot) setCell(g.world, x + spot[0], y + spot[1], M.SCRAP)
+}
+
+const leaveRoom = g => {
+  g.flung.forEach(f => settleFlung(g, f))
+  Object.assign(g.rooms[g.index], { enemies: g.enemies, cards: g.cards })
+}
+
+const enterRoom = (g, index) => {
+  const room = g.rooms[index]
+  room.visited = true
+  Object.assign(g, {
+    index,
+    world: room.world,
+    enemies: room.enemies,
+    cards: room.cards,
+    depth: g.depthOverride ?? room.depth,
+    shots: [], fireballs: [], flung: [], bolts: [], particles: [],
+  })
+}
+
+const walkThrough = (g, index, side) => {
+  leaveRoom(g)
+  enterRoom(g, index)
+  const p = g.player
+  const door = g.rooms[index].doors[side]
+  p.x = side === 'left' ? 1 : WORLD_PX - p.w - 1
+  p.y = (door + 2) * BLOCK - p.h
+  p.vy = Math.min(p.vy, 0)
+}
+
+export const createGame = (depthOverride = null) => {
+  const g = {
+    depthOverride,
+    time: 0,
+    phase: 'playing',
+    phaseTime: 0,
+    pause: 0,
+    pulse: 0,
+    rooms: createRooms(Math.floor(Math.random() * 1e9)),
+    index: 0,
+    player: createPlayer(FIRST_ROOM.spawn),
+    flung: [],
+  }
+  enterRoom(g, 0)
+  return g
+}
 
 const aimFrom = (p, input) => {
   const x = input.left ? -1 : input.right ? 1 : 0
@@ -187,8 +250,91 @@ const cast = (g, p) => {
   energize(g.world, cell(x), cell(y), energy)
   ignite(g.world, cell(x), cell(y))
   burst(g, x, y, 'charge', 8)
-  p.boltReady = P.boltEvery
   g.pulse = 1
+}
+
+const inCone = (from, aim, reach, width) => point => {
+  const dx = point.x - from.x
+  const dy = point.y - from.y
+  const along = dx * aim.x + dy * aim.y
+  const across = Math.abs(dx * aim.y - dy * aim.x)
+  return along > 0 && along <= reach && across <= width
+}
+
+const repel = (g, p) => {
+  const R = TUNING.skills.repel
+  const from = muzzle(p)
+  const covered = inCone(from, p.aim, R.reach, R.width)
+  const near = inCone(from, p.aim, R.recoilReach, R.width)
+  let recoil = false
+  for (let y = 0; y < ROOM; y++) {
+    for (let x = 0; x < ROOM; x++) {
+      const point = { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK }
+      const m = matAt(g.world, x, y)
+      if (m === M.METAL && near(point)) recoil = true
+      if (m !== M.SCRAP || !covered(point)) continue
+      setCell(g.world, x, y, M.EMPTY)
+      g.flung.push({ x: x * BLOCK, y: y * BLOCK, w: 8, h: 8, vx: p.aim.x * R.fling, vy: p.aim.y * R.fling - 40, age: 0 })
+    }
+  }
+  for (const e of g.enemies) {
+    if (!MAGNETIC.has(e.kind) || !covered(centre(e))) continue
+    e.vx = p.aim.x * R.shove
+    e.vy = p.aim.y * R.shove - 60
+    e.shoved = R.shoveTime
+  }
+  if (recoil) {
+    p.vx = -p.aim.x * R.recoil
+    p.vy = -p.aim.y * R.recoil
+    p.jumpHeld = false
+    p.drift = TUNING.player.drift
+  }
+  for (let i = 0; i < 14; i++) {
+    const spread = (Math.random() - 0.5) * 0.9
+    const speed = 90 + Math.random() * 120
+    g.particles.push({
+      x: from.x, y: from.y,
+      vx: (p.aim.x + spread * p.aim.y) * speed,
+      vy: (p.aim.y - spread * p.aim.x) * speed,
+      life: 0.3, colour: 'magnet',
+    })
+  }
+  g.pulse = Math.max(g.pulse, 0.6)
+}
+
+const SKILLS = { bolt: cast, repel }
+
+const useSkills = (g, p, input, stunned, dt) => {
+  p.skills.forEach((skill, slot) => {
+    skill.ready -= dt
+    const pressed = input[SKILL_KEYS[slot]] === true
+    if (!stunned && pressed && !p.wasSkills[slot] && skill.ready <= 0) {
+      SKILLS[skill.kind](g, p)
+      skill.ready = TUNING.skills[skill.kind].every
+    }
+  })
+  SKILL_KEYS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
+}
+
+const collectCards = (g, p) => {
+  const touched = g.cards.find(c => overlap(p, c))
+  if (!touched) return
+  if (touched.kind === 'core') {
+    g.phase = 'cleared'
+    g.phaseTime = 0
+    return
+  }
+  if (p.skills.length >= SKILL_KEYS.length) return
+  g.cards = g.cards.filter(c => c !== touched)
+  p.skills.push({ kind: touched.kind, ready: 0 })
+  g.pause = TUNING.cardPause
+  g.pulse = 1
+}
+
+const useDoors = (g, p) => {
+  const { doors } = g.rooms[g.index]
+  if (doors.right !== undefined && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, g.index + 1, 'left')
+  else if (doors.left !== undefined && p.x <= 0.5) walkThrough(g, g.index - 1, 'right')
 }
 
 const stepPlayer = (g, input, dt) => {
@@ -201,7 +347,8 @@ const stepPlayer = (g, input, dt) => {
   const wish = stunned ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
   const top = P.run * (swimming ? P.swimRun : 1)
   const towards = p.crouching ? 0 : wish * top
-  const change = P.accel * dt
+  const change = P.accel * dt * (p.drift > 0 ? 0.15 : 1)
+  p.drift -= dt
   p.vx += Math.max(-change, Math.min(change, towards - p.vx))
   if (wish !== 0) p.facing = wish
   p.aim = aimFrom(p, input)
@@ -233,24 +380,14 @@ const stepPlayer = (g, input, dt) => {
   pushOutOfSolid(world, p)
 
   p.shotReady -= dt
-  p.boltReady -= dt
   if (!stunned && input.shoot && p.shotReady <= 0) shoot(g, p)
-  if (!stunned && input.skill && !p.wasSkill && p.hasCard && p.boltReady <= 0) cast(g, p)
-  p.wasSkill = input.skill
+  useSkills(g, p, input, stunned, dt)
   p.iframes -= dt
   p.stun -= dt
 
   applyHazards(g, p, dt)
-  if (!g.card.taken && overlap(p, g.card)) {
-    g.card.taken = true
-    p.hasCard = true
-    g.pause = TUNING.cardPause
-    g.pulse = 1
-  }
-  if (p.x + p.w >= WORLD_PX - 0.5) {
-    g.phase = 'cleared'
-    g.phaseTime = 0
-  }
+  collectCards(g, p)
+  if (g.phase === 'playing') useDoors(g, p)
   if (p.hp <= 0) {
     g.phase = 'dead'
     g.phaseTime = 0
@@ -261,8 +398,16 @@ const stepPlayer = (g, input, dt) => {
 const stepCrawler = (g, e, dt) => {
   const C = TUNING.crawler
   e.vy = Math.min(P.maxFall, e.vy + C.gravity * dt)
+  if (e.shoved > 0) {
+    e.shoved -= dt
+    move(g.world, e, dt)
+    if (e.hitWall) {
+      hurt(g, e, TUNING.flung.damage)
+      e.shoved = 0
+    }
+    return
+  }
   if (e.stun > 0) {
-    move(g.world, { ...e, vx: 0 }, 0)
     e.vx = 0
   } else {
     e.vx = e.facing * C.speed
@@ -434,6 +579,30 @@ const stepFireballs = (g, dt) => {
   g.fireballs = g.fireballs.filter(f => f.age >= 0)
 }
 
+const stepFlung = (g, dt) => {
+  const F = TUNING.flung
+  for (const f of g.flung) {
+    f.age += dt
+    f.vy += F.gravity * dt
+    const blocked = moveAxis(g.world, f, 'x', f.vx * dt) || moveAxis(g.world, f, 'y', f.vy * dt)
+    const victim = g.enemies.find(e => overlap(f, e))
+    if (victim) {
+      hurt(g, victim, F.damage)
+      victim.stun = F.stun
+    }
+    if (f.age > F.friendlyAfter && overlap(f, g.player)) {
+      hurt(g, g.player, F.damage)
+      g.player.stun = F.stun
+    }
+    if (blocked) {
+      settleFlung(g, f)
+      burst(g, f.x + 4, f.y + 4, 'pale', 6)
+      f.age = -1
+    }
+  }
+  g.flung = g.flung.filter(f => f.age >= 0)
+}
+
 const stepEffects = (g, dt) => {
   for (const b of g.bolts) b.life -= dt
   g.bolts = g.bolts.filter(b => b.life > 0)
@@ -447,7 +616,7 @@ const stepEffects = (g, dt) => {
   g.pulse = Math.max(0, g.pulse - dt * 2.5)
 }
 
-const reset = g => Object.assign(g, createGame(g.depth))
+const reset = g => Object.assign(g, createGame(g.depthOverride))
 
 export const restart = reset
 
@@ -475,4 +644,5 @@ export const step = (g, input, dt) => {
   stepEnemies(g, dt)
   stepShots(g, dt)
   stepFireballs(g, dt)
+  stepFlung(g, dt)
 }

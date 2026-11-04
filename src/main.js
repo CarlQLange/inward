@@ -11,6 +11,7 @@ const KEYS = {
   KeyZ: 'jump', Space: 'jump',
   KeyX: 'shoot', KeyJ: 'shoot',
   KeyC: 'skill', KeyK: 'skill',
+  KeyV: 'skill2', KeyL: 'skill2',
 }
 
 const held = {}
@@ -21,13 +22,19 @@ const depthFromDigit = code => {
   return match ? (Number(match[1]) - 1) / 8 : null
 }
 
+const overrideDepth = depth => {
+  state.depthOverride = depth
+  state.depth = depth ?? state.rooms[state.index].depth
+}
+
 window.addEventListener('keydown', e => {
   if (KEYS[e.code]) {
     held[KEYS[e.code]] = true
     e.preventDefault()
   }
   const depth = depthFromDigit(e.code)
-  if (depth !== null) state.depth = depth
+  if (depth !== null) overrideDepth(depth)
+  if (e.code === 'Digit0') overrideDepth(null)
   if (e.code === 'KeyR') restart(state)
   if (e.code === 'KeyH') document.getElementById('hint').hidden ^= true
 })

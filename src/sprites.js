@@ -53,6 +53,14 @@ const SAND = [
   'bbcbbbbc', 'bbbbbabb', 'cbbbbbbb', 'bbbabbcb',
   'bbbbbbbb', 'bcbbbabb', 'bbbbbbbb', 'bbabbbcb',
 ]
+const SCRAP = [
+  'acccccca', 'cbbbbbba', 'cbabbabb', 'cbbbbbba',
+  'cbbbbbba', 'cbabbabb', 'cbbbbbba', 'abaaaaaa',
+]
+const VOLATILE = [
+  'abbbbbba', 'bcbbbbcb', 'bbcbbcbb', 'bbbccbbb',
+  'bbbccbbb', 'bbcbbcbb', 'bcbbbbcb', 'abbbbbba',
+]
 const ASH = [
   '........', '..c.....', '.....c..', '........',
   '...b....', '.c...b..', '........', '..b...c.',
@@ -119,6 +127,18 @@ const CARD = [
 ]
 const CARD_C = { g: '#76d648', y: '#ffe84a' }
 
+const REPEL_CARD = [
+  'gggggggg', 'g......g', 'g.b..b.g', 'g.b..b.g', 'g.b..b.g',
+  'g.b..b.g', 'g..bb..g', 'g......g', 'g......g', 'gggggggg',
+]
+const REPEL_ICON = [
+  '................', '...bbbb..bbbb...', '...bbbb..bbbb...', '...bb......bb...',
+  '...bb......bb...', '...bb......bb...', '...bb......bb...', '...bb......bb...',
+  '...bb......bb...', '...bbb....bbb...', '....bbb..bbb....', '.....bbbbbb.....',
+  '......bbbb......', '................', '................', '................',
+]
+const BLUE = '#6fd0ff'
+
 const BOLT_ICON = [
   '...........yyyy.', '..........yyyy..', '.........yyyy...', '........yyyy....',
   '.......yyyy.....', '......yyyyyyyy..', '.....yyyyyyyy...', '.........yyy....',
@@ -138,6 +158,8 @@ export const SPRITES = {
     gate: [paint(GATE, shaded('#1c2022', '#70767a', '#b6bbbd'))],
     bedrock: [paint(BEDROCK, shaded('#111a16', '#27332b', '#27332b'))],
     sand: [paint(SAND, shaded('#8a7a44', '#c7b26a', '#e2d28c'))],
+    scrap: [paint(SCRAP, shaded('#2a2e30', '#8a6a4a', '#b6a080'))],
+    volatile: [paint(VOLATILE, shaded('#3a1440', '#8a3a9a', '#f07ae0'))],
     ash: [paint(ASH, shaded('#000', '#5a5a52', '#8a8a80'))],
   },
   flames: FLAMES.map(rows => paint(rows, { f: '#d9531c', g: '#ff9a2e', y: '#ffe84a' })),
@@ -145,8 +167,8 @@ export const SPRITES = {
   crawler: CRAWLER.map(rows => pair(rows, CRAWLER_C)),
   spitter: pair(SPITTER, SPITTER_C),
   fish: FISH.map(rows => pair(rows, FISH_C)),
-  card: paint(CARD, CARD_C),
-  boltIcon: paint(BOLT_ICON, { y: '#ffe84a' }),
+  cards: { bolt: paint(CARD, CARD_C), repel: paint(REPEL_CARD, { g: '#76d648', b: BLUE }) },
+  icons: { bolt: paint(BOLT_ICON, { y: '#ffe84a' }), repel: paint(REPEL_ICON, { b: BLUE }) },
   heart: paint(HEART, { g: '#76d648' }),
   heartEmpty: paint(HEART, { g: '#26542a' }),
 }

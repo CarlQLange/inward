@@ -5,7 +5,6 @@ export const ORIGIN = { x: 101, y: 8 }
 export const TICK = 1 / 60
 
 export const TUNING = {
-  startDepth: 0.25,
   world: {
     fluidRate: 10,
     fireRate: 8,
@@ -22,6 +21,7 @@ export const TUNING = {
     boltEnergy: 44,
     crushDamage: 2,
     crushStun: 0.5,
+    blastReach: 2,
   },
   player: {
     hp: 5,
@@ -39,13 +39,19 @@ export const TUNING = {
     shotEvery: 0.18,
     shotSpeed: 230,
     shotLife: 0.7,
-    boltEvery: 0.9,
     swimGravity: 0.35,
     swimMaxFall: 60,
     swimStroke: 112,
     swimRun: 0.7,
     smokeTolerance: 2,
+    drift: 0.45,
   },
+  skills: {
+    bolt: { every: 0.9 },
+    repel: { every: 0.7, reach: 56, width: 10, recoilReach: 26, fling: 240, recoil: 300, shove: 220, shoveTime: 0.45 },
+  },
+  flung: { gravity: 360, damage: 2, stun: 0.8, friendlyAfter: 0.25 },
+  run: { rooms: 8 },
   crawler: { hp: 2, speed: 22, gravity: 500 },
   spitter: { hp: 4, gravity: 500, every: 2.2, range: 150, flights: [0.5, 0.7, 0.9, 1.1, 1.3], wobble: 20, burst: 2 },
   fish: { hp: 2, speed: 26, chase: 44, airDamageEvery: 1 },

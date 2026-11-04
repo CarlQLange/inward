@@ -59,6 +59,10 @@ export const puff = (w, x, y, mat, range) => {
   if (matAt(w, x, y) === M.EMPTY) place(w, idx(x, y), mat, between(range))
 }
 
+export const setCell = (w, x, y, mat) => {
+  if (inside(x, y)) place(w, idx(x, y), mat)
+}
+
 export const ignite = (w, x, y) => {
   if (!inside(x, y)) return
   const i = idx(x, y)
@@ -86,7 +90,7 @@ const conduct = (w, i, energy) => {
 const fall = (w, x, y) => {
   const i = idx(x, y)
   const below = matAt(w, x, y + 1)
-  const sinks = below === M.WATER && w.mat[i] === M.SAND
+  const sinks = below === M.WATER && props(w.mat[i]).sinks === true
   if (below === M.WATER && w.mat[i] === M.ASH) {
     place(w, i, M.EMPTY)
     return
@@ -177,9 +181,25 @@ const emitSmoke = (w, x, y) => {
   if (spot) puff(w, x + spot[0], y + spot[1], M.SMOKE, T.smokeLife)
 }
 
-const burnOut = (w, i) => {
-  const { burnsTo } = props(w.mat[i])
+const explode = (w, x, y) => {
+  for (let dy = -T.blastReach; dy <= T.blastReach; dy++) {
+    for (let dx = -T.blastReach; dx <= T.blastReach; dx++) {
+      const nx = x + dx
+      const ny = y + dy
+      if (!inside(nx, ny)) continue
+      const n = idx(nx, ny)
+      w.crushing[n] = 1
+      ignite(w, nx, ny)
+      if (w.mat[n] === M.ROCK || w.mat[n] === M.SAND) place(w, n, M.EMPTY)
+    }
+  }
+}
+
+const burnOut = (w, x, y) => {
+  const i = idx(x, y)
+  const { burnsTo, explodes } = props(w.mat[i])
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
+  if (explodes) explode(w, x, y)
 }
 
 const stepFire = (w, dt, excite) => {
@@ -205,7 +225,7 @@ const stepFire = (w, dt, excite) => {
       if (Math.random() < p.smoke * dt) emitSmoke(w, x, y)
       if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY && !w.moved[i]) {
         const quenched = N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.STEAM)
-        if (!quenched) burnOut(w, i)
+        if (!quenched) burnOut(w, x, y)
       }
     }
   }
