@@ -8,6 +8,7 @@ import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
 import { RELIC_BY_ID } from './relics.js'
+import { COMMON_HELP, scheme, skillKey } from './controls.js'
 
 const GREEN = '#76d648'
 const DIM = '#3d7a3c'
@@ -57,12 +58,12 @@ const drawTitle = (ctx, g, menu) => {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
   ctx.fillRect(ORIGIN.x, ORIGIN.y, ROOM_PX, ROOM_PX)
   const lift = Math.round(Math.sin(g.time * 1.3) * 2)
-  centred(ctx, 'CORE', ORIGIN.y + 36 + lift, WHITE, 6)
-  centred(ctx, 'REACH THE CENTRE', ORIGIN.y + 76, DIM)
-  panel(ctx, CENTRE - 56, ORIGIN.y + 92, 112, 12 + menu.items.length * 11)
-  drawList(ctx, menu, ORIGIN.y + 100)
-  if (save.best > 0) centred(ctx, `BEST ${save.best}`, ORIGIN.y + 180, YELLOW)
-  centred(ctx, 'ARROWS AND Z', ORIGIN.y + 212, FAINT)
+  centred(ctx, 'CORE', ORIGIN.y + 30 + lift, WHITE, 6)
+  centred(ctx, 'REACH THE CENTRE', ORIGIN.y + 72, DIM)
+  panel(ctx, CENTRE - 56, ORIGIN.y + 86, 112, 12 + menu.items.length * 11)
+  drawList(ctx, menu, ORIGIN.y + 94)
+  if (save.best > 0) centred(ctx, `BEST ${save.best}`, ORIGIN.y + 186, YELLOW)
+  centred(ctx, `CONTROLS: ${scheme().name}`, ORIGIN.y + 212, DIM)
 }
 
 const drawPause = (ctx, menu) => {
@@ -86,28 +87,14 @@ const drawOptions = (ctx, menu) => {
   drawList(ctx, menu, ORIGIN.y + 50)
 }
 
-const CONTROLS = [
-  ['ARROWS OR WASD', 'MOVE'],
-  ['UP', 'AIM UP'],
-  ['DOWN', 'CROUCH, OR AIM DOWN IN AIR'],
-  ['Z OR SPACE', 'JUMP, LEAP OUT OF LIQUID'],
-  ['X', 'SHOOT'],
-  ['C V B N', 'SKILLS'],
-  ['F', 'THROW A BOMB'],
-  ['TAB', 'SKILLS PAGE'],
-  ['M', 'MAP'],
-  ['ESC OR P', 'PAUSE'],
-  ['R', 'NEW RUN'],
-  ['1 TO 9', 'PREVIEW DISTANCE TO CORE'],
-  ['0', 'REAL DISTANCE'],
-]
-
 const drawControls = (ctx, menu) => {
   sheet(ctx, menu.title)
-  CONTROLS.forEach(([key, action], i) => {
-    const y = ORIGIN.y + 36 + i * 12
-    drawText(ctx, key, ORIGIN.x + 20, y, YELLOW)
-    drawText(ctx, action, ORIGIN.x + 88, y, PALE)
+  const lines = [...scheme().help, ...COMMON_HELP]
+  centred(ctx, `${scheme().name}: CHANGE IN OPTIONS`, ORIGIN.y + 28, DIM)
+  lines.forEach(([key, action], i) => {
+    const y = ORIGIN.y + 38 + i * 12
+    drawText(ctx, key, ORIGIN.x + 16, y, YELLOW)
+    drawText(ctx, action, ORIGIN.x + 72, y, PALE)
   })
   drawList(ctx, menu, ORIGIN.y + 196)
 }
@@ -139,7 +126,7 @@ const drawSkills = (ctx, g, menu) => {
     const skill = p.skills[slot]
     const on = slot === menu.slot && skill
     panel(ctx, ORIGIN.x + 12, top, 22, 22, on ? YELLOW : skill ? GREEN : FAINT)
-    drawText(ctx, 'CVBN'[slot], ORIGIN.x + 38, top + 2, skill ? (on ? YELLOW : GREEN) : FAINT)
+    drawText(ctx, skillKey(slot), ORIGIN.x + 38, top + 2, skill ? (on ? YELLOW : GREEN) : FAINT)
     if (!skill) {
       drawText(ctx, 'EMPTY', ORIGIN.x + 38, top + 10, FAINT)
       continue
@@ -234,8 +221,8 @@ const drawNotes = (ctx, menu) => {
 const drawSummary = (ctx, g, menu) => {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
   ctx.fillRect(ORIGIN.x, ORIGIN.y, ROOM_PX, ROOM_PX)
-  panel(ctx, CENTRE - 76, ORIGIN.y + 34, 152, 146)
-  centred(ctx, g.phase === 'dead' ? 'YOU DIED' : 'THE CORE', ORIGIN.y + 42, g.phase === 'dead' ? WHITE : YELLOW, 2)
+  panel(ctx, CENTRE - 76, ORIGIN.y + 28, 152, 160)
+  centred(ctx, g.phase === 'dead' ? 'YOU DIED' : 'THE CORE', ORIGIN.y + 36, g.phase === 'dead' ? WHITE : YELLOW, 2)
   const rows = [
     ['SCORE', g.score, GREEN],
     ['BEST', save.best, g.newBest ? YELLOW : DIM],
@@ -245,15 +232,17 @@ const drawSummary = (ctx, g, menu) => {
     ['KILLS', g.kills, PALE],
     ['BY THE WORLD', g.environmentKills, YELLOW],
     ['BEST CHAIN', g.chainPeak, PALE],
+    [g.phase === 'dead' ? 'KILLED BY' : 'RELICS', g.phase === 'dead' ? g.player.lastCause ?? 'BAD LUCK' : g.player.relics.size, g.phase === 'dead' ? 'hurt' : PALE],
   ]
   rows.forEach(([name, value, colour], i) => {
-    const y = ORIGIN.y + 62 + i * 10
+    const y = ORIGIN.y + 54 + i * 10
     drawText(ctx, name, CENTRE - 64, y, DIM)
     const text = String(value)
-    drawText(ctx, text, CENTRE + 64 - textWidth(text), y, colour)
+    drawText(ctx, text, CENTRE + 64 - textWidth(text), y, colour === 'hurt' ? '#ff5a4a' : colour)
   })
-  if (g.newBest) centred(ctx, 'NEW BEST', ORIGIN.y + 133, YELLOW)
-  drawList(ctx, menu, ORIGIN.y + 150)
+  if (g.newBest) centred(ctx, 'NEW BEST', ORIGIN.y + 146, YELLOW)
+  if (g.quick) centred(ctx, 'QUICKSTART: NOT RECORDED', ORIGIN.y + 146, DIM)
+  drawList(ctx, menu, ORIGIN.y + 156)
 }
 
 const drawCard = (ctx, card, x, y, w, h, on) => {
@@ -334,7 +323,13 @@ const drawMap = (ctx, g, menu) => {
   drawList(ctx, menu, ORIGIN.y + 200)
 }
 
+const drawQuickstart = (ctx, menu) => {
+  sheet(ctx, menu.title)
+  drawList(ctx, menu, ORIGIN.y + 42)
+}
+
 const PAGES = {
+  quickstart: (ctx, g, menu) => drawQuickstart(ctx, menu),
   map: (ctx, g, menu) => drawMap(ctx, g, menu),
   relics: (ctx, g, menu) => drawRelics(ctx, g, menu),
   title: (ctx, g, menu) => drawTitle(ctx, g, menu),

@@ -127,6 +127,7 @@ const spitter = (g, e, dt) => {
   e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
   e.frame = e.cooldown < 0.4 || e.cooldown > S.every - 0.3 ? 1 : 0
+  e.windup = e.cooldown < TUNING.feel.windup
   if (e.cooldown > 0 || Math.hypot(them.x - me.x, them.y - me.y) > S.range) return
   const mouth = { x: me.x, y: e.y - 2 }
   const flight = S.flights.find(f => arcIsClear(g.world, mouth, launch(mouth, them, f), f))
@@ -176,6 +177,8 @@ const fish = (g, e, dt) => swim(g, e, dt, E.fish.speed, E.fish.chase)
 const jelly = (g, e, dt) => {
   swim(g, e, dt, E.fish.speed * 0.6, E.fish.speed)
   e.cooldown -= dt
+  e.windup = e.cooldown < TUNING.feel.windup
+  if (e.windup) burst(g, centre(e).x, centre(e).y, 'charge', 1)
   if (e.cooldown > 0 || !inWater(g.world, e)) return
   e.cooldown = E.jelly.every
   const c = centre(e)
@@ -248,14 +251,12 @@ const guardian = (g, e, dt) => {
   const me = centre(e)
   if (e.stun <= 0 && Math.abs(them.x - me.x) > 16) e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
+  e.windup = e.cooldown < TUNING.feel.windup
   if (e.cooldown > 0 || e.stun > 0 || !e.grounded) return
   e.cooldown = E.guardian.every
   quake(g, 12, 7)
   burst(g, me.x, e.y + e.h, 'pale', 18)
-  if (g.player.grounded) {
-    hurt(g, g.player, 1)
-    g.player.stun = 0.25
-  }
+  if (g.player.grounded) hurt(g, g.player, 1, 'world', 'CRUSHED')
 }
 
 const lineClear = (world, a, b) => {
@@ -275,7 +276,9 @@ const turret = (g, e, dt) => {
   e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
   const d = Math.hypot(them.x - me.x, them.y - me.y)
-  if (e.cooldown > 0 || d > T.range || !lineClear(g.world, me, them)) return
+  const lined = d <= T.range && lineClear(g.world, me, them)
+  e.aimAt = lined && e.cooldown < TUNING.feel.windup * 1.4 ? them : null
+  if (e.cooldown > 0 || !lined) return
   e.cooldown = T.every
   g.fireballs.push({
     x: me.x, y: me.y, w: 3, h: 3, vx: ((them.x - me.x) / d) * T.speed, vy: ((them.y - me.y) / d) * T.speed,

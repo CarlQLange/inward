@@ -116,6 +116,15 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror), helpers
   (drone, rod, mine) and skills acting on skills (echo, pact). Skills are verbs on world
   rules, and no synergy is written anywhere.
+- Eight random starter rooms, each teaching its own first skill, and a quickstart for any
+  ring with a matching random loadout. Quickstarts don't count towards records.
+- Each room has one of eight layouts, such as tunnels, chasm or chimney, and regions have
+  their own tinted tiles and backdrop.
+- Two control schemes: keyboard (arrows, Z, X, C V D F, hold S to aim, with aim assist) and
+  mouse (WASD, free aim). Carl called the earlier keys a nightmare.
+- Eight hearts, and each hit costs one. Hurt feedback names the cause, and the first time
+  also explains it. Holding Shift or Q shows what hurts, burns, conducts or explodes.
+- Foes warn before attacking. Clearing a room heals one heart.
 - 27 relics, from chests, altars, mimics and the shop. They change your gun, your movement
   and what can hurt you, such as fire immunity making fire a toy.
 - Eight region themes change materials, tiles and foes. Room events: arena, flood,

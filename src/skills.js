@@ -3,6 +3,7 @@ import { M, props } from './materials.js'
 import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
+import { chunks } from './feel.js'
 
 const S = TUNING.skills
 
@@ -203,16 +204,20 @@ const smash = (g, x, y) => {
   if (m === M.VOLATILE) ignite(g.world, x, y)
   else if (m === M.ROCK) setCell(g.world, x, y, M.SAND)
   else if (BREAKS.has(m)) setCell(g.world, x, y, M.EMPTY)
-  burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'pale', 2)
+  chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, m, 7)
 }
 
 const hammer = (g, p) => {
   const from = muzzle(p)
   const width = owns(p, 'hammer.wide') ? 1 : 0
   const across = { x: -p.aim.y, y: p.aim.x }
+  const bodyHigh = Math.abs(p.aim.x) > Math.abs(p.aim.y) && !p.crouching ? 1 : 0
   for (let reach = 1; reach <= S.hammer.reach; reach++) {
     for (let w = -width; w <= width; w++) {
-      smash(g, cell(from.x + p.aim.x * reach * BLOCK + across.x * w * BLOCK), cell(from.y + p.aim.y * reach * BLOCK + across.y * w * BLOCK))
+      const x = cell(from.x + p.aim.x * reach * BLOCK + across.x * w * BLOCK)
+      const y = cell(from.y + p.aim.y * reach * BLOCK + across.y * w * BLOCK)
+      smash(g, x, y)
+      if (bodyHigh) smash(g, x, y + 1)
     }
   }
   const covered = inCone(from, p.aim, (S.hammer.reach + 1) * BLOCK, BLOCK * (1 + width))
@@ -350,7 +355,8 @@ const grapple = (g, p) => {
   p.vx = ((hit.x - c.x) / d) * S.grapple.pull
   p.vy = ((hit.y - c.y) / d) * S.grapple.pull
   p.jumpHeld = false
-  p.drift = 0.5
+  p.zipping = d / S.grapple.pull
+  p.drift = p.zipping + 0.15
 }
 
 const dash = (g, p) => {
@@ -431,7 +437,9 @@ const mason = (g, p) => {
 }
 
 const seed = (g, p) => {
-  const { x, y } = aimedCell(g, p, S.seed.reach)
+  const here = muzzle(p)
+  const straightUp = p.aim.y < -0.5 && Math.abs(p.aim.x) < 0.8
+  const { x, y } = straightUp ? { x: cell(here.x), y: cell(p.y + p.h - 1) } : aimedCell(g, p, S.seed.reach)
   const length = owns(p, 'seed.overgrowth') ? S.seed.big : S.seed.length
   setCell(g.world, x, y, M.VINE, length)
   if (owns(p, 'seed.overgrowth')) {

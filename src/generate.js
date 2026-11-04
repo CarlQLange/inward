@@ -13,22 +13,59 @@ const LOWEST_FLOOR = 23
 const HIGHEST_FLOOR = 9
 const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B', 'W'])
 
-const walkFloors = (rand, range, pitChance) => {
+export const LAYOUTS = {
+  caves: { length: [3, 6], gap: [2, 3], pits: 0.45, rise: [-3, 3], headroom: [7, 10], blobs: [2, 4], ledges: [2, 5] },
+  hall: { length: [6, 10], gap: [2, 2], pits: 0.1, rise: [-1, 1], headroom: [13, 17], blobs: [0, 1], ledges: [1, 2], pillars: true },
+  tunnels: { length: [4, 7], gap: [2, 2], pits: 0.15, rise: [-2, 2], headroom: [3, 4], blobs: [0, 0], ledges: [0, 0], buried: true },
+  islands: { length: [2, 4], gap: [2, 3], pits: 0.95, rise: [-2, 2], headroom: [9, 13], blobs: [3, 5], ledges: [1, 2] },
+  terraces: { length: [3, 5], gap: [2, 2], pits: 0, rise: [2, 3], headroom: [8, 10], blobs: [1, 2], ledges: [0, 1], stairs: true },
+  chasm: { length: [4, 6], gap: [2, 2], pits: 0, rise: [0, 0], headroom: [11, 15], blobs: [2, 3], ledges: [1, 2], bridge: true },
+  cistern: { length: [2, 3], gap: [2, 3], pits: 1, rise: [-1, 1], headroom: [10, 14], blobs: [2, 4], ledges: [2, 3], low: true },
+  chimney: { length: [4, 7], gap: [2, 2], pits: 0.2, rise: [-1, 1], headroom: [16, 20], blobs: [2, 3], ledges: [6, 9], low: true },
+}
+const THEME_LAYOUTS = [
+  ['caves', 'hall', 'terraces', 'chimney', 'caves'],
+  ['cistern', 'cistern', 'islands', 'chasm', 'hall'],
+  ['caves', 'tunnels', 'islands', 'terraces'],
+  ['tunnels', 'hall', 'terraces', 'chasm'],
+  ['chasm', 'hall', 'islands', 'chimney'],
+  ['chimney', 'terraces', 'chasm', 'tunnels'],
+  ['tunnels', 'islands', 'chimney', 'caves'],
+  ['hall', 'chasm'],
+]
+
+const walkBridge = (layout, range) => {
+  const floor = range(14, 19)
+  const left = range(4, 6)
+  const right = range(4, 6)
+  return {
+    segments: [{ from: 1, to: left, floor }, { from: ROOM - 1 - right, to: ROOM - 2, floor }],
+    pits: [{ from: left + 1, to: ROOM - 2 - right }],
+    bridge: { from: left + 1, to: ROOM - 2 - right, row: floor },
+  }
+}
+
+const walkFloors = (rand, range, pitChance, layout) => {
+  if (layout.bridge) return walkBridge(layout, range)
   const segments = []
   const pits = []
   let x = 1
-  let floor = range(HIGHEST_FLOOR + 3, LOWEST_FLOOR - 2)
+  const climbing = rand() < 0.5
+  let floor = layout.stairs
+    ? (climbing ? LOWEST_FLOOR : HIGHEST_FLOOR + 1)
+    : layout.low ? range(LOWEST_FLOOR - 3, LOWEST_FLOOR) : range(HIGHEST_FLOOR + 3, LOWEST_FLOOR - 2)
   while (x < ROOM - 1) {
-    const length = range(3, 6)
+    const length = range(...layout.length)
     const to = Math.min(x + length - 1, ROOM - 2)
-    const last = ROOM - 2 - to < 4
+    const last = ROOM - 2 - to < 3
     const end = last ? ROOM - 2 : to
     segments.push({ from: x, to: end, floor })
     if (last) break
-    const gap = rand() < pitChance ? range(2, 3) : 0
+    const gap = rand() < pitChance ? range(...layout.gap) : 0
     if (gap) pits.push({ from: end + 1, to: end + gap })
     x = end + gap + 1
-    floor = clamp(floor + range(gap ? -2 : -3, 3), HIGHEST_FLOOR, LOWEST_FLOOR)
+    const step = layout.stairs ? (climbing ? -1 : 1) * range(...layout.rise) : range(gap ? Math.max(-2, layout.rise[0]) : layout.rise[0], layout.rise[1])
+    floor = clamp(floor + step, HIGHEST_FLOOR, LOWEST_FLOOR)
   }
   return { segments, pits }
 }
@@ -41,18 +78,19 @@ const floorsByColumn = ({ segments }) => {
 
 const nearestFloor = (floors, x) => {
   const around = [0, -1, 1, -2, 2, -3, 3, -4, 4]
-  return Math.min(...around.map(d => floors[x + d]).filter(f => f !== null && f !== undefined))
+  const near = around.map(d => floors[x + d]).filter(f => f !== null && f !== undefined)
+  return near.length ? Math.min(...near) : Math.min(...floors.filter(f => f !== null))
 }
 
-const carve = (grid, floors, range) => {
+const carve = (grid, floors, range, layout) => {
   const ceilings = new Array(ROOM).fill(1)
   for (let x = 1; x < ROOM - 1; x++) {
-    const ceiling = clamp(nearestFloor(floors, x) - 7 - range(0, 3), 2, ROOM)
+    const ceiling = clamp(nearestFloor(floors, x) - range(...layout.headroom), 2, ROOM)
     const bottom = floors[x] === null ? WATER_BOTTOM : floors[x] - 1
     ceilings[x] = ceiling
     for (let y = ceiling; y <= bottom; y++) grid[y][x] = '.'
   }
-  for (let blob = range(2, 4); blob > 0; blob--) {
+  for (let blob = range(...layout.blobs); blob > 0; blob--) {
     const cx = range(4, ROOM - 5)
     const cy = range(3, 10)
     const r = range(2, 4)
@@ -95,6 +133,18 @@ const addLedges = (grid, floors, ceilings, range, rand, count, theme) => {
     if (y <= roof + 3) continue
     const material = rand() < 0.7 ? theme.ledge : 'R'
     for (let d = 0; d < length; d++) if (grid[y][x + d] === '.') grid[y][x + d] = material
+  }
+}
+
+const addPillars = (grid, floors, ceilings, range, material) => {
+  for (let x = range(5, 7); x < ROOM - 5; x += range(6, 8)) {
+    const floor = floors[x]
+    if (floor === null || floor === undefined) continue
+    const hanging = floor - range(3, 5)
+    for (let y = ceilings[x]; y <= hanging; y++) {
+      grid[y][x] = material
+      grid[y][x + 1] = material
+    }
   }
 }
 
@@ -365,7 +415,8 @@ const EVENT_SETUP = {
   },
 }
 
-const attempt = ({ seed, depth, links, lean, special, theme }) => {
+const attempt = ({ seed, depth, links, lean, special, theme, themeIndex }) => {
+  const core = special.core === true
   const rand = seeded(seed)
   const range = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1))
   const help = 1 - depth
@@ -373,11 +424,15 @@ const attempt = ({ seed, depth, links, lean, special, theme }) => {
   const grid = Array.from({ length: ROOM }, (_, y) =>
     Array.from({ length: ROOM }, (_, x) => (x === 0 || y === 0 || x === ROOM - 1 || y === ROOM - 1 ? '#' : 'R')))
 
-  const layout = walkFloors(rand, range, clamp(0.45 + (theme.pits ?? 0) + (lean.water ? help * 0.3 : 0), 0, 0.95))
+  const layoutName = core ? 'hall' : THEME_LAYOUTS[themeIndex][Math.floor(rand() * THEME_LAYOUTS[themeIndex].length)]
+  const shape = LAYOUTS[layoutName]
+  const layout = walkFloors(rand, range, clamp(shape.pits + (theme.pits ?? 0) + (lean.water ? help * 0.2 : 0), 0, 1), shape)
   const floors = floorsByColumn(layout)
-  const ceilings = carve(grid, floors, range)
+  const ceilings = carve(grid, floors, range, shape)
   fillPits(grid, layout.pits, floors, (theme.oil ?? 0) + (lean.fuel ? help * 0.3 : 0.1), theme.lava ?? 0, rand)
-  addLedges(grid, floors, ceilings, range, rand, range(2, 5), theme)
+  addLedges(grid, floors, ceilings, range, rand, range(...shape.ledges), theme)
+  if (shape.pillars) addPillars(grid, floors, ceilings, range, theme.ledge === 'w' ? 'w' : 'R')
+  if (layout.bridge) for (let x = layout.bridge.from; x <= layout.bridge.to; x++) grid[layout.bridge.row][x] = 'w'
   dress(grid, layout, floors, ceilings, depth, lean, rand, range, theme)
   const enemies = populate(layout, depth, lean, rand, range, grid, ceilings, theme, floors)
   EVENT_SETUP[special.event]?.(grid, layout, ceilings, range)
@@ -438,15 +493,15 @@ const attempt = ({ seed, depth, links, lean, special, theme }) => {
   const drains = []
   grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
   grid[ROOM - 1].forEach((c, x) => { if (c !== '#') drains.push((ROOM - 1) * ROOM + x) })
-  return { ok, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies, drains } }
+  return { ok, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies, drains, layout: layoutName } }
 }
 
 const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }
 
-export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {}, theme = THEMES[0] }) => {
-  let result = attempt({ seed, depth, links, lean, special, theme })
+export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {}, theme = THEMES[0], themeIndex = 0 }) => {
+  let result = attempt({ seed, depth, links, lean, special, theme, themeIndex })
   for (let tries = 1; tries < 60 && !result.ok; tries++) {
-    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special, theme })
+    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special, theme, themeIndex })
   }
   return { ...result.definition, passed: result.ok }
 }

@@ -9,10 +9,12 @@ import { save } from './store.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
 import { keyOf } from './map.js'
+import { scheme, skillKey, usesMouse } from './controls.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
 const COLOURS = {
+  hurt: '#ff5a4a', heal: '#7dff8a',
   white: '#f4f8f2', pale: '#c9d4c0', fire: '#ff9a2e', charge: '#ffe84a',
   magnet: '#6fd0ff', frost: '#bff2ff', gas: '#c79ae0',
 }
@@ -27,23 +29,81 @@ const TILE = {
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
 
-const makeBackdrop = () => {
+const LOOKS = [
+  { bg: '#07100e', speck: '#0f2218', tint: null, pattern: 'specks' },
+  { bg: '#05101a', speck: '#0c2436', tint: 'rgba(40, 110, 170, 0.34)', pattern: 'drips' },
+  { bg: '#120d06', speck: '#241a0c', tint: 'rgba(120, 80, 20, 0.34)', pattern: 'roots' },
+  { bg: '#0b0d10', speck: '#1c2228', tint: 'rgba(120, 130, 150, 0.42)', pattern: 'grid' },
+  { bg: '#150704', speck: '#2e0f08', tint: 'rgba(190, 60, 20, 0.4)', pattern: 'embers' },
+  { bg: '#071218', speck: '#123040', tint: 'rgba(120, 210, 240, 0.4)', pattern: 'shards' },
+  { bg: '#0e0616', speck: '#26103a', tint: 'rgba(150, 70, 210, 0.38)', pattern: 'shards' },
+  { bg: '#10060c', speck: '#361026', tint: 'rgba(220, 50, 120, 0.3)', pattern: 'rings' },
+]
+
+const PATTERNS = {
+  specks: (ctx, x, y) => {
+    if (hash(x, y) % 5 === 0) ctx.fillRect(x * BLOCK + 2, y * BLOCK + 2, 3, 1)
+    if (hash(y, x) % 7 === 0) ctx.fillRect(x * BLOCK + 5, y * BLOCK + 5, 1, 2)
+  },
+  drips: (ctx, x, y) => {
+    if (hash(x, 3) % 4 === 0 && hash(x, y) % 3 !== 0) ctx.fillRect(x * BLOCK + 3, y * BLOCK, 1, 5)
+  },
+  roots: (ctx, x, y) => {
+    if (hash(x, y) % 6 === 0) ctx.fillRect(x * BLOCK, y * BLOCK + 4, 8, 1)
+    if (hash(y, x) % 6 === 0) ctx.fillRect(x * BLOCK + 4, y * BLOCK, 1, 8)
+  },
+  grid: (ctx, x, y) => {
+    if (x % 4 === 0) ctx.fillRect(x * BLOCK, y * BLOCK, 1, 8)
+    if (y % 4 === 0) ctx.fillRect(x * BLOCK, y * BLOCK, 8, 1)
+    if (x % 4 === 0 && y % 4 === 0) ctx.fillRect(x * BLOCK - 1, y * BLOCK - 1, 3, 3)
+  },
+  embers: (ctx, x, y) => {
+    if (hash(x, y) % 9 === 0) ctx.fillRect(x * BLOCK + 3, y * BLOCK + 2, 2, 2)
+    if (y % 6 === 0) ctx.fillRect(x * BLOCK, y * BLOCK + 3, 8, 1)
+  },
+  shards: (ctx, x, y) => {
+    if (hash(x, y) % 8 !== 0) return
+    for (let i = 0; i < 5; i++) ctx.fillRect(x * BLOCK + i, y * BLOCK + 4 - i, 1, i * 2 + 1)
+  },
+  rings: (ctx, x, y) => {
+    const d = Math.round(Math.hypot(x - 13.5, y - 13.5))
+    if (d % 3 === 0) ctx.fillRect(x * BLOCK + 2, y * BLOCK + 2, 3, 3)
+  },
+}
+
+const makeBackdrop = ({ bg, speck, pattern }) => {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = ROOM_PX
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = BACKGROUND
+  ctx.fillStyle = bg
   ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
-  ctx.fillStyle = '#0d1c1a'
-  for (let y = 0; y < ROOM; y++) {
-    for (let x = 0; x < ROOM; x++) {
-      if (hash(x, y) % 5 === 0) ctx.fillRect(x * BLOCK + 2, y * BLOCK + 2, 3, 1)
-      if (hash(y, x) % 7 === 0) ctx.fillRect(x * BLOCK + 5, y * BLOCK + 5, 1, 2)
-    }
-  }
+  ctx.fillStyle = speck
+  for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) PATTERNS[pattern](ctx, x, y)
   return canvas
 }
 
-const backdrop = makeBackdrop()
+const backdrops = LOOKS.map(makeBackdrop)
+const tinted = LOOKS.map(() => new Map())
+
+const tintTile = (theme, tile) => {
+  const { tint } = LOOKS[theme]
+  if (!tint) return tile
+  const cache = tinted[theme]
+  if (!cache.has(tile)) {
+    const canvas = document.createElement('canvas')
+    canvas.width = tile.width
+    canvas.height = tile.height
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(tile, 0, 0)
+    ctx.globalCompositeOperation = 'source-atop'
+    ctx.fillStyle = tint
+    ctx.fillRect(0, 0, tile.width, tile.height)
+    cache.set(tile, canvas)
+  }
+  return cache.get(tile)
+}
+
+const TINTED_TILES = new Set(['rock', 'bedrock', 'brick'])
 
 const tileFor = (name, x, y, depth, skin) => {
   const h = hash(x, y)
@@ -60,14 +120,15 @@ const isBuried = (world, x, y) =>
   [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
     .every(([dx, dy]) => props(matAt(world, x + dx, y + dy)).solid)
 
-const drawSolids = (ctx, world, depth, skin) => {
+const drawSolids = (ctx, world, depth, skin, theme) => {
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
       if (m === M.ASH) ctx.drawImage(SPRITES.ash, x * BLOCK, y * BLOCK)
       const name = TILE[m]
       if (!name) continue
-      ctx.drawImage(tileFor(name, x, y, depth, skin), x * BLOCK, y * BLOCK)
+      const tile = tileFor(name, x, y, depth, skin)
+      ctx.drawImage(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, x * BLOCK, y * BLOCK)
       if (isBuried(world, x, y)) {
         ctx.fillStyle = 'rgba(5, 12, 10, 0.72)'
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
@@ -151,6 +212,13 @@ const drawPlayer = (ctx, g) => {
   const ax = x + 4
   const ay = y + (p.crouching ? 5 : 6)
   for (let i = 3; i < 7; i++) ctx.fillRect(Math.round(ax + p.aim.x * i), Math.round(ay + p.aim.y * i), 1, 1)
+  const choking = (p.smoked ?? 0) / TUNING.player.smokeTolerance
+  if (choking > 0.1) {
+    ctx.fillStyle = '#000'
+    ctx.fillRect(x - 1, y - 5, 10, 3)
+    ctx.fillStyle = choking > 0.66 ? COLOURS.hurt : '#c8c8b8'
+    ctx.fillRect(x, y - 4, Math.round(8 * Math.min(1, choking)), 1)
+  }
 }
 
 const enemyFrame = (e, time) => {
@@ -169,6 +237,19 @@ const drawEnemies = (ctx, g) => {
     const x = Math.round(e.x + e.w / 2 - 14) + jitter
     const y = Math.round(e.y + e.h - 28)
     ctx.drawImage(enemyFrame(e, g.time), x, y)
+    if (e.flash > 0) {
+      ctx.globalAlpha = 0.75
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h)
+      ctx.globalAlpha = 1
+    }
+    if (e.windup && e.stun <= 0 && !e.friendly) drawText(ctx, '!', e.x + e.w / 2 - 1, e.y - 8, Math.floor(g.time * 12) % 2 ? COLOURS.hurt : COLOURS.charge)
+    if (e.aimAt && e.stun <= 0) {
+      ctx.fillStyle = COLOURS.hurt
+      const c = { x: e.x + e.w / 2, y: e.y + e.h / 2 }
+      const d = Math.hypot(e.aimAt.x - c.x, e.aimAt.y - c.y)
+      for (let t = 6 + (g.time * 40) % 6; t < d; t += 6) ctx.fillRect(Math.round(c.x + ((e.aimAt.x - c.x) / d) * t), Math.round(c.y + ((e.aimAt.y - c.y) / d) * t), 1, 1)
+    }
     if (e.frozen > 0) {
       ctx.fillStyle = 'rgba(160, 230, 255, 0.5)'
       ctx.fillRect(Math.round(e.x), Math.round(e.y), e.w, e.h)
@@ -206,7 +287,7 @@ const drawProjectiles = (ctx, g) => {
     ctx.fillRect(Math.round(f.x), Math.round(f.y), f.w, f.h)
   }
   for (const p of g.particles) {
-    ctx.fillStyle = COLOURS[p.colour]
+    ctx.fillStyle = COLOURS[p.colour] ?? p.colour
     ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1)
   }
   g.bolts.forEach(b => drawBolt(ctx, b))
@@ -299,14 +380,20 @@ const drawLeftHud = (ctx, g) => {
       ctx.fillStyle = ready * 6 > i ? GREEN : DIM
       ctx.fillRect(x + i * 5 + 1, top + 34, 4, 2)
     }
-    drawText(ctx, 'CVBN'[slot], x - 7, top + 2, skill ? GREEN : DIM)
+    drawText(ctx, skillKey(slot), x - 7, top + 2, skill ? GREEN : DIM)
   }
   for (let i = 0; i < TUNING.player.hp; i++) {
-    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + i * 8, ORIGIN.y + 154)
+    const jolt = g.hurtFlash > 0.4 ? Math.round((Math.random() - 0.5) * 3) : 0
+    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + (i % 4) * 9 + jolt, ORIGIN.y + 152 + Math.floor(i / 4) * 7)
   }
-  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 164, DIM)
-  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 172, DIM)
-  drawText(ctx, 'M MAP', x - 7, ORIGIN.y + 180, DIM)
+  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 168, DIM)
+  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 175, DIM)
+  drawText(ctx, 'M MAP', x - 7, ORIGIN.y + 182, DIM)
+  drawText(ctx, 'SHIFT LOOK', x - 7, ORIGIN.y + 189, DIM)
+  const { jump, shoot, bomb } = scheme().labels
+  drawText(ctx, `${jump} JUMP`, x - 7, ORIGIN.y + 198, DIM)
+  drawText(ctx, `${shoot} SHOOT`, x - 7, ORIGIN.y + 205, DIM)
+  drawText(ctx, `${bomb} BOMB`, x - 7, ORIGIN.y + 212, DIM)
 }
 
 const drawMinimap = (ctx, g, x) => {
@@ -352,7 +439,51 @@ const drawRightHud = (ctx, g) => {
   }
 }
 
-export const draw = (ctx, g) => {
+const drawLook = (ctx, g) => {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
+  for (let y = 0; y < ROOM; y++) {
+    for (let x = 0; x < ROOM; x++) {
+      const m = matAt(g.world, x, y)
+      const p = props(m)
+      const hurts = burningAt(g.world, x, y) || chargedAt(g.world, x, y) || m === M.LAVA || m === M.ACID || p.harmful
+      const blows = p.blast
+      const burns = p.flammability
+      const conducts = p.conductance
+      const colour = hurts ? 'rgba(255, 50, 40, 0.8)' : blows ? 'rgba(220, 90, 255, 0.75)' : burns ? 'rgba(255, 150, 30, 0.5)' : conducts ? 'rgba(255, 235, 70, 0.45)' : null
+      if (!colour) continue
+      ctx.fillStyle = colour
+      ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
+    }
+  }
+  for (const e of g.enemies) {
+    ctx.strokeStyle = e.friendly ? '#7dff8a' : e.ally ? COLOURS.gas : COLOURS.hurt
+    ctx.lineWidth = 1
+    ctx.strokeRect(Math.round(e.x) - 1.5, Math.round(e.y) - 1.5, e.w + 3, e.h + 3)
+    drawText(ctx, e.kind.toUpperCase(), e.x - 4, e.y - 7, e.friendly ? '#7dff8a' : COLOURS.hurt)
+  }
+  ctx.fillStyle = COLOURS.hurt
+  for (const f of g.fireballs) if (!f.friendly) ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, f.w + 2, f.h + 2)
+}
+
+const LEGEND = [
+  ['RED HURTS', '#ff3228'], ['PURPLE EXPLODES', '#dc5aff'], ['ORANGE BURNS', '#ff961e'], ['YELLOW CONDUCTS', '#ffeb46'],
+]
+
+const drawLookLegend = ctx => {
+  ctx.fillStyle = '#000'
+  ctx.fillRect(16, ORIGIN.y + 150, 84, 70)
+  LEGEND.forEach(([text, colour], i) => drawText(ctx, text, 20, ORIGIN.y + 154 + i * 10, colour))
+}
+
+const drawReticle = (ctx, pointer) => {
+  const x = Math.round(pointer.x)
+  const y = Math.round(pointer.y)
+  ctx.fillStyle = COLOURS.white
+  for (const [dx, dy] of [[-4, 0], [-3, 0], [3, 0], [4, 0], [0, -4], [0, -3], [0, 3], [0, 4]]) ctx.fillRect(x + dx, y + dy, 1, 1)
+}
+
+export const draw = (ctx, g, pointer) => {
   ctx.imageSmoothingEnabled = false
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, VIEW.w, VIEW.h)
@@ -364,8 +495,9 @@ export const draw = (ctx, g) => {
   ctx.beginPath()
   ctx.rect(0, 0, ROOM_PX, ROOM_PX)
   ctx.clip()
-  ctx.drawImage(backdrop, 0, 0)
-  drawSolids(ctx, g.world, g.depth, THEMES[g.rooms[keyOf(g.x, g.y)]?.theme]?.skin)
+  const theme = g.rooms[keyOf(g.x, g.y)]?.theme ?? 0
+  ctx.drawImage(backdrops[theme], 0, 0)
+  drawSolids(ctx, g.world, g.depth, THEMES[theme]?.skin, theme)
   drawCards(ctx, g)
   drawWares(ctx, g)
   drawPickups(ctx, g)
@@ -378,11 +510,23 @@ export const draw = (ctx, g) => {
   drawOverlays(ctx, g.world, g.time)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
+  if (usesMouse() && pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
+  if (g.looking) drawLook(ctx, g)
+  if (g.hurtFlash > 0) {
+    ctx.fillStyle = `rgba(255, 40, 30, ${0.45 * g.hurtFlash})`
+    ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
+  }
+  const low = g.phase === 'playing' && g.player.hp <= 2
+  if (low) {
+    ctx.fillStyle = `rgba(255, 40, 30, ${0.22 + Math.sin(g.time * 6) * 0.14})`
+    for (const [x, y, w, h] of [[0, 0, ROOM_PX, 4], [0, ROOM_PX - 4, ROOM_PX, 4], [0, 0, 4, ROOM_PX], [ROOM_PX - 4, 0, 4, ROOM_PX]]) ctx.fillRect(x, y, w, h)
+  }
   ctx.restore()
   if (g.phase !== 'title') {
     drawLeftHud(ctx, g)
     drawRightHud(ctx, g)
     if (g.menus.length === 0) drawToast(ctx, g)
+    if (g.looking) drawLookLegend(ctx)
   }
   drawMenus(ctx, g)
 }

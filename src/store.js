@@ -9,7 +9,7 @@ const DEFAULTS = {
   deepest: 0,
   worldKills: 0,
   notes: [],
-  settings: { shaders: 'full', shake: true },
+  settings: { shaders: 'full', shake: true, controls: 'keys' },
 }
 
 const read = () => {

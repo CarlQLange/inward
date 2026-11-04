@@ -1,7 +1,8 @@
 import { TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
 import { SKILL_DETAILS, SKILL_NAMES } from './skills.js'
-import { continueRun, newRun, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
+import { skillKey } from './controls.js'
+import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
 const P = TUNING.player
 
@@ -28,6 +29,10 @@ const cycleShaders = () => {
   save.settings.shaders = SHADER_LEVELS[(at + 1) % SHADER_LEVELS.length]
   persist()
 }
+const toggleControls = () => {
+  save.settings.controls = save.settings.controls === 'mouse' ? 'keys' : 'mouse'
+  persist()
+}
 const toggleShake = () => {
   save.settings.shake = !save.settings.shake
   persist()
@@ -37,6 +42,7 @@ const openOptions = g => openMenu(g, {
   page: 'options',
   title: 'OPTIONS',
   items: [
+    { label: () => `CONTROLS: ${save.settings.controls === 'mouse' ? 'MOUSE' : 'KEYBOARD'}`, detail: 'KEYBOARD USES ARROWS. MOUSE USES WASD AND FREE AIM.', run: toggleControls },
     { label: () => `SHADERS: ${save.settings.shaders.toUpperCase()}`, detail: 'HOW STRONGLY THE SCREEN WARPS NEAR THE CORE', run: cycleShaders },
     { label: () => `SCREEN SHAKE: ${save.settings.shake ? 'ON' : 'OFF'}`, run: toggleShake },
     {
@@ -70,6 +76,19 @@ export const openRelics = openPage('relics')
 export const openMap = g => openMenu(g, { page: 'map', title: 'MAP', items: [back] })
 const openControls = openPage('controls')
 const openRecords = openPage('records')
+const openQuickstart = g => openMenu(g, {
+  page: 'quickstart',
+  title: 'QUICKSTART',
+  items: [
+    ...Array.from({ length: 8 }, (_, ring) => ({
+      label: ring === 7 ? 'THE CORE' : `RING ${ring + 1}`,
+      detail: ring === 0 ? 'ONE RANDOM SKILL.' : `${Math.min(4, ring + 1)} SKILLS, ${ring * 2} UPGRADES, ${ring} RELICS.`,
+      run: quickstart(ring),
+    })),
+    back,
+  ],
+})
+
 const openNotes = g => openMenu(g, { page: 'notes', title: 'FIELD NOTES', scroll: 0, items: [back] })
 
 export const openTitle = g => openMenu(g, {
@@ -78,6 +97,7 @@ export const openTitle = g => openMenu(g, {
   items: [
     ...(hasRun() ? [{ label: 'CONTINUE', run: continueRun }] : []),
     { label: 'NEW RUN', run: startFromTitle },
+    { label: 'QUICKSTART', run: openQuickstart },
     { label: 'FIELD NOTES', run: openNotes },
     { label: 'RECORDS', run: openRecords },
     { label: 'CONTROLS', run: openControls },
@@ -136,7 +156,7 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
     subtitle: SKILL_DETAILS[kind],
     items: [
       ...p.skills.map((skill, slot) => ({
-        card: { icon: skill.kind, name: `DROP ${SKILL_NAMES[skill.kind]}`, text: 'IT STAYS HERE', sub: 'CVBN'[slot] },
+        card: { icon: skill.kind, name: `DROP ${SKILL_NAMES[skill.kind]}`, text: 'IT STAYS HERE', sub: skillKey(slot) },
         run: gm => {
           dropCard(gm, skill.kind)
           p.skills[slot] = { kind, ready: 0 }

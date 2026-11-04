@@ -1,32 +1,16 @@
-import { TICK, VIEW } from './config.js'
+import { ORIGIN, TICK, VIEW } from './config.js'
 import { createGame, depthHere, restart, step } from './game.js'
 import { draw } from './render.js'
 import { loadSprites } from './sprites.js'
 import { save } from './store.js'
 import { createPresenter } from './present.js'
-
-const KEYS = {
-  ArrowLeft: 'left', KeyA: 'left',
-  ArrowRight: 'right', KeyD: 'right',
-  ArrowUp: 'up', KeyW: 'up',
-  ArrowDown: 'down', KeyS: 'down',
-  KeyZ: 'jump', Space: 'jump',
-  KeyX: 'shoot', KeyJ: 'shoot',
-  KeyC: 'skill', KeyK: 'skill',
-  KeyV: 'skill2', KeyL: 'skill2',
-  KeyB: 'skill3',
-  KeyN: 'skill4',
-  Enter: 'confirm',
-  Escape: 'pause', KeyP: 'pause',
-  Tab: 'skills', KeyI: 'skills',
-  KeyM: 'map',
-  KeyF: 'bomb',
-}
+import { scheme, usesMouse } from './controls.js'
 
 await loadSprites()
 
 const held = {}
 const state = createGame(null, 'title')
+const screen = document.getElementById('screen')
 
 const depthFromDigit = code => {
   const match = code.match(/^Digit([1-9])$/)
@@ -39,28 +23,50 @@ const overrideDepth = depth => {
 }
 
 window.addEventListener('keydown', e => {
-  if (KEYS[e.code]) {
-    held[KEYS[e.code]] = true
+  const action = scheme().bindings[e.code]
+  if (action) {
+    held[action] = true
     e.preventDefault()
   }
   const depth = depthFromDigit(e.code)
   if (depth !== null) overrideDepth(depth)
   if (e.code === 'Digit0') overrideDepth(null)
-  if (e.code === 'KeyR' && state.phase === 'playing' && state.menus.length === 0) restart(state)
 })
 window.addEventListener('keyup', e => {
-  if (KEYS[e.code]) held[KEYS[e.code]] = false
+  const action = scheme().bindings[e.code]
+  if (action) held[action] = false
 })
 window.addEventListener('blur', () => Object.keys(held).forEach(k => { held[k] = false }))
+
+const pointerToRoom = e => {
+  const box = screen.getBoundingClientRect()
+  return {
+    x: ((e.clientX - box.left) / box.width) * VIEW.w - ORIGIN.x,
+    y: ((e.clientY - box.top) / box.height) * VIEW.h - ORIGIN.y,
+  }
+}
+
+window.addEventListener('mousemove', e => { held.pointer = pointerToRoom(e) })
+window.addEventListener('mousedown', e => {
+  if (!usesMouse()) return
+  held.pointer = pointerToRoom(e)
+  if (e.button === 0) held.shoot = true
+  if (e.button === 2) held.skill = true
+})
+window.addEventListener('mouseup', e => {
+  if (e.button === 0) held.shoot = false
+  if (e.button === 2) held.skill = false
+})
+window.addEventListener('contextmenu', e => { if (usesMouse()) e.preventDefault() })
 
 const source = document.createElement('canvas')
 source.width = VIEW.w
 source.height = VIEW.h
 const ctx = source.getContext('2d')
-const present = createPresenter(document.getElementById('screen'))
+const present = createPresenter(screen)
 
 const render = () => {
-  draw(ctx, state)
+  draw(ctx, state, held.pointer)
   const { shaders } = save.settings
   const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
