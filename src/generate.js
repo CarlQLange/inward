@@ -144,8 +144,8 @@ const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, ra
 
 const ROSTER = [
   { kind: 'crawler', from: 0, weight: 3 },
-  { kind: 'spitter', from: 0.1, weight: 2 },
-  { kind: 'bat', from: 0.1, weight: 2 },
+  { kind: 'spitter', from: 0.2, weight: 2 },
+  { kind: 'bat', from: 0.2, weight: 2 },
   { kind: 'spore', from: 0.25, weight: 2 },
   { kind: 'slug', from: 0.25, weight: 2 },
 ]
@@ -162,7 +162,7 @@ const place = (x, row, kind) => ({ kind, x: x * BLOCK, row })
 const populate = ({ segments, pits }, depth, lean, rand, range, grid, ceilings) => {
   const enemies = []
   for (const s of segments.slice(1)) {
-    const chance = 0.4 + depth * 0.3
+    const chance = 0.25 + depth * 0.45
     for (let n = 0; n < 2; n++) {
       if (rand() < chance * (n ? 0.5 : 1)) {
         const kind = pickFoe(depth, rand, enemies)

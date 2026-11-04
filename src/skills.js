@@ -118,7 +118,10 @@ const frost = (g, p) => {
   forEachCell((x, y, point) => {
     if (!covered(point)) return
     const m = matAt(g.world, x, y)
-    if (m === M.WATER) setCell(g.world, x, y, M.ICE)
+    if (m === M.WATER) {
+      g.world.notes?.add(`freeze:${M.WATER}`)
+      setCell(g.world, x, y, M.ICE)
+    }
     else if (g.world.burn[y * 28 + x] > 0) g.world.burn[y * 28 + x] = 0
     else if (m === M.STEAM) setCell(g.world, x, y, M.WATER)
     else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x, y, M.SAND)
@@ -227,33 +230,42 @@ export const SKILLS = { bolt, repel, ember, frost, hammer, gust }
 
 export const TREES = {
   bolt: [
-    { id: 'bolt.fork', name: 'FORK' },
-    { id: 'bolt.overcharge', name: 'OVERCHARGE' },
+    { id: 'bolt.fork', name: 'FORK', text: 'THREE BOLTS AT ONCE' },
+    { id: 'bolt.overcharge', name: 'OVERCHARGE', text: 'RUNS FURTHER, LIGHTS WHAT IT CROSSES' },
   ],
   repel: [
-    { id: 'repel.wide', name: 'WIDE FIELD' },
-    { id: 'repel.charged', name: 'LIVE SCRAP' },
+    { id: 'repel.wide', name: 'WIDE FIELD', text: 'WIDER AND FURTHER' },
+    { id: 'repel.charged', name: 'LIVE SCRAP', text: 'THROWN SCRAP LANDS CHARGED' },
   ],
   ember: [
-    { id: 'ember.trio', name: 'TRIO' },
-    { id: 'ember.napalm', name: 'NAPALM' },
+    { id: 'ember.trio', name: 'TRIO', text: 'THREE EMBERS AT ONCE' },
+    { id: 'ember.napalm', name: 'NAPALM', text: 'SPILLS BURNING OIL WHERE IT LANDS' },
   ],
   frost: [
-    { id: 'frost.wide', name: 'BLIZZARD' },
-    { id: 'frost.brittle', name: 'BRITTLE ROCK' },
+    { id: 'frost.wide', name: 'BLIZZARD', text: 'WIDER AND FURTHER' },
+    { id: 'frost.brittle', name: 'BRITTLE ROCK', text: 'FROZEN ROCK CRUMBLES' },
   ],
   hammer: [
-    { id: 'hammer.wide', name: 'BROAD HEAD' },
-    { id: 'hammer.quake', name: 'QUAKE' },
+    { id: 'hammer.wide', name: 'BROAD HEAD', text: 'THREE BLOCKS WIDE' },
+    { id: 'hammer.quake', name: 'QUAKE', text: 'SHAKES THE CEILING LOOSE' },
   ],
   gust: [
-    { id: 'gust.wide', name: 'GALE' },
-    { id: 'gust.bellows', name: 'BELLOWS' },
+    { id: 'gust.wide', name: 'GALE', text: 'WIDER AND FURTHER' },
+    { id: 'gust.bellows', name: 'BELLOWS', text: 'FLAMES LEAP FURTHER' },
   ],
 }
 
 export const SKILL_NAMES = {
   bolt: 'BOLT', repel: 'REPEL', ember: 'EMBER', frost: 'FROST', hammer: 'HAMMER', gust: 'GUST',
+}
+
+export const SKILL_DETAILS = {
+  bolt: 'LIGHTNING. RUNS THROUGH WATER AND METAL.',
+  repel: 'THROWS LOOSE METAL. FIXED METAL THROWS YOU.',
+  ember: 'LOBS FIRE. WHATEVER BURNS WILL BURN.',
+  frost: 'FREEZES WATER AND FOES. PUTS OUT FIRE.',
+  hammer: 'BREAKS BLOCKS. ROCK BECOMES FALLING RUBBLE.',
+  gust: 'BLOWS GAS, FOES AND FIREBALLS. FANS FLAMES.',
 }
 
 export const spillNapalm = (g, x, y) => {

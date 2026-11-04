@@ -2,9 +2,10 @@ import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
 import { ENEMY_DEFS } from './enemies.js'
-import { SKILL_NAMES } from './skills.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
+import { drawMenus, drawToast } from './screens.js'
+import { save } from './store.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -256,8 +257,10 @@ const drawLeftHud = (ctx, g) => {
     drawText(ctx, 'CVB'[slot], x - 7, top + 2, skill ? GREEN : DIM)
   }
   for (let i = 0; i < TUNING.player.hp; i++) {
-    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 4 + i * 8, ORIGIN.y + 122)
+    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + i * 8, ORIGIN.y + 122)
   }
+  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 134, DIM)
+  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 142, DIM)
 }
 
 const drawMinimap = (ctx, g, x) => {
@@ -304,57 +307,13 @@ const drawRightHud = (ctx, g) => {
   }
 }
 
-const panel = (ctx, x, y, w, h) => {
-  ctx.fillStyle = '#04100c'
-  ctx.fillRect(x, y, w, h)
-  box(ctx, x, y, w, h)
-}
-
-const optionText = option => (option.type === 'new' ? 'NEW SKILL' : option.node.name)
-const optionSub = option => (option.type === 'new' ? 'RANDOM' : SKILL_NAMES[option.skill])
-
-const drawOffer = (ctx, g) => {
-  const { options, selected } = g.offer
-  const w = 60
-  const gap = 8
-  const total = options.length * w + (options.length - 1) * gap
-  const left = (ROOM_PX - total) / 2
-  const top = 80
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-  ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
-  options.forEach((option, i) => {
-    const x = left + i * (w + gap)
-    panel(ctx, x, top, w, 58)
-    if (i === selected) box(ctx, x - 2, top - 2, w + 4, 62, COLOURS.charge)
-    if (option.type === 'new') drawText(ctx, '?', x + w / 2 - 1, top + 16, COLOURS.charge)
-    else ctx.drawImage(SPRITES.icons[option.skill], x + w / 2 - 8, top + 8)
-    const lines = optionText(option).split(' ')
-    lines.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, top + 28 + n * 7, COLOURS.white))
-    const sub = optionSub(option)
-    drawText(ctx, sub, x + (w - textWidth(sub)) / 2, top + 48, DIM)
-  })
-}
-
-const drawSummary = (ctx, g) => {
-  const lines = [
-    [g.phase === 'dead' ? 'YOU DIED' : 'YOU REACHED THE CORE', COLOURS.white],
-    [`SCORE ${g.score}`, GREEN],
-    [`BEST ${g.best}`, g.newBest ? COLOURS.charge : DIM],
-    [`ROOM ${g.index + 1} OF ${g.rooms.length}`, COLOURS.pale],
-    [`KILLS ${g.kills}`, COLOURS.pale],
-    [`BY THE WORLD ${g.environmentKills}`, COLOURS.charge],
-    ['Z TO GO AGAIN', DIM],
-  ]
-  panel(ctx, 40, 66, ROOM_PX - 80, 80)
-  lines.forEach(([text, colour], i) => drawText(ctx, text, (ROOM_PX - textWidth(text)) / 2, 72 + i * 10, colour))
-}
-
 export const draw = (ctx, g) => {
   ctx.imageSmoothingEnabled = false
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, VIEW.w, VIEW.h)
-  const shakeX = g.shake > 0.5 ? Math.round((Math.random() - 0.5) * g.shake) : 0
-  const shakeY = g.shake > 0.5 ? Math.round((Math.random() - 0.5) * g.shake) : 0
+  const shake = save.settings.shake ? g.shake : 0
+  const shakeX = shake > 0.5 ? Math.round((Math.random() - 0.5) * shake) : 0
+  const shakeY = shake > 0.5 ? Math.round((Math.random() - 0.5) * shake) : 0
   ctx.save()
   ctx.translate(ORIGIN.x + shakeX, ORIGIN.y + shakeY)
   ctx.beginPath()
@@ -367,15 +326,17 @@ export const draw = (ctx, g) => {
   drawPickups(ctx, g)
   drawFlung(ctx, g)
   drawEnemies(ctx, g)
-  if (g.phase !== 'dead') drawPlayer(ctx, g)
+  if (g.phase !== 'dead' && g.phase !== 'title') drawPlayer(ctx, g)
   drawLiquids(ctx, g.world, g.time)
   drawGas(ctx, g.world)
   drawOverlays(ctx, g.world, g.time)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
-  if (g.offer) drawOffer(ctx, g)
-  if (g.phase !== 'playing') drawSummary(ctx, g)
   ctx.restore()
-  drawLeftHud(ctx, g)
-  drawRightHud(ctx, g)
+  if (g.phase !== 'title') {
+    drawLeftHud(ctx, g)
+    drawRightHud(ctx, g)
+    if (g.menus.length === 0) drawToast(ctx, g)
+  }
+  drawMenus(ctx, g)
 }

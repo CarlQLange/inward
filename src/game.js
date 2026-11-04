@@ -6,7 +6,9 @@ import { generateRoom } from './generate.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
-import { SKILLS, TREES, muzzle, spillNapalm } from './skills.js'
+import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, spillNapalm } from './skills.js'
+import { closeMenu, dropCard, openMenu, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
+import { knownNotes, persist, recordRun, save } from './store.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -15,22 +17,6 @@ const SKILL_KEYS = ['skill', 'skill2', 'skill3']
 const ALL_SKILLS = Object.keys(SKILLS)
 
 const shuffled = list => list.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
-
-const readBest = () => {
-  try {
-    return Number(localStorage.getItem(R.bestKey)) || 0
-  } catch {
-    return 0
-  }
-}
-
-const saveBest = score => {
-  try {
-    localStorage.setItem(R.bestKey, String(score))
-  } catch {
-    return
-  }
-}
 
 const createPlayer = ({ x, row }) => ({
   x, y: row * BLOCK - P.height, w: 6, h: P.height,
@@ -68,7 +54,7 @@ const buildRoom = (g, index) => {
   return {
     doors: definition.doors,
     world: createWorld(definition.map, index === R.rooms - 1),
-    enemies: definition.enemies.map(createEnemy),
+    enemies: definition.enemies.map(createEnemy).map(e => ({ ...e, cooldown: e.cooldown + R.entryGrace })),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare),
     pickups: [],
@@ -94,6 +80,9 @@ const enterRoom = (g, index) => {
   g.rooms[index] ??= buildRoom(g, index)
   const room = g.rooms[index]
   room.visited = true
+  room.world.notes = knownNotes
+  room.world.mat.forEach(m => knownNotes.add(`seen:${m}`))
+  room.enemies.forEach(e => knownNotes.add(`met:${e.kind}`))
   Object.assign(g, {
     index,
     world: room.world,
@@ -108,6 +97,7 @@ const enterRoom = (g, index) => {
 
 const walkThrough = (g, index, side) => {
   leaveRoom(g)
+  persist()
   enterRoom(g, index)
   const p = g.player
   const door = g.rooms[index].doors[side]
@@ -116,7 +106,9 @@ const walkThrough = (g, index, side) => {
   p.vy = Math.min(p.vy, 0)
 }
 
-export const createGame = (depthOverride = null) => {
+const showToast = (g, title, text) => { g.toast = { title, text, life: R.toastLife } }
+
+const createRun = depthOverride => {
   const g = {
     depthOverride,
     awake: false,
@@ -134,8 +126,9 @@ export const createGame = (depthOverride = null) => {
     player: createPlayer(FIRST_ROOM.spawn),
     flung: [],
     score: 0,
-    best: readBest(),
+    best: save.best,
     chain: 0,
+    chainPeak: 0,
     chainTime: 0,
     xp: 0,
     level: 1,
@@ -143,11 +136,26 @@ export const createGame = (depthOverride = null) => {
     gold: 0,
     kills: 0,
     environmentKills: 0,
-    offer: null,
-    pendingOffers: 0,
+    menus: [],
     menuHeld: {},
+    wasPause: false,
+    wasSkillsPage: false,
+    pendingOffers: 0,
+    toast: { title: '', text: 'ARROWS MOVE. Z JUMPS. X SHOOTS.', life: 6 },
+    rekindle: 0,
+    newBest: false,
+    summaryShown: false,
   }
   enterRoom(g, 0)
+  return g
+}
+
+export const createGame = (depthOverride = null, phase = 'playing') => {
+  const g = createRun(depthOverride)
+  if (phase === 'title') {
+    Object.assign(g, { phase: 'title', titleTime: 0, toast: null, shownDepth: 0.25 })
+    openTitle(g)
+  }
   return g
 }
 
@@ -156,48 +164,70 @@ const availableUpgrades = p =>
     TREES[kind].filter(node => !p.upgrades.has(node.id)).map(node => ({ type: 'upgrade', skill: kind, node })))
 
 const unownedSkills = g => {
-  const owned = new Set(g.player.skills.map(s => s.kind))
-  return ALL_SKILLS.filter(s => !owned.has(s))
+  const carried = new Set(g.player.skills.map(s => s.kind))
+  const lying = new Set(g.cards.map(c => c.kind))
+  return ALL_SKILLS.filter(s => !carried.has(s) && !lying.has(s))
 }
 
-const openOffer = (g, kinds = ['new', 'upgrade']) => {
+const learn = (g, kind) => {
   const p = g.player
-  const options = []
-  const roomForSkill = p.skills.length < P.skillSlots && unownedSkills(g).length > 0
-  if (kinds.includes('new') && roomForSkill) options.push({ type: 'new' })
-  if (kinds.includes('upgrade')) options.push(...shuffled(availableUpgrades(p)).slice(0, 3 - options.length))
-  if (options.length === 0) {
-    p.hp = Math.min(P.hp, p.hp + 2)
-    g.score += 100
+  p.skills.push({ kind, ready: 0 })
+  g.cardPool = g.cardPool.filter(s => s !== kind)
+  const key = 'CVB'[p.skills.length - 1]
+  showToast(g, `${SKILL_NAMES[kind]}: PRESS ${key}`, SKILL_DETAILS[kind])
+  g.pulse = 1
+  g.shake = Math.max(g.shake, 3)
+  if (!g.awake) {
+    g.awake = true
+    g.depth = g.depthOverride ?? depthOf(g, g.index)
+  }
+}
+
+const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
+  if (!slotsFull(g.player)) {
+    learn(g, kind)
+    onTake(g)
     return
   }
-  g.offer = { options, selected: 0, armed: false }
+  openSwap(g, kind, gm => {
+    gm.cardPool = gm.cardPool.filter(s => s !== kind)
+    showToast(gm, `${SKILL_NAMES[kind]}: LEARNED`, SKILL_DETAILS[kind])
+    onTake(gm)
+  }, onLeave)
 }
 
 const chooseOption = (g, option) => {
   const p = g.player
+  g.menus.pop()
   if (option.type === 'new') {
     const kind = shuffled(unownedSkills(g))[0]
-    p.skills.push({ kind, ready: 0 })
-    g.cardPool = g.cardPool.filter(s => s !== kind)
+    learnOrSwap(g, kind, () => {}, gm => dropCard(gm, kind))
   } else {
     p.upgrades.add(option.node.id)
+    showToast(g, option.node.name, option.node.text)
+    g.pulse = 1
   }
-  g.offer = null
-  g.pulse = 1
+  if (g.menus.length === 0) p.wasJump = true
 }
 
-const stepOffer = (g, input) => {
-  const offer = g.offer
-  const pressed = key => input[key] && !g.menuHeld[key]
-  if (!offer.armed) {
-    offer.armed = !input.jump && !input.shoot
-  } else {
-    if (pressed('left')) offer.selected = (offer.selected + offer.options.length - 1) % offer.options.length
-    if (pressed('right')) offer.selected = (offer.selected + 1) % offer.options.length
-    if (pressed('jump') || pressed('shoot')) chooseOption(g, offer.options[offer.selected])
+const openOffer = (g, kinds = ['new', 'upgrade'], title = 'LEVEL UP') => {
+  const p = g.player
+  const options = []
+  if (kinds.includes('new') && unownedSkills(g).length > 0) options.push({ type: 'new' })
+  if (kinds.includes('upgrade')) options.push(...shuffled(availableUpgrades(p)).slice(0, 3 - options.length))
+  if (options.length === 0) {
+    p.hp = Math.min(P.hp, p.hp + 2)
+    g.score += 100
+    showToast(g, 'NOTHING LEFT TO LEARN', 'THE WORLD MENDS YOU INSTEAD.')
+    return
   }
-  g.menuHeld = { left: input.left, right: input.right, jump: input.jump, shoot: input.shoot }
+  openMenu(g, {
+    page: 'offer',
+    layout: 'cards',
+    back: false,
+    title,
+    items: options.map(option => ({ option, run: gm => chooseOption(gm, option) })),
+  })
 }
 
 const addPopup = (g, x, y, text, colour = 'white') => g.popups.push({ x, y, text, colour, life: 1.1 })
@@ -209,7 +239,7 @@ const gainXp = (g, amount) => {
     g.level += 1
     g.nextLevel = R.firstLevel + (g.level - 1) * R.levelGrowth
     g.pendingOffers += 1
-    g.player.hp = Math.min(P.hp, g.player.hp + 1)
+    g.player.hp = Math.min(P.hp, g.player.hp + R.levelHeal)
   }
 }
 
@@ -226,6 +256,7 @@ const dropLoot = (g, e, count) => {
 
 const onKill = (g, e) => {
   onDeath(g, e)
+  knownNotes.add(`killed:${e.kind}`)
   const c = centre(e)
   burst(g, c.x, c.y, 'pale', 10)
   const def = ENEMY_DEFS[e.kind]
@@ -236,6 +267,7 @@ const onKill = (g, e) => {
   const environmental = e.lastSource !== 'player'
   g.chain = g.chainTime > 0 ? g.chain + 1 : 1
   g.chainTime = R.chainWindow
+  g.chainPeak = Math.max(g.chainPeak, g.chain)
   const points = def.value * g.chain * (environmental ? 2 : 1)
   g.score += points
   g.kills += 1
@@ -283,29 +315,31 @@ const useSkills = (g, p, input, stunned, dt) => {
 const finishRun = (g, phase) => {
   g.phase = phase
   g.phaseTime = 0
-  g.newBest = g.score > g.best
-  if (g.newBest) {
-    g.best = g.score
-    saveBest(g.score)
-  }
+  g.newBest = recordRun({
+    score: g.score,
+    chainPeak: g.chainPeak,
+    roomReached: g.index + 1,
+    reachedCore: phase === 'cleared',
+    worldKills: g.environmentKills,
+  })
+  g.best = save.best
 }
 
 const collectCards = (g, p) => {
-  const touched = g.cards.find(c => overlap(p, c))
+  for (const c of g.cards) if (c.declined && !overlap(p, c)) c.declined = false
+  const touched = g.cards.find(c => overlap(p, c) && !c.declined)
   if (!touched) return
   if (touched.kind === 'core') {
     g.score += R.coreBonus + p.hp * 100
     finishRun(g, 'cleared')
     return
   }
-  g.cards = g.cards.filter(c => c !== touched)
-  if (p.skills.length < P.skillSlots) p.skills.push({ kind: touched.kind, ready: 0 })
-  else g.pendingOffers += 1
-  g.pause = TUNING.cardPause
-  g.pulse = 1
-  g.shake = Math.max(g.shake, 3)
-  g.awake = true
-  g.depth = g.depthOverride ?? depthOf(g, g.index)
+  touched.declined = true
+  const take = gm => {
+    gm.cards = gm.cards.filter(c => c !== touched)
+    gm.pause = TUNING.cardPause
+  }
+  learnOrSwap(g, touched.kind, take)
 }
 
 const talkToInhabitants = (g, p) => {
@@ -313,11 +347,11 @@ const talkToInhabitants = (g, p) => {
     if (!e.friendly || e.spent || !overlap(p, e)) continue
     if (e.kind === 'hermit' && availableUpgrades(p).length > 0) {
       e.spent = true
-      openOffer(g, ['upgrade'])
+      openOffer(g, ['upgrade'], 'THE HERMIT TEACHES')
     }
-    if (e.kind === 'miner' && p.skills.length < P.skillSlots && unownedSkills(g).length > 0) {
+    if (e.kind === 'miner' && unownedSkills(g).length > 0) {
       e.spent = true
-      openOffer(g, ['new'])
+      openOffer(g, ['new'], 'THE MINER TEACHES')
     }
   }
 }
@@ -361,6 +395,17 @@ const stepCore = (g, dt) => {
   const x = 1 + Math.floor(Math.random() * 26)
   const y = 1 + Math.floor(Math.random() * 26)
   if (matAt(g.world, x, y) === M.ROCK && !props(matAt(g.world, x, y + 1)).solid) setCell(g.world, x, y, M.SAND)
+}
+
+const stepFirstRoom = (g, dt) => {
+  if (g.index !== 0 || g.player.skills.length > 0) return
+  const wallStands = g.cards.length > 0 && g.world.mat.some((m, i) => m === M.PEAT && i % 28 === 18)
+  const fireLeft = g.world.burning > 0 || g.enemies.some(e => e.kind === 'spitter')
+  g.rekindle = wallStands && !fireLeft ? g.rekindle + dt : 0
+  if (g.rekindle < R.rekindleAfter) return
+  g.rekindle = 0
+  g.enemies.push(createEnemy({ kind: 'spitter', x: 15 * BLOCK, row: 5 }))
+  knownNotes.add('met:spitter')
 }
 
 const useDoors = (g, p) => {
@@ -553,6 +598,10 @@ const stepEffects = (g, dt) => {
   g.popups = g.popups.filter(p => p.life > 0)
   g.pulse = Math.max(0, g.pulse - dt * 2.5)
   g.shownDepth += (g.depth - g.shownDepth) * Math.min(1, dt * 1.6)
+  if (g.toast) {
+    g.toast.life -= dt
+    if (g.toast.life <= 0) g.toast = null
+  }
   g.shake = Math.max(0, g.shake - dt * 14)
   g.chainTime = Math.max(0, g.chainTime - dt)
   if (g.chainTime === 0) g.chain = 0
@@ -568,19 +617,77 @@ const handleWorldEvents = g => {
   g.world.events.length = 0
 }
 
-const reset = g => Object.assign(g, createGame(g.depthOverride))
+const reset = g => {
+  Object.assign(g, createGame(g.depthOverride))
+  g.player.wasJump = true
+  g.player.shotReady = 0.2
+}
 
 export const restart = reset
+export const newRun = reset
+export const startFromTitle = reset
+export const returnToTitle = g => {
+  persist()
+  Object.assign(g, createGame(g.depthOverride, 'title'))
+}
+
+const stepTitle = (g, dt) => {
+  g.titleTime += dt
+  g.shownDepth = 0.3 + Math.sin(g.time * 0.25) * 0.25
+  stepWorld(g.world, dt, 0.25)
+  g.world.events.length = 0
+  if (g.titleTime > 2 && !g.lit) {
+    g.lit = true
+    ignite(g.world, 9, 10)
+  }
+  if (g.titleTime > 45) {
+    g.rooms[0] = null
+    enterRoom(g, 0)
+    g.titleTime = 0
+    g.lit = false
+  }
+}
+
+const edges = (g, input) => {
+  const pausePressed = input.pause && !g.wasPause
+  const skillsPressed = input.skills && !g.wasSkillsPage
+  g.wasPause = input.pause
+  g.wasSkillsPage = input.skills
+  return { pausePressed, skillsPressed }
+}
 
 export const step = (g, input, dt) => {
   g.time += dt
   stepEffects(g, dt)
-  if (g.offer) {
-    stepOffer(g, input)
+  const { pausePressed, skillsPressed } = edges(g, input)
+  if (g.phase === 'title') stepTitle(g, dt)
+  if (g.phase === 'dead' || g.phase === 'cleared') {
+    g.phaseTime += dt
+    stepWorld(g.world, dt, g.depth)
+    handleWorldEvents(g)
+    if (g.phaseTime > 0.8 && !g.summaryShown) {
+      g.summaryShown = true
+      openSummary(g)
+    }
+  }
+  if (g.menus.length > 0) {
+    stepMenus(g, input)
     return
   }
   if (g.pause > 0) {
     g.pause -= dt
+    return
+  }
+  if (g.phase !== 'playing') return
+  if (pausePressed) {
+    g.menuHeld = { ...input }
+    persist()
+    openPause(g)
+    return
+  }
+  if (skillsPressed) {
+    g.menuHeld = { ...input }
+    openSkills(g)
     return
   }
   if (g.pendingOffers > 0) {
@@ -588,17 +695,10 @@ export const step = (g, input, dt) => {
     openOffer(g)
     return
   }
-  if (g.phase !== 'playing') {
-    g.phaseTime += dt
-    stepWorld(g.world, dt, g.depth)
-    handleWorldEvents(g)
-    const confirm = input.jump || input.shoot
-    if ((g.phaseTime > 0.8 && confirm) || g.phaseTime > 12) reset(g)
-    return
-  }
   stepWorld(g.world, dt, g.depth)
   handleWorldEvents(g)
   stepCore(g, dt)
+  stepFirstRoom(g, dt)
   stepPlayer(g, input, dt)
   if (g.phase !== 'playing') return
   stepEnemies(g, dt)

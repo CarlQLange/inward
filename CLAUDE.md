@@ -22,7 +22,10 @@ In the page, `window.game` drives it without playing: `game.sim(seconds, input)`
 steps and draws, `game.tick(input)` steps without drawing (use this in long loops,
 since drawing thousands of frames crashes the pane), `game.state` reads it, and
 `game.restart()` starts a new run. Long scripted loops also need a time limit, or the
-browser tool gives up. Testing writes to the saved best score, so clear it afterwards.
+browser tool gives up. Testing writes to the save, including records, field notes and
+options, so snapshot localStorage in sessionStorage first and restore it afterwards. A
+random soak can reach the option that forgets everything. Screenshots can lag, so wait
+half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
 Regenerate the sprite atlases with
 `uv run --with pillow --with numpy --with scipy python art/process_art.py`.
@@ -83,6 +86,9 @@ effects must spread across blocks visibly and be readable without text.
 - Numbers in Carl's original note, such as room and maze sizes, were only there
   to convey the concept. He likes around 15×15 rooms for the map.
 - A run shouldn't truly dead-end much, if at all.
+- It should be slightly easier to get started. So far: six hearts, longer
+  invulnerability, a faster first level, a calmer first two rooms, slower and wilder
+  spitters at the outskirts, and fire only hurts what it touches or stands on.
 
 **The look**
 
@@ -115,6 +121,16 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Score with chains. Kills by the world score double and give triple experience.
 - In the core room rock burns and conducts, and the core drifts toward you.
 - Rooms generate on entry and lean toward your skills, easing off with depth.
+- Title screen with the first room burning behind it, pause menu, skills page with
+  each tree, controls, options (shader strength, screen shake, forget everything),
+  records, and an end-of-run summary.
+- Field notes that persist across runs and only list what you've witnessed: materials
+  and what they did, creatures and their trait once you've killed one.
+- With full slots, a new skill opens a replacement choice. The dropped skill stays in
+  the room as a card and keeps its upgrades, so you can swap back.
+- First-room safety net: if the peat wall still stands with no fire and no spitter
+  left, another spitter drops in.
+- The title says CORE, which is a placeholder like the folder name.
 
 Not built: rings, side routes, the 15×15 layout (rooms are a straight line along one
 row), and any design pass on archetypes. In a physics search using movement alone, 60

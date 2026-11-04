@@ -8,25 +8,10 @@
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   body { display: grid; place-items: center; }
   canvas { display: block; }
-  #hint {
-    position: fixed; left: 12px; bottom: 12px; margin: 0;
-    font: 11px/1.5 ui-monospace, Menlo, monospace; color: #3f7a34; white-space: pre;
-    pointer-events: none;
-  }
 </style>
 </head>
 <body>
 <canvas id="screen"></canvas>
-<pre id="hint">←→      move
-↑       aim up
-↓       crouch, or aim down in air
-Z/space jump
-X       shoot
-C V B   skills
-1–9     preview distance to core
-0       real distance
-R       restart
-H       hide this</pre>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

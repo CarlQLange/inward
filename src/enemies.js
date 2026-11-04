@@ -23,6 +23,21 @@ export const ENEMY_DEFS = {
   miner: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [12] },
 }
 
+export const ENEMY_TRAITS = {
+  crawler: 'METAL SHELL. MAGNETS MOVE IT.',
+  spitter: 'BURSTS INTO FLAME WHEN KILLED.',
+  fish: 'CHASES SWIMMERS. DIES IN THE AIR.',
+  spore: 'BURSTS INTO MARSH GAS.',
+  bat: 'SLEEPS UNTIL YOU COME CLOSE.',
+  slug: 'LEAVES A TRAIL OF OIL.',
+  jelly: 'SHOCKS THE WATER AROUND IT.',
+  worm: 'EATS THROUGH TERRAIN TOWARD YOU.',
+  guardian: 'ITS STOMP LOOSENS THE CEILING.',
+  mole: 'SELLS THINGS. CARRIES COIN.',
+  hermit: 'TEACHES WHAT YOU ALREADY KNOW.',
+  miner: 'TEACHES SOMETHING NEW.',
+}
+
 const shoved = (g, e, dt) => {
   if (e.shoved <= 0) return false
   e.shoved -= dt
@@ -68,6 +83,8 @@ const arcIsClear = (world, from, { vx, vy }, flight) => {
 
 const spitter = (g, e, dt) => {
   const S = E.spitter
+  const distance = g.index / (TUNING.run.rooms - 1)
+  const calm = 1 - distance
   if (shoved(g, e, dt)) return
   e.vy = Math.min(P.maxFall, e.vy + E.gravity * dt)
   e.vx = 0
@@ -85,10 +102,10 @@ const spitter = (g, e, dt) => {
   const { vx, vy } = launch(mouth, them, flight)
   g.fireballs.push({
     x: mouth.x - 2, y: mouth.y - 2, w: 4, h: 4,
-    vx: vx + ((Math.random() - 0.5) * S.wobble * 2) / flight,
+    vx: vx + ((Math.random() - 0.5) * S.wobble * (1 + calm * S.calmWobble) * 2) / flight,
     vy, age: 0,
   })
-  e.cooldown = S.every
+  e.cooldown = S.every * (1 + calm * S.calmDelay)
 }
 
 const swim = (g, e, dt, speed, chaseSpeed) => {

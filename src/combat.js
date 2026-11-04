@@ -35,7 +35,8 @@ export const applyHazards = (g, e, dt) => {
     hurt(g, e, 2)
     e.stun = Math.max(e.stun, 0.7)
   }
-  if (!e.fireproof && touching.some(([x, y]) => burningAt(world, x, y))) hurt(g, e, 1)
+  const burning = cellsUnder({ x: e.x, y: e.y, w: e.w, h: e.h + 1 })
+  if (!e.fireproof && burning.some(([x, y]) => burningAt(world, x, y))) hurt(g, e, 1)
   const inSmoke = cellsUnder(e).some(([x, y]) => props(matAt(world, x, y)).harmful)
   e.smoked = inSmoke ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
   if (e.smoked > TUNING.player.smokeTolerance) {

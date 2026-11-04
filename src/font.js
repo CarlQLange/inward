@@ -10,17 +10,30 @@ const GLYPHS = {
   U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101',
   Y: '101101010010010', Z: '111001010100111',
   '+': '000010111010000', '?': '111001011000010', '-': '000000111000000',
+  '.': '000000000000010', ',': '000000000010100', ':': '000010000010000', "'": '010010000000000',
+  '!': '010010010000010', '/': '001001010100100',
 }
 
 export const textWidth = text => text.length * 4 - 1
 
-export const drawText = (ctx, text, x, y, colour) => {
+export const drawText = (ctx, text, x, y, colour, scale = 1) => {
   ctx.fillStyle = colour
   ;[...String(text)].forEach((ch, i) => {
     const glyph = GLYPHS[ch]
     if (!glyph) return
     ;[...glyph].forEach((on, b) => {
-      if (on === '1') ctx.fillRect(Math.round(x) + i * 4 + (b % 3), Math.round(y) + Math.floor(b / 3), 1, 1)
+      if (on !== '1') return
+      ctx.fillRect(Math.round(x) + (i * 4 + b % 3) * scale, Math.round(y) + Math.floor(b / 3) * scale, scale, scale)
     })
   })
+}
+
+export const wrapText = (text, chars) => {
+  const lines = []
+  for (const word of text.split(' ')) {
+    const last = lines.at(-1)
+    if (last !== undefined && last.length + word.length + 1 <= chars) lines[lines.length - 1] = `${last} ${word}`
+    else lines.push(word)
+  }
+  return lines
 }

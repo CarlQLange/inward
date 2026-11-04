@@ -27,6 +27,12 @@ const PROPS = {
 
 export const props = mat => PROPS[mat]
 
+export const MATERIAL_NAMES = {
+  [M.BEDROCK]: 'BEDROCK', [M.ROCK]: 'ROCK', [M.MOSS]: 'MOSS', [M.PEAT]: 'PEAT', [M.WOOD]: 'WOOD',
+  [M.METAL]: 'METAL', [M.SCRAP]: 'SCRAP', [M.SAND]: 'SAND', [M.WATER]: 'WATER', [M.OIL]: 'OIL',
+  [M.ICE]: 'ICE', [M.SMOKE]: 'SMOKE', [M.STEAM]: 'STEAM', [M.METHANE]: 'MARSH GAS', [M.VOLATILE]: 'VOLATILE CRYSTAL',
+}
+
 const LEGEND = {
   '.': M.EMPTY, '#': M.BEDROCK, R: M.ROCK, m: M.MOSS, p: M.PEAT, w: M.WOOD,
   M: M.METAL, G: M.GATE, s: M.SAND, '~': M.WATER, S: M.SCRAP, V: M.VOLATILE, I: M.ICE, o: M.OIL, g: M.METHANE,

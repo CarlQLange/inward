@@ -83,6 +83,7 @@ export const ignite = (w, x, y) => {
   if (!inside(x, y)) return
   const i = idx(x, y)
   if (flammabilityOf(w, w.mat[i]) && w.burn[i] <= 0) {
+    note(w, 'burn', w.mat[i])
     w.burn[i] = (props(w.mat[i]).burnTime ?? T.overloadBurnTime) * (0.7 + Math.random() * 0.6)
   }
 }
@@ -95,7 +96,10 @@ export const energize = (w, x, y, energy) => {
   w.frontier.push({ x, y, energy })
 }
 
+const note = (w, tag, mat) => w.notes?.add(`${tag}:${mat}`)
+
 const conduct = (w, i, energy) => {
+  note(w, 'conduct', w.mat[i])
   w.charge[i] = T.chargeTime
   w.refractory[i] = T.chargeRefractory
   if (props(w.mat[i]).opensWhenCharged) {
@@ -114,6 +118,7 @@ const fall = (w, x, y) => {
   }
   if (isOpen(w, x, y + 1) || sinks) {
     const heavy = props(w.mat[i]).solid === true
+    note(w, 'fall', w.mat[i])
     swap(w, i, idx(x, y + 1))
     if (heavy) w.crushing[idx(x, y + 1)] = 1
     return
@@ -216,9 +221,13 @@ const explode = (w, x, y, reach) => {
 
 const burnOut = (w, x, y) => {
   const i = idx(x, y)
-  const { burnsTo = M.ASH, blast } = props(w.mat[i])
+  const mat = w.mat[i]
+  const { burnsTo = M.ASH, blast } = props(mat)
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
-  if (blast) explode(w, x, y, blast)
+  if (blast) {
+    note(w, 'blast', mat)
+    explode(w, x, y, blast)
+  }
 }
 
 const stepFire = (w, dt, excite) => {
@@ -240,7 +249,10 @@ const stepFire = (w, dt, excite) => {
           w.burn[i] = 0
           place(w, idx(nx, ny), M.STEAM, between(T.steamLife))
         }
-        if (other === M.ICE && Math.random() < T.melt * dt) place(w, idx(nx, ny), M.WATER)
+        if (other === M.ICE && Math.random() < T.melt * dt) {
+          note(w, 'melt', M.ICE)
+          place(w, idx(nx, ny), M.WATER)
+        }
       }
       if (Math.random() < (p.smoke ?? 1) * dt) emitSmoke(w, x, y)
       if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY) {

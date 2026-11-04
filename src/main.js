@@ -2,6 +2,7 @@ import { TICK, VIEW } from './config.js'
 import { createGame, restart, step } from './game.js'
 import { draw } from './render.js'
 import { loadSprites } from './sprites.js'
+import { save } from './store.js'
 import { createPresenter } from './present.js'
 
 const KEYS = {
@@ -14,12 +15,15 @@ const KEYS = {
   KeyC: 'skill', KeyK: 'skill',
   KeyV: 'skill2', KeyL: 'skill2',
   KeyB: 'skill3', KeyN: 'skill3',
+  Enter: 'confirm',
+  Escape: 'pause', KeyP: 'pause',
+  Tab: 'skills', KeyI: 'skills',
 }
 
 await loadSprites()
 
 const held = {}
-const state = createGame()
+const state = createGame(null, 'title')
 
 const depthFromDigit = code => {
   const match = code.match(/^Digit([1-9])$/)
@@ -40,8 +44,7 @@ window.addEventListener('keydown', e => {
   const depth = depthFromDigit(e.code)
   if (depth !== null) overrideDepth(depth)
   if (e.code === 'Digit0') overrideDepth(null)
-  if (e.code === 'KeyR') restart(state)
-  if (e.code === 'KeyH') document.getElementById('hint').hidden ^= true
+  if (e.code === 'KeyR' && state.phase === 'playing' && state.menus.length === 0) restart(state)
 })
 window.addEventListener('keyup', e => {
   if (KEYS[e.code]) held[KEYS[e.code]] = false
@@ -56,7 +59,10 @@ const present = createPresenter(document.getElementById('screen'))
 
 const render = () => {
   draw(ctx, state)
-  present(source, { ...state, depth: state.shownDepth })
+  const { shaders } = save.settings
+  const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
+  const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
+  present(source, { ...state, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse })
 }
 
 let last = performance.now()
