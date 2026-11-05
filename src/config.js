@@ -165,7 +165,6 @@ export const TUNING = {
     blastStop: 0.05,
     doorTime: 0.34,
     levelBurst: 0.55,
-    recoilShove: 0,
     deathHold: 1.1,
     hurtKick: 135,
     hurtShove: 95,

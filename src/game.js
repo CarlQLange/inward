@@ -8,7 +8,7 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap,
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, pourAcid, recordTrail, spillNapalm, stepDash } from './skills.js'
-import { chunks, dust } from './feel.js'
+import { dust } from './feel.js'
 import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { scheme, skillKey, usesMouse } from './controls.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'

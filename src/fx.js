@@ -183,7 +183,6 @@ export const shotFx = (g, p, aim) => {
   smoke(g, from.x + aim.x * 3, from.y + aim.y * 3, aim.x * 12, aim.y * 12 - 4, '#a9b6b2')
   addLight(g, from.x, from.y, 26, [1, 0.85, 0.5], 0.07)
   punch(g, -aim.x * 0.7, -aim.y * 0.7)
-  p.vx -= aim.x * F.recoilShove
   rumble(g, 0.08)
 }
 
