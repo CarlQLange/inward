@@ -63,6 +63,11 @@ const runMoves = (g, e, dt, moves, pick) => {
 
 const endMove = e => { e.clock = 0 }
 
+const keepInside = e => {
+  e.x = Math.max(3 * BLOCK, Math.min(WORLD_PX - 3 * BLOCK - e.w, e.x))
+  e.y = Math.max(3 * BLOCK, Math.min(WORLD_PX - 4 * BLOCK - e.h, e.y))
+}
+
 const walkTo = (g, e, dt, speed, x) => {
   e.vy = Math.min(TUNING.player.maxFall, e.vy + E.gravity * dt)
   e.vx = Math.abs(x - centre(e).x) > 6 ? toward(centre(e).x, x) * speed : 0
@@ -286,6 +291,7 @@ const crucible = (g, e, dt) => {
     }
     burst(g, centre(e).x, centre(e).y, 'pale', 12)
   }
+  keepInside(e)
   runMoves(g, e, dt, crucibleMoves, () => bag(e, Object.keys(crucibleMoves)))
 }
 
@@ -501,6 +507,7 @@ const brood = (g, e, dt) => {
     Object.assign(e, { fallen: true, grounded: false, windup: false, vy: 0, stage: 'rest', clock: 2 })
     return
   }
+  keepInside(e)
   runMoves(g, e, dt, broodMoves, () => bag(e, Object.keys(broodMoves)))
 }
 
@@ -520,7 +527,7 @@ const flashStrip = (g, strip, floorRow) => {
 
 const conductorMoves = {
   pattern: {
-    tell: 0.95, act: 0.2, rest: 1.1,
+    tell: 0.95, act: 0.2, rest: 1.7,
     telling: (g, e) => {
       e.pattern ??= Math.random() < 0.5 ? [0, 2] : [1, 3]
       e.pattern.forEach(i => flashStrip(g, stripColumns()[i], e.floorRow))
@@ -532,7 +539,7 @@ const conductorMoves = {
     },
   },
   sweep: {
-    tell: 0.8, act: 1.3, rest: 1.2,
+    tell: 0.8, act: 1.3, rest: 1.8,
     telling: (g, e) => flashStrip(g, stripColumns()[e.facing > 0 ? 0 : 3], e.floorRow),
     start: (g, e) => { e.sweepAt = 0; e.sweepClock = 0 },
     during: (g, e, dt) => {
@@ -689,14 +696,14 @@ const core = (g, e, dt) => {
   }
   const them = centre(g.player)
   const c = centre(e)
-  const goal = { x: them.x, y: Math.min(them.y - 44, 15 * BLOCK) }
+  const goal = { x: them.x, y: Math.min(them.y - 44, 19 * BLOCK) }
   const d = Math.max(1, dist(goal, c))
   const drift = (e.stage === 'rest' ? 30 : 14) + e.phase * 6
   if (d > 6 && fighting(e)) {
     e.x += ((goal.x - c.x) / d) * drift * dt
     e.y += ((goal.y - c.y) / d) * drift * dt
   }
-  e.y = Math.max(3 * BLOCK, e.y)
+  keepInside(e)
   runMoves(g, e, dt, coreMoves, () => bag(e, CORE_MOVES[e.phase]))
 }
 

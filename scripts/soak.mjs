@@ -241,9 +241,12 @@ const worker = async ({ opts, from, to }) => {
         }
         bot.enteredAt = g.time
         const dist = Math.abs(c.x - me.x)
+        if (bot.opts.trace && Math.floor(g.time * 60) % 300 === 0) console.log(`  boss ${boss.kind} hp=${boss.hp} phase=${boss.phase} shield=${boss.shield} stage=${boss.stage}/${boss.move} at ${boss.x.toFixed(0)},${boss.y.toFixed(0)} me ${me.x.toFixed(0)},${me.y.toFixed(0)} clear=${lineClear(g.world, me, c)} shots=${g.shots.length}`)
         const away = c.x < me.x ? 'right' : 'left'
         const near = c.x < me.x ? 'left' : 'right'
-        if (dist < 50) input[away] = true
+        const blocked = !lineClear(g.world, me, c)
+        if (blocked || (p.hitWall && dist < 50)) input[me.x < (ROOM * BLOCK) / 2 ? 'right' : 'left'] = true
+        else if (dist < 50) input[away] = true
         else if (dist > 110) input[near] = true
         else if (Math.random() < 0.02) input[Math.random() < 0.5 ? 'left' : 'right'] = true
         if (p.grounded && !bot.jumpHeld && (p.hitWall || Math.random() < 0.03 || g.fireballs.some(f => f.wave && Math.abs(f.x - me.x) < 22))) input.jump = true
