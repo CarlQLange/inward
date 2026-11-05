@@ -24,7 +24,7 @@ const PROPS = {
   [M.BRICK]: { solid: true },
   [M.GLASS]: { solid: true, clear: true, brittle: true },
   [M.MUD]: { thick: true, falls: true, sinks: true, smothers: true, bakes: true, conductance: 2 },
-  [M.SNOW]: { solid: true, falls: true, slides: true, melts: true, smothers: true },
+  [M.SNOW]: { solid: true, falls: true, slides: true, melts: true, smothers: true, soft: true },
   [M.LAVA]: { liquid: true, hot: true },
   [M.VINE]: { flammability: 1.2, burnTime: 1, burnsTo: M.EMPTY, smoke: 0.3, climbable: true },
   [M.ACID]: { liquid: true, corrosive: true },

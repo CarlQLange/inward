@@ -27,7 +27,7 @@ const shards = (g, { x, y, fromX, fromY }) => {
   const cy = (y + 0.5) * BLOCK
   chipsAt(g, cx, cy, M.GLASS, 6)
   for (let n = 0; n < L.shards; n++) {
-    const dir = outward(x, y, fromX, fromY, Math.PI * 1.4)
+    const dir = outward(x, y, fromX, fromY, Math.PI * 0.8)
     const speed = between(L.shardSpeed)
     launch(g, {
       x: cx - 2, y: cy - 2, w: 4, h: 4, vx: dir.x * speed, vy: dir.y * speed - 30,

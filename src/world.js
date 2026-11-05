@@ -225,10 +225,10 @@ const fall = (w, x, y) => {
     note(w, 'fall', mat)
     swap(w, i, j)
     if (w.drop[j] < 255) w.drop[j] += 1
-    if (p.solid) w.crushing[j] = 1
+    if (p.solid && !p.soft) w.crushing[j] = 1
     return
   }
-  if (p.solid && w.drop[i] >= T.shatterDrop) shatter(w, x, y + 1, x, y)
+  if (p.solid && !p.soft && w.drop[i] >= T.shatterDrop) shatter(w, x, y + 1, x, y)
   w.drop[i] = 0
   if (!p.slides && !(p.thick && Math.random() < T.mudSlump)) return
   const side = Math.random() < 0.5 ? 1 : -1
@@ -516,6 +516,7 @@ const stepCharge = (w, dt) => {
   w.charged = charged
   const next = []
   for (const { x, y, energy } of w.frontier) {
+    const live = conductanceOf(w, w.mat[idx(x, y)])
     for (const [dx, dy] of N4) {
       const nx = x + dx
       const ny = y + dy
@@ -525,7 +526,7 @@ const stepCharge = (w, dt) => {
       if (cost && w.refractory[n] <= 0 && energy > cost) {
         conduct(w, n, energy)
         next.push({ x: nx, y: ny, energy: energy - cost })
-      } else if (w.mat[n] === M.SAND && Math.random() < T.fuse) {
+      } else if (live && w.mat[n] === M.SAND && Math.random() < T.fuse) {
         turn(w, n, M.GLASS, 'fuse')
       } else if (flammabilityOf(w, w.mat[n]) && Math.random() < T.spark) {
         ignite(w, nx, ny)
