@@ -137,7 +137,8 @@ const drawTies = (ctx, g, f) => {
   for (const pulse of f.pulses) {
     const [pa, pb] = [endOf(g, f, pulse.from), endOf(g, f, pulse.to)]
     if (!pa || !pb) continue
-    const t = Math.min(1, pulse.age / 0.25)
+    if (pulse.age < 0) continue
+    const t = Math.min(1, pulse.age / S.link.hopTime)
     const size = era >= 2 ? 2 : 1
     dot(ctx, pa.x + (pb.x - pa.x) * t - size / 2, pa.y + (pb.y - pa.y) * t - size / 2, size, size, pulse.colour)
     if (era >= 4) dot(ctx, pa.x + (pb.x - pa.x) * Math.max(0, t - 0.15), pa.y + (pb.y - pa.y) * Math.max(0, t - 0.15), 1, 1, pulse.colour)

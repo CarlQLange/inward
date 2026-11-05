@@ -1,5 +1,5 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
-import { M, props } from './materials.js'
+import { props } from './materials.js'
 import { acidAt, burningAt, chargedAt, crushingAt, energize, ignite, lavaAt, matAt } from './world.js'
 import { cell, cellsUnder, centre, moveAxis, overlap } from './physics.js'
 import { hurt } from './combat.js'
@@ -47,8 +47,16 @@ export const linkOf = (g, e) => g.effects.find(f => f.kind === 'link' && !f.done
 const COLD = '#bff2ff'
 const PALE = '#f4f8f2'
 
+const hops = (f, from, to) => {
+  if (f.hub) return from === f.hub ? [[f.hub, to, 0]] : [[from, f.hub, 0], [f.hub, to, 1]]
+  const [a, b] = [f.members.indexOf(from), f.members.indexOf(to)]
+  if (a < 0 || b < 0) return [[from, to, 0]]
+  const step = Math.sign(b - a)
+  return [[f.members[b - step], to, Math.abs(b - a) - 1]]
+}
+
 const pulse = (g, f, from, to, colour) => {
-  f.pulses.push({ from, to, age: 0, colour })
+  hops(f, from, to).forEach(([a, b, delay]) => f.pulses.push({ from: a, to: b, age: -delay * S.hopTime, colour }))
   const at = endOf(g, f, to)
   if (at) tieGlint(g, at.x, at.y, colour)
 }
@@ -266,7 +274,7 @@ export const stepLink = (g, f, dt) => {
   if (f.cable) runCables(g, f, dt)
   if (f.rope) pullRopes(g, f)
   f.pulses.forEach(p => { p.age += dt })
-  f.pulses = f.pulses.filter(p => p.age < 0.25)
+  f.pulses = f.pulses.filter(p => p.age < S.hopTime)
 }
 
 export const endLink = (g, f) => {

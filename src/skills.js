@@ -135,8 +135,8 @@ export const FORKS = {
     [form('float.tilt', 'TILT', 'FALLS THE WAY YOU AIM', MAGNET), form('float.flip', 'FLIP', 'FALLS UP AND DOWN BY TURNS', BLOOD)],
   ],
   link: [
-    [form('link.stake', 'STAKE', 'TIES FOES TO A BLOCK', STONE), form('link.yoke', 'YOKE', 'TIES FOES TO YOU', BLOOD)],
-    [form('link.cable', 'CABLE', 'FIRE AND CHARGE RUN ALONG THE LINKS', CHARGE), form('link.rope', 'ROPE', 'LINKED FOES DRAG EACH OTHER', WHITE)],
+    [form('link.stake', 'STAKE', 'TIES FOES TO A BLOCK', ACID), form('link.yoke', 'YOKE', 'TIES FOES TO YOU', BLOOD)],
+    [form('link.cable', 'CABLE', 'FIRE AND CHARGE RUN ALONG THE LINKS', MAGNET), form('link.rope', 'ROPE', 'LINKED FOES DRAG EACH OTHER', GAS)],
   ],
 }
 
@@ -1585,7 +1585,8 @@ const solidShare = (g, at, r) => {
 
 const settleBubble = (g, at, r) => [1, 2, 3, 4]
   .map(k => ({ x: at.x, y: at.y - k * BLOCK }))
-  .reduce((best, spot) => (solidShare(g, spot, r) < best.share - 0.04 ? { ...spot, share: solidShare(g, spot, r) } : best), { ...at, share: solidShare(g, at, r) })
+  .map(spot => ({ ...spot, share: solidShare(g, spot, r) }))
+  .reduce((best, spot) => (spot.share < best.share - 0.04 ? spot : best), { ...at, share: solidShare(g, at, r) })
 
 const floatBubble = (g, p) => {
   const set = g.effects.find(f => f.kind === 'float' && f.snare && !f.done)
@@ -1621,6 +1622,14 @@ const floatOff = g => {
   if (bubble) bubble.life = 0
 }
 
+const blockAlong = (g, from, aim, reach) => {
+  for (let d = 0; d < reach; d += 2) {
+    const [x, y] = [cell(from.x + aim.x * d), cell(from.y + aim.y * d)]
+    if (props(matAt(g.world, x, y)).solid) return { x, y }
+  }
+  return null
+}
+
 const linkFoes = (g, p) => {
   const options = { cable: owns(p, 'link.cable'), rope: owns(p, 'link.rope'), colour: hue(p, 'link', TIE) }
   if (owns(p, 'link.yoke')) {
@@ -1629,15 +1638,12 @@ const linkFoes = (g, p) => {
     tieUp(g, near, 'hero', options)
     return
   }
-  if (owns(p, 'link.stake')) {
-    const hit = ray(g, muzzle(p), p.aim, S.link.reach)
-    if (hit.solid && hit.m !== M.BEDROCK) {
-      const block = { x: cell(hit.x), y: cell(hit.y) }
-      const near = gatherAround(g, { x: (block.x + 0.5) * BLOCK, y: (block.y + 0.5) * BLOCK }, S.link.reach)
-      if (near.length === 0) return FREE
-      tieUp(g, near, block, options)
-      return
-    }
+  const block = owns(p, 'link.stake') && blockAlong(g, muzzle(p), p.aim, S.link.reach)
+  if (block) {
+    const near = gatherAround(g, { x: (block.x + 0.5) * BLOCK, y: (block.y + 0.5) * BLOCK }, S.link.reach)
+    if (near.length === 0) return FREE
+    tieUp(g, near, block, options)
+    return
   }
   const covered = inCone(muzzle(p), p.aim, S.link.reach, S.link.width)
   const target = nearestTo(g.enemies.filter(e => linkable(e) && covered(centre(e))), centre(p))
