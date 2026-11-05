@@ -58,7 +58,7 @@ const line = (x0, y0, x1, y1, c) => {
 const outline = () => {
   for (let i = 0; i < grid.length; i++) {
     if (grid[i] !== 0) continue
-    const lit = v => v !== 0 && v !== OUTLINE
+    const lit = v => v !== undefined && v !== 0 && v !== OUTLINE
     if (lit(grid[i - 1]) || lit(grid[i + 1]) || lit(grid[i - SIZE]) || lit(grid[i + SIZE])) grid[i] = OUTLINE
   }
 }
