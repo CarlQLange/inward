@@ -1,7 +1,8 @@
 import { M, MATERIAL_NAMES } from './materials.js'
 import { ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
-import { SKILL_DETAILS, SKILL_NAMES, TREES } from './skills.js'
+import { FORKS, SKILL_DETAILS, formOf, owns } from './skills.js'
+import { tintedIcon } from './skillart.js'
 import { SPRITES } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { drawText, textWidth, wrapText } from './font.js'
@@ -87,10 +88,11 @@ const skillColumn = (ctx, g, menu) => {
     const chosen = on && menu.slot === slot && skill
     panel(ctx, 8, y, 20, 20, chosen ? YELLOW : skill ? GREEN : FAINT)
     if (!skill) continue
-    ctx.drawImage(SPRITES.icons[skill.kind], 10, y + 2)
-    drawText(ctx, SKILL_NAMES[skill.kind], 32, y + 3, chosen ? YELLOW : WHITE)
-    TREES[skill.kind].forEach((node, n) => {
-      ctx.fillStyle = p.upgrades.has(node.id) ? YELLOW : FAINT
+    const { name, tint, stage } = formOf(p, skill.kind)
+    ctx.drawImage(tintedIcon(skill.kind, tint), 10, y + 2)
+    drawText(ctx, name, 32, y + 3, chosen ? YELLOW : WHITE)
+    FORKS[skill.kind].forEach((_, n) => {
+      ctx.fillStyle = n < stage ? tint : FAINT
       ctx.fillRect(32 + n * 6, y + 12, 4, 4)
     })
   }
@@ -103,8 +105,8 @@ const skillColumn = (ctx, g, menu) => {
     y += 7
   })
   y += 4
-  TREES[chosen.kind].forEach(node => {
-    const owned = p.upgrades.has(node.id)
+  FORKS[chosen.kind].flatMap(fork => (fork.some(node => owns(p, node.id)) ? fork.filter(node => owns(p, node.id)) : fork)).forEach(node => {
+    const owned = owns(p, node.id)
     drawText(ctx, node.name, left, y, owned ? YELLOW : DIM)
     y += 7
     wrapText(node.text, 22).forEach(line => {
@@ -272,7 +274,7 @@ const drawSummary = (ctx, g, menu) => {
 const drawCard = (ctx, card, x, y, w, h, on, time) => {
   panel(ctx, x, y, w, h, on ? YELLOW : GREEN)
   if (card.mystery) drawText(ctx, '?', x + w / 2 - 6, y + 8, Math.floor(time * 5) % 2 ? YELLOW : WHITE, 4)
-  else if (card.icon) ctx.drawImage(SPRITES.icons[card.icon], x + w / 2 - 8, y + 8)
+  else if (card.icon) ctx.drawImage(tintedIcon(card.icon, card.tint), x + w / 2 - 8, y + 8)
   const chars = Math.floor((w - 6) / 4)
   const name = wrapText(card.name, chars)
   name.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 30 + n * 7, on ? YELLOW : WHITE))

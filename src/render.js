@@ -12,6 +12,7 @@ import { drawHero } from './hero.js'
 import { cameraOffset, doorOffset, drawMotes, drawParticles } from './fx.js'
 import { drawScene, liquidOverlay } from './scene.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
+import { drawSkillEffects } from './skillart.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -23,7 +24,7 @@ const COLOURS = {
 const ROOM_PX = ROOM * BLOCK
 
 const drawBolt = (ctx, bolt) => {
-  ctx.fillStyle = COLOURS[bolt.colour] ?? COLOURS.charge
+  ctx.fillStyle = COLOURS[bolt.colour] ?? bolt.colour ?? COLOURS.charge
   bolt.points.slice(1).forEach((b, i) => {
     const a = bolt.points[i]
     const steps = Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)))
@@ -223,6 +224,7 @@ const drawRoom = (ctx, g, pointer) => {
   drawScene(ctx, g, { ...room, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
   drawChain(ctx, g)
   if (g.phase !== 'title') drawHeroLayer(ctx, g)
+  drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
   if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)

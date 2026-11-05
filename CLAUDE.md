@@ -120,11 +120,13 @@ effects must spread across blocks visibly and be readable without text.
 He asked to be surprised, so these were agent choices. Treat them as open to change.
 
 - The world is four-shade green until the first card, then colour floods in.
-- 28 skills with three upgrades each, and three slots. Carl called the first six boring, so
-  they now span movement (blink, grapple, dash, rewind), terrain (mason, seed, spring,
-  acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror), helpers
-  (drone, rod, mine) and skills acting on skills (echo, pact). Skills are verbs on world
-  rules, and no synergy is written anywhere.
+- 26 skills in three slots: movement (blink, grapple, dash, rewind), terrain (mason, seed,
+  spring, acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror) and
+  helpers (drone, rod, mine). Skills are verbs on world rules, and no synergy is written
+  anywhere.
+- Each skill evolves through two forks of two exclusive forms, so two picks and four possible
+  ends. Carl rejected "the same but slightly better": a form must change what the skill does,
+  never only how much. Taking a form renames the skill and changes how it looks in play.
 - Eight random starter rooms, each teaching its own first skill, and a quickstart for any
   ring with a matching random loadout. Quickstarts don't count towards records.
 - Each room has one of eight layouts, such as tunnels, chasm or chimney, and regions have
@@ -137,8 +139,9 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Eight hearts, and each hit costs one. Hurt feedback names the cause, and the first time
   also explains it. Holding Shift or LT shows what hurts, burns, conducts or explodes.
 - Foes warn before attacking. Clearing a room heals one heart.
-- 27 relics, from chests, altars, mimics and the shop. They change your gun, your movement
-  and what can hurt you, such as fire immunity making fire a toy.
+- 27 relics, from chests, altars, mimics and the shop. They change rules rather than numbers:
+  your gun, your movement, what can hurt you, and what pays (fire immunity makes fire a toy,
+  the odd gem only rewards world kills, gas lifts you).
 - Eight region themes change materials, tiles and foes. Room events: arena, flood,
   gasworks, collapse, vault, nest, altar and chests. Elite foes can burn, shock or be armoured.
 - Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, lava, acid,

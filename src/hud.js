@@ -5,6 +5,8 @@ import { RELIC_BY_ID } from './relics.js'
 import { drawMapGrid } from './screens.js'
 import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
+import { FORKS, cooldownOf, formOf } from './skills.js'
+import { tintedIcon } from './skillart.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -42,16 +44,21 @@ const drawSkillSlot = (ctx, g, slot) => {
     corners(ctx, SLOT_X, top, SLOT, DIM)
     return
   }
-  const whole = TUNING.skills[skill.kind].every
+  const whole = cooldownOf(g.player, skill.kind)
+  const { tint, stage } = formOf(g.player, skill.kind)
   const waiting = Math.max(0, Math.min(1, skill.ready / whole))
   const wasWaiting = readiness.get(skill) ?? 0
   const flash = wasWaiting > 0 && waiting === 0 ? 0.18 : Math.max(0, (skill.flash ?? 0) - 1 / 60)
   skill.flash = flash
   readiness.set(skill, waiting)
-  box(ctx, SLOT_X, top, SLOT, SLOT, waiting > 0 ? MID : GREEN)
+  box(ctx, SLOT_X, top, SLOT, SLOT, waiting > 0 ? MID : tint ?? GREEN)
   ctx.globalAlpha = waiting > 0 ? 0.45 : 1
-  ctx.drawImage(SPRITES.icons[skill.kind], SLOT_X + 8, top + 8)
+  ctx.drawImage(tintedIcon(skill.kind, tint), SLOT_X + 8, top + 8)
   ctx.globalAlpha = 1
+  FORKS[skill.kind].forEach((_, n) => {
+    ctx.fillStyle = n < stage ? tint : DIM
+    ctx.fillRect(SLOT_X + SLOT - 8 - (FORKS[skill.kind].length - 1 - n) * 5, top + SLOT - 5, 3, 3)
+  })
   if (waiting > 0) {
     const h = Math.round((SLOT - 2) * waiting)
     ctx.fillStyle = 'rgba(118, 214, 72, 0.22)'

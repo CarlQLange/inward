@@ -6,6 +6,7 @@ import { drawText } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
 import { drawCreatures } from './creatures.js'
+import { drawSkillMatter } from './skillart.js'
 
 const GREEN = '#76d648'
 const WHITE = '#f4f8f2'
@@ -478,6 +479,7 @@ export const drawScene = (ctx, g, room, live) => {
   const { world, theme } = room
   const time = g.time
   drawSolids(ctx, world, g.depth, THEMES[theme]?.skin, theme)
+  if (live) drawSkillMatter(ctx, g)
   drawCards(ctx, time, room.cards)
   drawWares(ctx, room.wares, g.gold)
   drawPickups(ctx, time, room.pickups)
