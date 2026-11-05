@@ -723,7 +723,7 @@ export const FOE_MATTER = {
   bomber: 'scrap', imp: 'shard', emberbat: 'cinder', slime: 'goo', crab: 'chip', nest: 'splinter', mimic: 'splinter', gasbag: 'puff',
   tick: 'chip', pillbug: 'chip', gnat: 'feather', stilt: 'chip', snapweed: 'splinter', scrapper: 'scrap', dripper: 'goo', shade: 'ink',
   urchin: 'chip', coil: 'scrap', puffer: 'puff', lantern: 'crystal', lamp: 'scrap', battery: 'scrap', tank: 'scrap', carboy: 'shard',
-  ladle: 'scrap', sandbag: 'clod', mole: 'gib', hermit: 'gib', miner: 'gib', cartographer: 'gib', tinker: 'gib', bloodletter: 'gib', orbit: 'gib',
+  ladle: 'scrap', sandbag: 'clod', mole: 'gib', hermit: 'gib', miner: 'gib', orbit: 'gib',
   bellows: 'scrap', colossus: 'chip', crucible: 'scrap', eel: 'gib', eelseg: 'gib', brood: 'gib', conductor: 'scrap', core: 'crystal',
 }
 

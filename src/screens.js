@@ -1,11 +1,11 @@
 import { pausedOverPit } from './moment.js'
-import { M, MATERIAL_NAMES } from './materials.js'
-import { ORIGIN, ROOM, TUNING, VIEW } from './config.js'
-import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
+import { M } from './materials.js'
+import { ORIGIN, ROOM, VIEW } from './config.js'
+import { ENEMY_TRAITS } from './enemies.js'
 import { FORKS, SKILL_DETAILS, formOf, owns } from './skills.js'
 import { tintedIcon } from './skillart.js'
 import { eatsLine } from './feed.js'
-import { SPRITES, creatureFrames } from './sprites.js'
+import { SPRITES } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { almanac } from './discover.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
@@ -17,7 +17,7 @@ import { CORE_RING, keyOf, ringOf } from './map.js'
 import { RELIC_BY_ID } from './relics.js'
 import { KEYSTONE_BY_ID, slotsOf } from './keystones.js'
 import { SCHOOLS } from './wards.js'
-import { CONTROL_ROWS, promptFor, skillAction } from './controls.js'
+import { CONTROL_ROWS, promptFor } from './controls.js'
 import { PROMPT_HEIGHT, drawPrompt, drawPromptRow, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
@@ -91,7 +91,7 @@ const hallRow = (ctx, run, y, colour) => {
   const score = String(run.score)
   const right = midX() - 2
   drawText(ctx, score, right - textWidth(score), y, colour)
-  const after = drawKeyGlyphs(ctx, run.keys ?? [], midX() + 4, y - 2)
+  const after = drawKeyGlyphs(ctx, (run.keys ?? []).filter(id => KEYSTONE_BY_ID[id]), midX() + 4, y - 2)
   drawLoopMarks(ctx, run.loop ?? 0, midX() + 6 + after, y - 1)
 }
 
@@ -254,26 +254,6 @@ const drawControls = (ctx, menu) => {
   drawList(ctx, menu, ORIGIN.y + 204 + rise)
 }
 
-const drawRecords = (ctx, menu) => {
-  const rise = sheet(ctx, menu)
-  const rows = [
-    ['BEST', save.best],
-    ['CHAIN', save.bestChain],
-    ['RUNS', save.runs],
-    ['DEEPEST', save.deepest],
-    ['CORES', save.coresReached],
-    ['DEEPER', save.deepestLoop],
-    ['WORLD KILLS', save.worldKills],
-  ]
-  rows.forEach(([name, value], i) => {
-    const y = ORIGIN.y + 44 + rise + i * 14
-    drawText(ctx, name, ORIGIN.x + 28, y, PALE)
-    const text = String(value)
-    drawText(ctx, text, ORIGIN.x + ROOM_PX - 28 - textWidth(text), y, GREEN)
-  })
-  drawList(ctx, menu, ORIGIN.y + 196 + rise)
-}
-
 const shadows = new WeakMap()
 
 const shadowOf = art => {
@@ -394,7 +374,6 @@ const drawCounts = (ctx, g, y) => {
   const items = [
     [`X${g.chainPeak}`, YELLOW, 'chain'],
     [g.wardenWins, g.outwits > 0 ? YELLOW : WHITE, g.outwits > 0 ? 'seal_broken' : 'seal'],
-    [g.cleanClears, WHITE, 'heart'],
     [g.gold, WHITE, 'coin'],
     [`${book.found}/${book.total}`, DIM, 'discovery'],
   ]
@@ -558,13 +537,11 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
     for (let x = 0; x < 15; x++) {
       const room = g.rooms[keyOf(x, y)]
       const seen = room?.visited
-      const known = seen || g.player.relics.has('eye')
       const here = x === g.x && y === g.y
       const core = x === 7 && y === 7
       ctx.fillStyle = here ? (Math.floor(g.time * 4) % 2 ? WHITE : YELLOW) : seen ? GREEN : core ? YELLOW : MAP_RINGS[ringOf(x, y)]
       ctx.fillRect(left + x * pitch, top + y * pitch, cellSize, cellSize)
-      if (!seen && !known) continue
-      if (!room) continue
+      if (!seen) continue
       for (const [dir, link] of Object.entries(room.links)) {
         const [dx, dy] = STEPS[dir]
         const lock = link.lock && room.doors[dir] && (link.lock === 'seal' ? g.seals < 3 : lockStands(room, dir))
@@ -616,7 +593,6 @@ const PAGES = {
   confirm: (ctx, g, menu) => drawConfirm(ctx, menu),
   options: (ctx, g, menu) => drawOptions(ctx, menu),
   controls: (ctx, g, menu) => drawControls(ctx, menu),
-  records: (ctx, g, menu) => drawRecords(ctx, menu),
   almanac: drawAlmanac,
   summary: drawSummary,
   choice: drawChoice,
@@ -629,17 +605,7 @@ export const drawMenus = (ctx, g) => {
   if (!menu) return
   menu.hits = []
   PAGES[menu.page](ctx, g, menu)
-  if (!['title', 'almanac', 'controls', 'records'].includes(menu.page)) drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
-}
-
-const drawToastPrompts = (ctx, prompts, y) => {
-  const widths = prompts.map(([action, word]) => promptWidth(action) + (word ? textWidth(word) + 2 : 0))
-  const total = widths.reduce((a, b) => a + b + 6, -6)
-  prompts.reduce((x, [action, word], i) => {
-    const drawn = drawPrompt(ctx, action, x, y)
-    if (word) drawText(ctx, word, x + drawn + 2, y + 2, PALE)
-    return x + widths[i] + 6
-  }, midX() - total / 2)
+  if (!['title', 'almanac', 'controls'].includes(menu.page)) drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
 }
 
 export const drawToast = (ctx, g) => {

@@ -6,16 +6,9 @@ const RUN_VERSION = 2
 const DEFAULTS = {
   version: 2,
   found: [],
-  ghost: null,
   best: 0,
-  bestChain: 0,
   runs: 0,
-  coresReached: 0,
-  deepest: 0,
-  worldKills: 0,
-  deepestLoop: 0,
   hall: [],
-  last: null,
   notes: [],
   settings: { autofire: true, shaders: 'full', shake: true, rumble: true },
 }
@@ -80,19 +73,12 @@ export const hasRun = () => loadRun() !== null
 
 const HALL_SIZE = 5
 
-export const recordRun = ({ score, chainPeak, roomReached, reachedCore, worldKills, loop = 0, entry = {} }) => {
-  const newBest = score > save.best
-  const run = { score, ...entry }
+export const recordRun = run => {
+  const newBest = run.score > save.best
   Object.assign(save, {
-    best: Math.max(save.best, score),
-    bestChain: Math.max(save.bestChain, chainPeak),
+    best: Math.max(save.best, run.score),
     runs: save.runs + 1,
-    coresReached: save.coresReached + (reachedCore ? 1 : 0),
-    deepest: Math.max(save.deepest, roomReached),
-    worldKills: save.worldKills + worldKills,
-    deepestLoop: Math.max(save.deepestLoop, loop),
     hall: [...save.hall, run].sort((a, b) => b.score - a.score).slice(0, HALL_SIZE),
-    last: run,
   })
   persist()
   return newBest

@@ -3,14 +3,10 @@ const relic = (id, name, text, icon) => ({ id, name, text, icon })
 export const RELICS = [
   relic('fireboots', 'CINDER BOOTS', 'FIRE CANNOT HURT', 'fireboots'),
   relic('rubber', 'RUBBER GLOVES', 'CHARGE CANNOT HURT', 'rubber'),
-  relic('gills', 'GILLS', 'SMOKE IS HARMLESS', 'gills'),
   relic('springs', 'COILED SPRINGS', 'DOUBLE JUMP', 'springs'),
   relic('claws', 'CLIMBING CLAWS', 'CLING TO WALLS', 'claws'),
   relic('feather', 'FEATHER', 'HOLD JUMP: FALL SLOWLY', 'feather'),
-  relic('coinmagnet', 'MAGNET HEART', 'YOU ARE MAGNETIC', 'coinmagnet'),
   relic('sack', 'GUT SACK', 'KILLED FOES SPILL THEIR MATERIAL', 'sack'),
-  relic('hands', 'HOT HANDS', 'FIRE RECHARGES ALL SKILLS', 'hands'),
-  relic('battery', 'BATTERY', 'EXTRA RECHARGE IS SAVED AS SPARE USES', 'battery'),
   relic('plate', 'REACTIVE PLATE', 'GETTING HIT SETS OFF A BLAST', 'plate'),
   relic('phoenix', 'PHOENIX', 'RETURN FROM DEATH ONCE', 'phoenix'),
   relic('incendiary', 'FIRE ROUNDS', 'SHOTS LIGHT FIRES', 'incendiary'),
@@ -25,8 +21,6 @@ export const RELICS = [
   relic('crown', 'GREEDY CROWN', 'HITS COST COINS INSTEAD OF HEARTS', 'crown'),
   relic('acidskull', 'ACID ROUNDS', 'SHOTS DISSOLVE BLOCKS', 'acidskull'),
   relic('wind', 'UPDRAFT', 'GAS LIFTS YOU', 'wind'),
-  relic('dice', 'LOADED DICE', 'NEW SKILLS COME EVOLVED', 'dice'),
-  relic('eye', 'THIRD EYE', 'SEE THE WHOLE MAP', 'eye'),
   relic('chain', 'BROKEN CHAIN', 'ONLY HITS BREAK CHAINS', 'chain'),
 ]
 

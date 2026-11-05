@@ -3,7 +3,6 @@ import { M, props } from './materials.js'
 import { centre, liquidAtPx } from './physics.js'
 import { anchorOf } from './cast.js'
 import { FREE, cooldownOf, handOf, holdOf, hostile, streamOf } from './skills.js'
-import { hasRelic } from './relics.js'
 import { castWait } from './keystones.js'
 
 const F = TUNING.feed
@@ -146,11 +145,7 @@ export const DIETS = {
   clay: ['fire', 'lava'], burrow: ['mud', 'falling'],
 }
 
-const foodOf = (p, kind) => {
-  const extra = p.diet?.[kind] ?? []
-  const fire = hasRelic(p, 'hands') ? ['fire'] : []
-  return [...new Set([...DIETS[kind], ...extra, ...fire])]
-}
+const foodOf = (_, kind) => DIETS[kind]
 
 export const dietOf = foodOf
 
@@ -275,18 +270,12 @@ export const stepFeeds = (g, p, dt) => {
   stepMotes(g, p, dt)
 }
 
-const stored = (p, skill, amount) => {
-  if (hasRelic(p, 'battery')) skill.spare = Math.min(F.spareMost, (skill.spare ?? 0) + amount)
-}
-
 export const feedEvent = (g, event, x, y, amount = 1) => {
   const p = g.player
   for (const skill of p.skills) {
     if (!DIETS[skill.kind].includes(event)) continue
     const whole = cooldownOf(p, skill.kind)
-    const refund = F.refund[event] * whole * amount
-    if (skill.ready <= 0) stored(p, skill, refund / whole)
-    skill.ready -= refund
+    skill.ready -= F.refund[event] * whole * amount
     skill.gulp = 1
     skill.meal = { amount: skill.meal?.amount ?? 0, tag: event }
     const look = EVENTS[event]
@@ -327,19 +316,8 @@ const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast }, holding)
 
 const HANDS = {
   tap: ({ g, p, skill, whole, pressed, stunned, dt, cast, boost }) => {
-    skill.ready -= dt * rateOf(skill, boost, p)
-    if (skill.ready < 0) {
-      stored(p, skill, (dt * (skill.meal?.amount ?? 0)) / whole)
-      skill.ready = 0
-    }
-    if (!pressed || stunned) return
-    if (skill.ready <= 0) fire(g, p, skill, whole, cast)
-    else if ((skill.spare ?? 0) >= 1) {
-      skill.spare -= 1
-      const waiting = skill.ready
-      fire(g, p, skill, whole, cast)
-      skill.ready = waiting
-    }
+    skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    if (pressed && !stunned && skill.ready <= 0) fire(g, p, skill, whole, cast)
   },
   stock: ({ g, p, skill, hand, whole, pressed, stunned, dt, cast, boost }) => {
     skill.stock ??= hand.most
@@ -400,14 +378,10 @@ export const waitingOf = (p, skill) => {
   const hand = handOf(p, skill.kind)
   const whole = cooldownOf(p, skill.kind)
   if (hand.type === 'stock' && (skill.stock ?? hand.most) > 0) return 0
-  if (hand.type === 'stream' || hand.type === 'toggle') return Math.max(0, Math.min(1, skill.ready / whole))
-  if ((skill.spare ?? 0) >= 1) return 0
   return Math.max(0, Math.min(1, skill.ready / whole))
 }
 
 export const pipsOf = (p, skill) => {
   const hand = handOf(p, skill.kind)
-  if (hand.type === 'stock') return { have: skill.stock ?? hand.most, most: hand.most }
-  const spare = Math.floor(skill.spare ?? 0)
-  return spare > 0 ? { have: spare, most: F.spareMost } : null
+  return hand.type === 'stock' ? { have: skill.stock ?? hand.most, most: hand.most } : null
 }

@@ -52,7 +52,6 @@ const openOptions = g => openMenu(g, {
     ...(isTouchLayout()
       ? [{ label: () => `AUTO FIRE: ${save.settings.autofire ? 'ON' : 'OFF'}`, run: toggleSetting('autofire') }]
       : [{ label: 'CONTROLS', run: g2 => openControls(g2) }]),
-    { label: 'RECORDS', run: g2 => openRecords(g2) },
     {
       label: 'DELETE SAVE',
       run: gm => openMenu(gm, {
@@ -62,7 +61,7 @@ const openOptions = g => openMenu(g, {
           {
             label: 'FORGET',
             run: gc => {
-              Object.assign(save, { best: 0, bestChain: 0, runs: 0, coresReached: 0, deepest: 0, worldKills: 0, deepestLoop: 0, hall: [], last: null, found: [], ghost: null })
+              Object.assign(save, { best: 0, runs: 0, hall: [], found: [] })
               knownNotes.clear()
               persist()
               closeMenu(gc)
@@ -75,10 +74,7 @@ const openOptions = g => openMenu(g, {
   ],
 })
 
-const openPage = page => g => openMenu(g, { page, title: page.toUpperCase().replace('-', ' '), scroll: 0, slot: 0, items: [back] })
-
-const openControls = openPage('controls')
-const openRecords = openPage('records')
+const openControls = g => openMenu(g, { page: 'controls', title: 'CONTROLS', items: [back] })
 const openQuickstart = g => openMenu(g, {
   page: 'quickstart',
   items: Array.from({ length: 8 }, (_, ring) => ({ run: quickstart(ring) })),
@@ -121,9 +117,6 @@ export const openPause = g => openMenu(g, {
     },
   ],
 })
-
-export const openSkills = openPause
-export const openMap = openPause
 
 export const openChoice = (g, { bank, deeper, stop, go }) => openMenu(g, {
   page: 'choice',

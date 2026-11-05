@@ -3,7 +3,7 @@ const ART = {
   worm: [17, 25], turret: [22, 13], bomber: [15, 24], imp: [22, 26], emberbat: [28, 20], slime: [22, 17], crab: [24, 18],
   nest: [16, 24], mimic: [22, 16], gasbag: [15, 24], tick: [10, 6], pillbug: [20, 12], stilt: [27, 27], snapweed: [12, 26],
   scrapper: [20, 24], dripper: [12, 20], shade: [20, 24], urchin: [21, 20], coil: [20, 26], lantern: [24, 21],
-  mole: [22, 24], hermit: [17, 22], miner: [22, 22], cartographer: [25, 21], tinker: [21, 24], bloodletter: [16, 24],
+  mole: [22, 24], hermit: [17, 22], miner: [22, 22],
   bellows: [66, 65], colossus: [69, 59], crucible: [54, 68], eel: [28, 26], eelseg: [16, 19], brood: [43, 65],
   conductor: [48, 66], core: [64, 54],
 }

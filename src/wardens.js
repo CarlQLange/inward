@@ -954,15 +954,15 @@ const orbit = (g, e) => {
 }
 
 Object.assign(ENEMY_DEFS, {
-  bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'], sprite: [26] },
-  colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, weakTo: ['CRUSHED'], sprite: [13] },
-  crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true, sprite: [16] },
-  eel: { size: [20, 16], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [15] },
-  eelseg: { size: [12, 12], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
-  brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'], sprite: [22] },
-  conductor: { size: [40, 62], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, weakTo: ['CHARGE'], sprite: [16] },
-  core: { size: [44, 44], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
-  orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true, sprite: [6] },
+  bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'] },
+  colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, weakTo: ['CRUSHED'] },
+  crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true },
+  eel: { size: [20, 16], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true },
+  eelseg: { size: [12, 12], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true },
+  brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'] },
+  conductor: { size: [40, 62], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, weakTo: ['CHARGE'] },
+  core: { size: [44, 44], hp: 600, value: 3000, heavy: true, free: true, warden: true },
+  orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true },
 })
 
 Object.assign(STEPPERS, { bellows, colossus, crucible, eel, eelseg, brood, conductor, core, orbit })
@@ -1134,7 +1134,6 @@ export const buildArena = (id, links) => {
     cards: [], wares: [],
     enemies: [{ kind: id, x: plan.boss.x * BLOCK, row: plan.boss.row, y: plan.boss.y }, ...hung],
     layout: `arena-${id}`,
-    spare: { x: 14 * BLOCK, y: (plan.floor - 2) * BLOCK },
     arena: { id, seals, exits, clears, interior, shape: plan.grid.map(row => row.join('')), lamps: hung, lampClock: 0, watch: 0 },
   }
 }

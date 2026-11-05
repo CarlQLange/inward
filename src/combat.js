@@ -31,7 +31,7 @@ const hurtPlayer = (g, p, cause) => {
   } else if (paid) spillCoins(g, p, TUNING.run.crownHit)
   else p.hp -= 1
   feedEvent(g, 'hit', centre(p).x, centre(p).y)
-  if (p.relics.has('chain') && !hasKeystone(p, 'unbroken')) {
+  if (p.relics.has('chain')) {
     g.chain = 0
     g.chainTime = 0
   }
@@ -125,7 +125,7 @@ export const applyHazards = (g, e, dt) => {
   if (burning.some(([x, y]) => acidAt(world, x, y))) hurt(g, e, 1, 'world', 'ACID')
   if (world.thorns && e !== g.player && cellsUnder(e).some(([x, y]) => vineAt(world, x, y))) hurt(g, e, 1)
   const inSmoke = cellsUnder(e).some(([x, y]) => props(matAt(world, x, y)).harmful)
-  e.smoked = inSmoke && !e.smokeproof ? (e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
+  e.smoked = inSmoke ?(e.smoked ?? 0) + dt : Math.max(0, (e.smoked ?? 0) - dt)
   if (e.smoked > TUNING.player.smokeTolerance) {
     hurt(g, e, 1, 'world', 'SMOKE')
     e.smoked = 0
