@@ -35,16 +35,16 @@ export const moveAxis = (world, e, axis, distance) => {
   return false
 }
 
-export const move = (world, e, dt) => {
+export const move = (world, e, dt, down = 1) => {
   e.hitWall = moveAxis(world, e, 'x', e.vx * dt)
   if (e.hitWall) e.vx = 0
   const blocked = moveAxis(world, e, 'y', e.vy * dt)
-  e.grounded = blocked && e.vy > 0
+  e.grounded = blocked && e.vy * down > 0
   if (blocked) e.vy = 0
 }
 
-export const pushOutOfSolid = (world, e) => {
-  for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= 1
+export const pushOutOfSolid = (world, e, down = 1) => {
+  for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= down
 }
 
 export const unbury = (world, e) => {

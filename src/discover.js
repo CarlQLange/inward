@@ -31,7 +31,7 @@ export const LADDER = [
   'keystone:breath', 'foe:mimic', 'foe:urchin', 'skill:charm', 'relic:crown', 'warden:brood', 'skill:alchemy',
   'foe:lantern', 'omen:glass', 'relic:skull', 'skill:mirror', 'foe:shade', 'relic:acidskull',
   'skill:stop', 'relic:dice', 'omen:blackout', 'skill:rewind', 'relic:eye',
-  'keystone:onecut', 'relic:phoenix',
+  'keystone:onecut', 'relic:phoenix', 'skill:float', 'skill:link',
 ]
 
 const CATALOGUE = [...BASE, ...LADDER]

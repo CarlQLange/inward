@@ -7,6 +7,7 @@ import { burstSparks, hitFx, hurtFx, woundFx } from './fx.js'
 import { bounced, schoolOf, wardShare } from './wards.js'
 import { hasKeystone } from './keystones.js'
 import { feedEvent } from './feed.js'
+import { passOn } from './link.js'
 
 export const burst = burstSparks
 
@@ -65,6 +66,7 @@ const hurtWarden = (g, e, amount, source, cause) => {
   } else e.gunDamage = (e.gunDamage ?? 0) + amount
   e.lastSource = source
   e.lastCause = cause
+  if (e.link > 0) passOn(g, e, amount, source, cause)
   if (share < 1) {
     bounced(g, e, school)
     return
@@ -86,6 +88,7 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   if (e.iframes > 0 || e.hp <= 0) return
   if (e === g.player) {
     hurtPlayer(g, e, cause)
+    if (e.link > 0) passOn(g, e, 1, 'world', cause)
     return
   }
   if (e.ward && schoolOf(source, cause) === e.ward) {
@@ -100,6 +103,7 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   e.lastCause = cause
   if (source === 'player') g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
   hitFx(g, e)
+  if (e.link > 0) passOn(g, e, amount, source, cause)
 }
 
 export const applyCrush = (g, e) => {

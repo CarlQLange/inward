@@ -279,6 +279,11 @@ const drawOne = (ctx, g, e) => {
   if (e.stowed) return
   if (e.anchor) stalk(ctx, e, y)
   if (e.intangible) ctx.globalAlpha = 0.35
+  if (e.upside) {
+    ctx.save()
+    ctx.translate(0, y * 2 + art.height)
+    ctx.scale(1, -1)
+  }
   if (e.elite || e.ally) ring(ctx, art, at, y, pose, e.ally ? GAS : ELITE_COLOURS[e.elite])
   stamp(ctx, art, at, y, pose)
   ctx.globalAlpha = 1
@@ -294,6 +299,7 @@ const drawOne = (ctx, g, e) => {
     stamp(ctx, silhouette(art, FROST), at, y, pose)
     ctx.globalAlpha = 1
   }
+  if (e.upside) ctx.restore()
   if (e.aimAt && e.stun <= 0) {
     ctx.fillStyle = HURT
     const c = { x: e.x + e.w / 2, y: e.y + e.h / 2 }

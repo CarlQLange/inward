@@ -3,6 +3,9 @@ import { M, props } from './materials.js'
 import { matAt } from './world.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
+import { eraIndex } from './particles.js'
+import { PULLS } from './float.js'
+import { endOf, tiesOf } from './link.js'
 
 const S = TUNING.skills
 
@@ -55,6 +58,83 @@ const circle = (ctx, x, y, r, colour, points = 16) => {
   for (let i = 0; i < points; i++) {
     const a = (i / points) * Math.PI * 2
     ctx.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r), 1, 1)
+  }
+}
+
+const chevron = (ctx, x, y, [gx, gy], colour) => {
+  const [px, py] = [gy, gx]
+  dot(ctx, x, y, 1, 1, colour)
+  dot(ctx, x - gx + px, y - gy + py, 1, 1, colour)
+  dot(ctx, x - gx - px, y - gy - py, 1, 1, colour)
+}
+
+const FADE = 0.6
+
+const drawBubble = (ctx, g, f) => {
+  const era = eraIndex(g)
+  const pull = PULLS[f.shown ?? f.pull]
+  const fading = !f.carry && f.life < FADE && Math.floor(g.time * 14) % 2
+  const rim = fading ? WHITE : f.colour
+  if (era >= 2) {
+    ctx.globalAlpha = 0.07 + era * 0.01
+    ctx.fillStyle = f.colour
+    ctx.beginPath()
+    ctx.arc(Math.round(f.x), Math.round(f.y), f.r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+  circle(ctx, f.x, f.y, f.r, rim, Math.round(f.r * (era >= 2 ? 1.6 : 1)))
+  if (f.snare) circle(ctx, f.x, f.y, f.r - 2, rim, Math.round(f.r * 0.8))
+  if (era >= 3) {
+    for (let i = 0; i < 6; i++) {
+      const a = -2.3 + i * 0.09
+      dot(ctx, f.x + Math.cos(a) * (f.r - 3), f.y + Math.sin(a) * (f.r - 3), 1, 1, WHITE)
+    }
+  }
+  const travel = (g.time * 18) % 12
+  for (let row = -2; row <= 2; row++) {
+    for (let col = -2; col <= 2; col++) {
+      const along = row * 12 + travel - 6
+      const across = col * 14 + (row % 2 ? 7 : 0)
+      const x = f.x + pull[0] * along + pull[1] * across
+      const y = f.y + pull[1] * along + pull[0] * across
+      if (Math.hypot(x - f.x, y - f.y) < f.r - 4) chevron(ctx, x, y, pull, rim)
+    }
+  }
+}
+
+const KNOT = 3
+
+const drawTies = (ctx, g, f) => {
+  const era = eraIndex(g)
+  const ending = f.life < 1 && Math.floor(g.time * 12) % 2
+  const colour = ending ? WHITE : f.colour
+  for (const [a, b] of tiesOf(f)) {
+    const [pa, pb] = [endOf(g, f, a), endOf(g, f, b)]
+    if (!pa || !pb) continue
+    const heat = f.live.get(b)
+    const taut = f.rope && Math.hypot(pb.x - pa.x, pb.y - pa.y) >= (f.lengths?.get(b) ?? Infinity) * 0.97
+    if (heat) dotted(ctx, pa, pb, Math.floor(g.time * 24) % 2 ? (heat.school === 'CHARGE' ? CHARGE : FIRE) : WHITE, 1)
+    else dotted(ctx, pa, pb, colour, taut ? 1 : era >= 2 ? 2 : 3, era >= 2 ? g.time * 16 : 0)
+  }
+  for (const e of f.members) dot(ctx, e.x + e.w / 2 - 1, e.y - KNOT - 1, KNOT, KNOT, colour)
+  if (f.hub && f.hub !== 'hero') {
+    const [x, y] = [f.hub.x * BLOCK, f.hub.y * BLOCK]
+    ctx.strokeStyle = colour
+    ctx.lineWidth = 1
+    ctx.strokeRect(x - 0.5, y - 0.5, BLOCK + 1, BLOCK + 1)
+  }
+  if (f.hub === 'hero') {
+    const p = g.player
+    dot(ctx, p.x + p.w / 2 - 1, (p.upside ? p.y + p.h + 1 : p.y - KNOT - 1), KNOT, KNOT, colour)
+  }
+  for (const pulse of f.pulses) {
+    const [pa, pb] = [endOf(g, f, pulse.from), endOf(g, f, pulse.to)]
+    if (!pa || !pb) continue
+    const t = Math.min(1, pulse.age / 0.25)
+    const size = era >= 2 ? 2 : 1
+    dot(ctx, pa.x + (pb.x - pa.x) * t - size / 2, pa.y + (pb.y - pa.y) * t - size / 2, size, size, pulse.colour)
+    if (era >= 4) dot(ctx, pa.x + (pb.x - pa.x) * Math.max(0, t - 0.15), pa.y + (pb.y - pa.y) * Math.max(0, t - 0.15), 1, 1, pulse.colour)
   }
 }
 
@@ -319,6 +399,8 @@ const ART = {
       ctx.fillRect(0, 0, ROOM * BLOCK, ROOM * BLOCK)
     }
   },
+  float: drawBubble,
+  link: drawTies,
   still: (ctx, g, f) => {
     if (f.life > 0.5 || Math.floor(g.time * 12) % 2) {
       ctx.fillStyle = 'rgba(191, 242, 255, 0.08)'

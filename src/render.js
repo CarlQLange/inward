@@ -101,9 +101,14 @@ const carryOffset = g => {
 const drawHeroLayer = (ctx, g) => {
   const p = g.player
   const carry = carryOffset(g)
+  ctx.save()
   ctx.translate(carry.x, carry.y)
+  if (p.upside) {
+    ctx.translate(0, Math.round(p.y * 2 + p.h))
+    ctx.scale(1, -1)
+  }
   drawHero(ctx, g, p)
-  ctx.translate(-carry.x, -carry.y)
+  ctx.restore()
   const choking = (p.smoked ?? 0) / TUNING.player.smokeTolerance
   if (choking > 0.1 && g.phase === 'playing') {
     const x = Math.round(p.x) - 1

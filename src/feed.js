@@ -1,6 +1,7 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M } from './materials.js'
-import { centre } from './physics.js'
+import { centre, liquidAtPx } from './physics.js'
+import { anchorOf } from './cast.js'
 import { FREE, cooldownOf, handOf, hostile, streamOf } from './skills.js'
 import { hasRelic } from './relics.js'
 import { castWait } from './keystones.js'
@@ -44,6 +45,8 @@ const within = (g, p, reach) => {
   const c = centre(p)
   return hostile(g).filter(e => !e.prop && Math.hypot(centre(e).x - c.x, centre(e).y - c.y) < reach)
 }
+
+const HELD_UP = new Set(['hang', 'wall'])
 
 const OTHERS = {
   variety: {
@@ -91,6 +94,13 @@ const OTHERS = {
       return { amount: g.timeStop > 0 ? 0 : Math.max(0, (stood - F.stillAfter) / F.stillFull), spots: [{ x: c.x + Math.cos(g.time * 9) * 22, y: c.y + Math.sin(g.time * 9) * 22 }] }
     },
   },
+  airborne: {
+    colours: ['#d8ecff', '#9ab8e0'], flight: 'rise',
+    sense: (g, p) => {
+      const aloft = within(g, p, REACH_PX * 2).filter(e => !e.grounded && !e.asleep && !(e.floated > 0) && !HELD_UP.has(anchorOf(e.kind)) && !liquidAtPx(g.world, centre(e).x, centre(e).y))
+      return { amount: aloft.length / F.full.airborne, spots: aloft.map(centre) }
+    },
+  },
   air: {
     colours: ['#f4f8f2', '#9fb0a8'], flight: 'streak',
     sense: (g, p) => {
@@ -110,6 +120,7 @@ const EVENTS = {
   smashed: { colours: ['#c9d4c0', '#9a9078'], flight: 'hop', motes: 2 },
   crossed: { colours: ['#c9d4c0', '#f4f8f2'], flight: 'shard', motes: 1 },
   coin: { colours: ['#ffe84a', '#d8a020'], flight: 'hop', motes: 1 },
+  worldKill: { colours: ['#ffe84a', '#ff5a4a'], flight: 'zig', motes: 4 },
 }
 
 export const DIETS = {
@@ -117,6 +128,8 @@ export const DIETS = {
   spring: ['steam', 'ice'], gust: ['gas'], acid: ['acid'], hammer: ['smashed', 'falling'], alchemy: ['variety'], swap: ['stun'], roar: ['crowd'], decoy: ['drawn'],
   stop: ['still'], grapple: ['air'], mine: ['blastKill'], well: ['blast'], rewind: ['hit'], mirror: ['returned'], charm: ['allyKill'], dash: ['dashHit'],
   blink: ['crossed'], drone: ['coin'],
+  float: ['airborne'],
+  link: ['worldKill'],
 }
 
 const foodOf = (p, kind) => {
@@ -130,6 +143,7 @@ export const dietOf = foodOf
 const EATS = {
   variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', drawn: 'FOES NEAR THE DECOY', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
   hit: 'TAKING HITS', returned: 'RETURNED SHOTS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
+  airborne: 'FOES IN THE AIR', worldKill: 'WORLD KILLS',
 }
 
 const named = tag => EATS[tag] ?? TASTES[tag].name

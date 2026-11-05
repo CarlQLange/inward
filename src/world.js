@@ -80,6 +80,11 @@ const isOpen = (w, x, y) => {
   return m === M.EMPTY || props(m).gas === true
 }
 
+const PULL = [[0, 1], [0, -1], [1, 0], [0, 1], [-1, 0]]
+const pullOf = (w, i) => PULL[w.lift?.[i] ?? 0]
+const keeps = (w, i, x, y) => !w.lift?.[i] || (inside(x, y) && w.lift[idx(x, y)] > 0)
+const openFrom = (w, i, x, y) => isOpen(w, x, y) && keeps(w, i, x, y)
+
 export const puff = (w, x, y, mat, range) => {
   if (matAt(w, x, y) === M.EMPTY) place(w, idx(x, y), mat, between(range))
 }
@@ -151,65 +156,69 @@ const conduct = (w, i, energy) => {
 
 const fall = (w, x, y) => {
   const i = idx(x, y)
-  const below = matAt(w, x, y + 1)
-  if (props(w.mat[i]).floats && matAt(w, x, y - 1) === M.WATER) {
-    swap(w, i, idx(x, y - 1))
+  const [gx, gy] = pullOf(w, i)
+  const below = matAt(w, x + gx, y + gy)
+  if (props(w.mat[i]).floats && matAt(w, x - gx, y - gy) === M.WATER) {
+    swap(w, i, idx(x - gx, y - gy))
     return
   }
-  const sinks = below === M.WATER && props(w.mat[i]).sinks === true
+  const sinks = below === M.WATER && props(w.mat[i]).sinks === true && keeps(w, i, x + gx, y + gy)
   if (below === M.WATER && w.mat[i] === M.ASH) {
     place(w, i, M.EMPTY)
     return
   }
-  if (isOpen(w, x, y + 1) || sinks) {
+  if (openFrom(w, i, x + gx, y + gy) || sinks) {
     const heavy = props(w.mat[i]).solid === true
     note(w, 'fall', w.mat[i])
-    swap(w, i, idx(x, y + 1))
-    if (heavy) w.crushing[idx(x, y + 1)] = 1
+    swap(w, i, idx(x + gx, y + gy))
+    if (heavy) w.crushing[idx(x + gx, y + gy)] = 1
     return
   }
   if (!props(w.mat[i]).slides) return
   const side = Math.random() < 0.5 ? 1 : -1
   for (const d of [side, -side]) {
-    if (isOpen(w, x + d, y) && isOpen(w, x + d, y + 1)) {
-      swap(w, i, idx(x + d, y))
+    if (openFrom(w, i, x + d * gy, y + d * gx) && openFrom(w, i, x + d * gy + gx, y + d * gx + gy)) {
+      swap(w, i, idx(x + d * gy, y + d * gx))
       return
     }
   }
 }
 
-const drainsToward = (w, x, y, d) => {
+const drainsToward = (w, i, x, y, d) => {
+  const [gx, gy] = pullOf(w, i)
   for (let k = 1; k <= T.flowReach; k++) {
-    if (!isOpen(w, x + d * k, y)) return false
-    if (isOpen(w, x + d * k, y + 1)) return true
+    if (!openFrom(w, i, x + d * k * gy, y + d * k * gx)) return false
+    if (openFrom(w, i, x + d * k * gy + gx, y + d * k * gx + gy)) return true
   }
   return false
 }
 
 const flow = (w, x, y) => {
   const i = idx(x, y)
-  const sinksThroughOil = w.mat[i] === M.WATER && matAt(w, x, y + 1) === M.OIL
-  if (isOpen(w, x, y + 1) || sinksThroughOil) {
-    swap(w, i, idx(x, y + 1))
+  const [gx, gy] = pullOf(w, i)
+  const sinksThroughOil = w.mat[i] === M.WATER && matAt(w, x + gx, y + gy) === M.OIL && keeps(w, i, x + gx, y + gy)
+  if (openFrom(w, i, x + gx, y + gy) || sinksThroughOil) {
+    swap(w, i, idx(x + gx, y + gy))
     return
   }
   const side = Math.random() < 0.5 ? 1 : -1
   const dirs = [side, -side]
-  const towardDrop = dirs.find(d => drainsToward(w, x, y, d))
-  const stacked = matAt(w, x, y - 1) === w.mat[i]
-  const spread = stacked ? dirs.find(d => isOpen(w, x + d, y)) : undefined
+  const towardDrop = dirs.find(d => drainsToward(w, i, x, y, d))
+  const stacked = matAt(w, x - gx, y - gy) === w.mat[i]
+  const spread = stacked ? dirs.find(d => openFrom(w, i, x + d * gy, y + d * gx)) : undefined
   const d = towardDrop ?? spread
-  if (d !== undefined) swap(w, i, idx(x + d, y))
+  if (d !== undefined) swap(w, i, idx(x + d * gy, y + d * gx))
 }
 
 const rise = (w, x, y) => {
   const i = idx(x, y)
-  if (matAt(w, x, y - 1) === M.EMPTY) {
-    swap(w, i, idx(x, y - 1))
+  const [gx, gy] = pullOf(w, i)
+  if (matAt(w, x - gx, y - gy) === M.EMPTY && keeps(w, i, x - gx, y - gy)) {
+    swap(w, i, idx(x - gx, y - gy))
     return
   }
   const d = Math.random() < 0.5 ? 1 : -1
-  if (matAt(w, x + d, y) === M.EMPTY) swap(w, i, idx(x + d, y))
+  if (matAt(w, x + d * gy, y + d * gx) === M.EMPTY && keeps(w, i, x + d * gy, y + d * gx)) swap(w, i, idx(x + d * gy, y + d * gx))
 }
 
 const ageOut = (w, i, dt) => {
@@ -235,7 +244,8 @@ const stepLava = (w, x, y, dt) => {
     if (props(other).melts) place(w, idx(nx, ny), M.WATER)
     if (props(other).flammability && Math.random() < T.lavaBurn * dt * 8) ignite(w, nx, ny)
   }
-  const thin = props(matAt(w, x, y + 1)).solid && matAt(w, x, y - 1) === M.EMPTY
+  const [gx, gy] = pullOf(w, i)
+  const thin = props(matAt(w, x + gx, y + gy)).solid && matAt(w, x - gx, y - gy) === M.EMPTY
   if (thin && Math.random() < T.lavaCrust * dt) {
     note(w, 'crust', M.LAVA)
     place(w, i, M.ROCK)
@@ -270,8 +280,9 @@ const stepAcid = (w, x, y) => {
 const stepSource = (w, x, y, dt) => {
   const i = idx(x, y)
   w.life[i] -= dt
-  if (w.life[i] <= 0 || matAt(w, x, y + 1) !== M.EMPTY || Math.random() > T.sourceFlow) return
-  place(w, idx(x, y + 1), M.WATER)
+  const [gx, gy] = pullOf(w, i)
+  if (w.life[i] <= 0 || matAt(w, x + gx, y + gy) !== M.EMPTY || Math.random() > T.sourceFlow) return
+  place(w, idx(x + gx, y + gy), M.WATER)
 }
 
 const growVine = (w, x, y) => {
@@ -453,4 +464,5 @@ export const stepWorld = (w, dt, depth) => {
   every(w, 'fluid', T.fluidRate, dt, step => stepFluids(w, step))
   every(w, 'fire', T.fireRate, dt, step => stepFire(w, step, excite))
   every(w, 'charge', T.chargeRate, dt, step => stepCharge(w, step))
+  w.lift = null
 }
