@@ -81,8 +81,8 @@ effects must spread across blocks visibly and be readable without text.
 - He found the world mostly read as fire and left the fix to agent judgement. Fire now belongs to the Moss Caves
   and Peat Bog, and every other region has its own system: charge, collapse, lava and water, falling ice, or blasts.
   Peat ceilings and lamps are per region, and each region hangs props the gun can set off, so no skill is needed.
-- He wants the jump from retro to modern to be the thrill, with a Fez-style moment and Animal Well's visual
-  confidence. Less visual interest outside, more going in, and a combo should be able to break the game a little
+- He wants the jump from retro to modern to be the thrill, with a wow moment as big as Fez's first rotation
+  (the surprise, not 3D as such) and Animal Well's visual confidence. Less visual interest outside, more going in, and a combo should be able to break the game a little
   without one pair of skills solving it. He's the customer now and doesn't want to be asked. `docs/direction.md`
   holds what this means.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",

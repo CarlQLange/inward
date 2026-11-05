@@ -43,7 +43,10 @@ read on a 390 px wide screen, it loses.
 
 ## The moment
 
-Breaking the first seal is the Fez moment. No words and no warning. Time holds, the flat room tips back in real
+Carl named Fez for the size of the surprise, not for 3D. What this moment has to do is overturn what the player
+thought the game was, and if it only shows off a technique it has failed.
+
+Breaking the first seal is that moment. No words and no warning. Time holds, the flat room tips back in real
 perspective, and the camera pulls out to show that the map is a stepped square pit with your room as one tile in
 its wall and the core glowing at the bottom. The camera swings around it, dives back into your room, and when
 you land the room has depth it never had before and keeps it. Later seals get a shorter version. After that the
