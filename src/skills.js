@@ -4,6 +4,7 @@ import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { chunks } from './feel.js'
+import { shotBox } from './cast.js'
 
 const S = TUNING.skills
 
@@ -187,7 +188,7 @@ const ray = (g, from, aim, reach, stopAtLiquid = false) => {
     last = { x, y }
     x += aim.x * 2
     y += aim.y * 2
-    const struck = g.enemies.find(e => overlap(e, { x, y, w: 1, h: 1 }))
+    const struck = g.enemies.find(e => overlap(shotBox(e), { x, y, w: 1, h: 1 }))
     const m = matAt(g.world, cell(x), cell(y))
     if (struck) return { x, y, last, struck, m }
     if (props(m).solid || (stopAtLiquid && props(m).liquid)) return { x, y, last, solid: true, m }
@@ -1101,7 +1102,7 @@ const meltBeam = (g, p) => {
   for (let d = 4; d < S.melt.reach && solids < S.melt.depth; d += 4) {
     end = { x: from.x + p.aim.x * d, y: from.y + p.aim.y * d }
     if (heat(g, p, cell(end.x), cell(end.y), budget)) solids += 1
-    const struck = g.enemies.find(e => !e.friendly && overlap(e, { x: end.x, y: end.y, w: 1, h: 1 }))
+    const struck = g.enemies.find(e => !e.friendly && overlap(shotBox(e), { x: end.x, y: end.y, w: 1, h: 1 }))
     if (struck) hurt(g, struck, 2, 'player')
   }
   zap(g, from, end, hue(p, 'melt', 'fire'))

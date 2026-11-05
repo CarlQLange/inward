@@ -1,7 +1,7 @@
 import { BLOCK, ROOM } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
-import { SPRITES } from './sprites.js'
+import { SPRITES, regionTiles } from './sprites.js'
 import { drawText } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
@@ -103,14 +103,14 @@ const tintTile = (theme, tile) => {
   return cache.get(tile)
 }
 
-const TINTED_TILES = new Set(['rock', 'bedrock', 'brick'])
+const TINTED_TILES = new Set(['bedrock', 'brick'])
 
-const tileFor = (name, x, y, depth, skin) => {
+const tileFor = (name, x, y, theme) => {
   const h = hash(x, y)
   if (name === 'rock') {
-    if (skin && h % 5 !== 0) return SPRITES.extra[skin]
-    if (depth > 0.5 && h % 6 === 0) return SPRITES.extra.fungus
-    if (h % 13 === 0) return SPRITES.extra.bones
+    if (h % 17 === 0) return SPRITES.extra.bones
+    const tiles = regionTiles(theme)
+    if (tiles.length) return tiles[h % 5 === 0 ? 1 : 0]
   }
   const set = SPRITES.tiles[name]
   return set[h % set.length]
@@ -156,7 +156,7 @@ const paintSolids = (ctx, world, depth, skin, theme) => {
       if (m === M.ASH) ctx.drawImage(SPRITES.ash, x * BLOCK, y * BLOCK)
       const name = TILE[m]
       if (!name) continue
-      const tile = tileFor(name, x, y, depth, skin)
+      const tile = tileFor(name, x, y, theme)
       ctx.drawImage(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, x * BLOCK, y * BLOCK)
       if (isBuried(world, x, y)) {
         ctx.fillStyle = 'rgba(5, 12, 10, 0.72)'

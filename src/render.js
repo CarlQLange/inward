@@ -115,20 +115,9 @@ const drawLook = (ctx, g) => {
     ctx.strokeStyle = e.friendly ? '#7dff8a' : e.ally ? COLOURS.gas : COLOURS.hurt
     ctx.lineWidth = 1
     ctx.strokeRect(Math.round(e.x) - 1.5, Math.round(e.y) - 1.5, e.w + 3, e.h + 3)
-    drawText(ctx, e.kind.toUpperCase(), e.x - 4, e.y - 7, e.friendly ? '#7dff8a' : COLOURS.hurt)
   }
   ctx.fillStyle = COLOURS.hurt
   for (const f of g.fireballs) if (!f.friendly) ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, f.w + 2, f.h + 2)
-}
-
-const LEGEND = [
-  ['RED HURTS', '#ff3228'], ['PURPLE EXPLODES', '#dc5aff'], ['ORANGE BURNS', '#ff961e'], ['YELLOW CONDUCTS', '#ffeb46'],
-]
-
-const drawLookLegend = ctx => {
-  ctx.fillStyle = '#000'
-  ctx.fillRect(16, ORIGIN.y + 150, 84, 70)
-  LEGEND.forEach(([text, colour], i) => drawText(ctx, text, 20, ORIGIN.y + 154 + i * 10, colour))
 }
 
 const drawReticle = (ctx, pointer) => {
@@ -222,14 +211,16 @@ const drawRoom = (ctx, g, pointer) => {
     ctx.drawImage(oldRoom, Math.round(ux * slide.t * ROOM_PX), Math.round(uy * slide.t * ROOM_PX))
     ctx.translate(Math.round(-ux * (1 - slide.t) * ROOM_PX), Math.round(-uy * (1 - slide.t) * ROOM_PX))
   }
-  drawScene(ctx, g, { ...room, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
+  drawScene(ctx, g, { ...room, theme: g.phase === 'title' ? 0 : room.theme, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
   drawChain(ctx, g)
-  if (g.phase !== 'title') drawHeroLayer(ctx, g)
+  drawHeroLayer(ctx, g)
   drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
+  drawBossBar(ctx, g)
   if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
   if (g.looking) drawLook(ctx, g)
+  drawReveal(ctx, g)
 }
 
 export const draw = (ctx, g, pointer) => {
@@ -248,7 +239,6 @@ export const draw = (ctx, g, pointer) => {
     if (g.menus.at(-1)?.page !== 'pause') drawHud(ctx, g)
     drawMotes(ctx, g)
     if (g.menus.length === 0) drawToast(ctx, g)
-    if (g.looking) drawLookLegend(ctx)
   }
   drawMenus(ctx, g)
 }

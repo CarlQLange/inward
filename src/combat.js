@@ -7,25 +7,6 @@ import { burstSparks, hitFx, hurtFx } from './fx.js'
 
 export const burst = burstSparks
 
-const TEACH = {
-  FIRE: 'FIRE BURNS WHAT TOUCHES IT. STAY OFF BURNING BLOCKS.',
-  LAVA: 'LAVA BURNS AS LONG AS YOU STAND IN IT.',
-  ACID: 'ACID EATS BLOCKS AND SKIN ALIKE.',
-  CHARGE: 'CHARGE RUNS THROUGH WATER AND METAL. GET OFF THEM.',
-  SMOKE: 'BREATHE SMOKE TOO LONG AND IT HURTS. WATCH THE BAR.',
-  CRUSHED: 'FALLING BLOCKS AND BLASTS HURT. LOOK UP.',
-  BITTEN: 'TOUCHING A FOE HURTS, UNLESS IT IS STUNNED.',
-  SHOT: 'THEIR SHOTS CAN BE DODGED. WATCH FOR THE WARNING.',
-}
-
-const spillCoins = (g, p, count) => {
-  g.gold -= count
-  const here = centre(p)
-  for (let i = 0; i < count; i++) {
-    g.pickups.push({ kind: 'coin', x: here.x - 2, y: here.y - 2, w: 5, h: 5, vx: (Math.random() - 0.5) * 160, vy: -80 - Math.random() * 80, spilt: 0.6 })
-  }
-}
-
 const hurtPlayer = (g, p, cause) => {
   const paid = p.relics.has('crown') && g.gold >= TUNING.run.crownHit
   if (paid) spillCoins(g, p, TUNING.run.crownHit)
@@ -45,10 +26,6 @@ const hurtPlayer = (g, p, cause) => {
   p.jumpHeld = false
   const here = centre(p)
   hurtFx(g, p, cause)
-  if (!g.taught.has(cause) && TEACH[cause]) {
-    g.taught.add(cause)
-    g.toast = { title: cause, text: TEACH[cause], life: TUNING.run.toastLife }
-  }
   if (p.relics.has('plate')) explode(g.world, cell(here.x), cell(here.y), 1)
 }
 

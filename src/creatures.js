@@ -1,6 +1,6 @@
 import { ENEMY_DEFS } from './enemies.js'
-import { creatureAnchor, creatureFrames as spriteFrames } from './sprites.js'
-import { drawText } from './font.js'
+import { paintFrames, creatureFrames as spriteFrames } from './sprites.js'
+import { artKind, artTop } from './cast.js'
 import { setPixelSource } from './fx.js'
 
 const HURT = '#ff5a4a'
@@ -13,11 +13,15 @@ const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, armoured: PALE }
 
 const STRIDE = { crawler: 7, bat: 10, emberbat: 11, fish: 5, jelly: 3, gasbag: 2, slug: 2, imp: 6, coil: 6, tick: 8, stilt: 3, spore: 3, lantern: 3 }
 
-const framesOf = kind => spriteFrames(kind)
+const LAMP = paintFrames(['..c...', '..c...', '.cccc.', 'cyyyyc', 'cyyyyc', '.cccc.'], { c: '#5a5a52', y: '#ffd24a' })
+const ORBIT = paintFrames(['..ss..', '.sSSs.', 'sSSSSs', 'sSSSds', '.sdds.', '..ss..'], { s: '#7a2a34', S: '#d94a5a', d: '#a03040' })
+const LOCAL_ART = { lamp: [LAMP], orbit: [ORBIT] }
+
+const framesOf = kind => LOCAL_ART[kind] ?? spriteFrames(artKind(kind))
 
 const frameIndex = (e, frames, time) => {
   if (frames.length < 2) return 0
-  if (e.windup || e.lit || e.frame === 1) return 1
+  if (e.windup || e.lit || e.frame === 1 || e.stage === 'tell' || e.stage === 'act' || e.ball || e.loaded) return 1
   const stride = STRIDE[e.kind]
   return stride ? Math.floor(time * stride) % frames.length : 0
 }
@@ -66,16 +70,9 @@ const pixelsOf = art => {
   return pixels
 }
 
-const ORIGINS = {
-  ground: (e, art) => e.y + e.h - art.height,
-  hang: e => e.y,
-  free: (e, art) => e.y + e.h / 2 - art.height / 2,
-  wall: (e, art) => e.y + e.h / 2 - art.height / 2,
-}
-
 const artOrigin = (e, art) => ({
   x: Math.round(e.x + e.w / 2 - art.width / 2),
-  y: Math.round(ORIGINS[creatureAnchor(e.kind)](e, art)),
+  y: Math.round(artTop(e, art.height)),
 })
 
 setPixelSource(e => {
@@ -161,8 +158,11 @@ const drawOne = (ctx, g, e) => {
   const jitter = e.stun > 0 && e.frozen <= 0 ? Math.round(Math.sin(time * 60)) : 0
   const { x, y } = artOrigin(e, art)
   const at = x + jitter
+  if (e.stowed) return
+  if (e.intangible) ctx.globalAlpha = 0.35
   if (e.elite || e.ally) ring(ctx, art, at, y, pose, e.ally ? GAS : ELITE_COLOURS[e.elite])
   stamp(ctx, art, at, y, pose)
+  ctx.globalAlpha = 1
   if (e.flash > 0) stamp(ctx, silhouette(art, '#ffffff'), at, y, pose)
   else {
     const warning = telegraphColour(e, time)
@@ -181,7 +181,8 @@ const drawOne = (ctx, g, e) => {
   }
   if (e.friendly && !e.spent && e.kind !== 'mole') {
     const bob = Math.round(Math.sin(time * 4))
-    drawText(ctx, '?', e.x + e.w / 2 - 1, e.y - 8 + bob, CHARGE)
+    ctx.fillStyle = CHARGE
+    ctx.fillRect(Math.round(e.x + e.w / 2) - 1, y - 5 + bob, 2, 2)
   }
 }
 

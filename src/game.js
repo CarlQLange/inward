@@ -6,6 +6,7 @@ import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid, unbury } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
+import { shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { dust } from './feel.js'
@@ -397,7 +398,7 @@ const storeRun = g => {
   persist()
 }
 
-const showToast = (g, title) => { g.toast = { title, life: R.toastLife, born: R.toastLife } }
+const showToast = (g, title, sub = '') => { g.toast = { title, sub, life: R.toastLife, born: R.toastLife } }
 
 const ringCells = (map, ring) =>
   Object.keys(map.links)
@@ -539,11 +540,10 @@ const createRun = (depthOverride, quickRing = null, discovering = false) => {
     g.lastTheme = -1
     enterRoom(g, x, y)
     placeAtDoor(g)
-    g.toast = { title: `QUICKSTART: RING ${quickRing + 1}`, text: 'RECORDS ARE NOT KEPT.', life: 6 }
     g.shownDepth = g.depth
   } else {
     enterRoom(g, ...map.start)
-    g.toast = { title: starter.name, text: '', prompts: [['move', 'MOVE'], ['jump', 'JUMP'], ['shoot', 'SHOOT'], ['look', 'LOOK']], life: 8 }
+    if (save.runs === 0) g.toast = { prompts: ['move', 'jump', 'shoot'], life: 7, born: 7 }
     if (omen && !meet(g, 'omen', omen)) showReveal(g, 'omen', omen)
   }
   if (fresh) persist()
@@ -595,7 +595,7 @@ const learn = (g, kind) => {
   p.skills.push({ kind, ready: 0 })
   g.cardPool = g.cardPool.filter(s => s !== kind)
   showToast(g, SKILL_NAMES[kind], SKILL_DETAILS[kind])
-  g.toast.prompts = [[skillAction(p.skills.length - 1), '']]
+  g.toast.prompts = [skillAction(p.skills.length - 1)]
   arrivesEvolved(g, kind)
   g.pulse = 1
   g.shake = Math.max(g.shake, 3)
@@ -614,7 +614,7 @@ const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
   }
   openSwap(g, kind, gm => {
     gm.cardPool = gm.cardPool.filter(s => s !== kind)
-    showToast(gm, `${SKILL_NAMES[kind]}: LEARNED`, SKILL_DETAILS[kind])
+    showToast(gm, SKILL_NAMES[kind], SKILL_DETAILS[kind])
     arrivesEvolved(gm, kind)
     onTake(gm)
   }, onLeave)
@@ -998,7 +998,6 @@ const openAltar = (g, altar) => {
         run: gm => {
           gm.menus.pop()
           if (gm.player.hp <= R.altarPrice) {
-            showToast(gm, 'THE ALTAR REFUSES', 'YOU HAVE TOO LITTLE TO GIVE.')
             return
           }
           gm.player.hp -= R.altarPrice
@@ -1161,13 +1160,7 @@ const stepEnding = (g, dt) => {
   finishRun(g, 'cleared')
 }
 
-const LOCK_HINTS = {
-  [M.PEAT]: ['PEAT PLUG', 'FIRE WILL CLEAR THIS.'],
-  [M.GATE]: ['METAL GATE', 'OPENS WHEN CHARGED. A BOMB ALSO WORKS.'],
-  [M.BRICK]: ['BRICKWORK', 'NEEDS A HAMMER OR A BLAST.'],
-  [M.ICE]: ['ICE PLUG', 'MELT IT, BREAK IT, OR BLOW IT UP.'],
-  [M.SCRAP]: ['SCRAP HEAP', 'THROW IT, BREAK IT, OR BLOW IT UP.'],
-}
+const LOCK_HINTS = { [M.PEAT]: 'FIRE', [M.GATE]: 'CHARGE', [M.BRICK]: 'CRUSHED', [M.ICE]: 'FIRE', [M.SCRAP]: 'CRUSHED' }
 
 const doorPoint = (dir, door) => ({
   left: [BLOCK, (door.row + 1) * BLOCK],
@@ -1180,8 +1173,9 @@ const doorCell = (dir, door) => ({
   left: [1, door.row], right: [26, door.row], up: [door.col, 1], down: [door.col, 26],
 }[dir])
 
-const stepLockHints = g => {
-  if (g.hinted) return
+const stepLockHints = (g, dt) => {
+  g.hintClock = (g.hintClock ?? 0) - dt
+  if (g.hintClock > 0) return
   const room = g.rooms[keyOf(g.x, g.y)]
   const c = centre(g.player)
   for (const [dir, door] of Object.entries(room.doors)) {
@@ -1189,8 +1183,8 @@ const stepLockHints = g => {
     if (!hint) continue
     const [dx, dy] = doorPoint(dir, door)
     if (Math.hypot(c.x - dx, c.y - dy) > R.hintReach) continue
-    showToast(g, hint[0], hint[1])
-    g.hinted = true
+    g.popups.push({ x: Math.max(12, Math.min(WORLD_PX - 12, dx)), y: Math.max(12, dy - 14), icon: hint, colour: 'charge', life: 1.2 })
+    g.hintClock = 1.3
     return
   }
 }
@@ -1217,7 +1211,6 @@ const sealRoom = (g, room) => {
     else setCell(g.world, x + 1, y, M.BRICK)
   }
   g.shake = Math.max(g.shake, 6)
-  showToast(g, 'THE WAY OUT IS GONE', 'KILL EVERYTHING.')
 }
 
 const unsealRoom = (g, room) => {
@@ -1231,7 +1224,6 @@ const unsealRoom = (g, room) => {
   }
   const c = centre(g.player)
   g.cards.push({ kind: 'chest', x: c.x - 6, y: c.y - 16, w: 12, h: 12, relic: nextRelic(g) })
-  showToast(g, 'THE ROOM LETS GO', 'IT LEAVES SOMETHING BEHIND.')
   g.pulse = 1
 }
 
@@ -1469,7 +1461,6 @@ const stepPlayer = (g, input, dt) => {
     p.iframes = 2
     const c = centre(p)
     explode(world, cell(c.x), cell(c.y), 2)
-    showToast(g, 'THE PHOENIX BURNS', 'NOT THIS TIME.')
     g.pulse = 1
     g.shake = 10
   }
@@ -1544,7 +1535,7 @@ const stepShots = (g, dt) => {
     s.x += s.vx * dt
     s.y += s.vy * dt
     s.life -= dt
-    const victim = g.enemies.find(e => overlap(s, e) && !e.ally && !e.intangible && !e.stowed && !s.passed?.has(e))
+    const victim = g.enemies.find(e => overlap(s, shotBox(e)) && !e.ally && !e.intangible && !e.stowed && !s.passed?.has(e))
     if (victim) {
       const blocked = victim.shielded && victim.stun <= 0 && Math.sign(s.vx) === -victim.facing
       if (victim.plated) {
@@ -1844,7 +1835,7 @@ export const step = (g, input, realDt) => {
     stepFirstRoom(g, dt)
     stepRoomEvents(g, dt)
   }
-  stepLockHints(g)
+  stepLockHints(g, dt)
   stepPlayer(g, input, dt)
   if (g.phase !== 'playing') return
   stepShots(g, dt)

@@ -77,6 +77,11 @@ const flipped = source => {
   return canvas
 }
 
+export const paintFrames = (rows, colours) => {
+  const sprite = paint(rows, colours)
+  return [sprite, flipped(sprite)]
+}
+
 export const SPRITES = {
   tiles: {},
   extra: {},

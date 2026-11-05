@@ -131,6 +131,12 @@ const drawXp = (ctx, g, x, top) => {
   ctx.fillRect(x, top, filled, 3)
 }
 
+const drawSeals = (ctx, g, x, top) => {
+  ctx.imageSmoothingEnabled = false
+  for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], x + i * 12, top, 10, 10)
+  if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], x + SPAN - 10, top, 10, 10)
+}
+
 const drawRight = (ctx, g) => {
   const x = VIEW.w - 101 + Math.floor((101 - SPAN) / 2)
   box(ctx, x, ORIGIN.y, SPAN, SPAN, GREEN)
@@ -142,7 +148,9 @@ const drawRight = (ctx, g) => {
   y += 9
   drawXp(ctx, g, x, y)
   drawText(ctx, g.level, x, y + 6, GREEN)
-  y += 16
+  y += 14
+  drawSeals(ctx, g, x, y)
+  y += 13
   drawRelicRow(ctx, g, x, y)
 }
 

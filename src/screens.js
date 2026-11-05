@@ -398,19 +398,24 @@ const drawToastPrompts = (ctx, prompts, y) => {
 }
 
 export const drawToast = (ctx, g) => {
-  if (!g.toast?.title) return
-  const { title, life, born = life } = g.toast
+  const toast = g.toast
+  if (!toast) return
+  const { title, sub, prompts, life, born = life } = toast
   const age = born - life
-  const fade = clamp01(Math.min(age * 3, life * 2))
-  const shown = title.slice(0, Math.ceil(age * 24))
-  const width = textWidth(title) * 2
-  ctx.globalAlpha = fade
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-  ctx.fillRect(ORIGIN.x, ORIGIN.y + 28, ROOM_PX, 22)
-  ctx.fillStyle = YELLOW
-  const rule = Math.round(width * easeOut(age * 2))
-  ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 30, rule, 1)
-  ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 47, rule, 1)
-  drawText(ctx, shown, CENTRE - width / 2, ORIGIN.y + 34, WHITE, 2)
+  ctx.globalAlpha = clamp01(Math.min(age * 3, life * 2))
+  if (title) {
+    const shown = title.slice(0, Math.ceil(age * 24))
+    const width = textWidth(title) * 2
+    const rule = Math.round(width * easeOut(age * 2))
+    const tall = sub ? 30 : 22
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+    ctx.fillRect(ORIGIN.x, ORIGIN.y + 28, ROOM_PX, tall)
+    ctx.fillStyle = YELLOW
+    ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 30, rule, 1)
+    ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 28 + tall - 3, rule, 1)
+    drawText(ctx, shown, CENTRE - width / 2, ORIGIN.y + 34, WHITE, 2)
+    if (sub) centred(ctx, sub, ORIGIN.y + 47, PALE)
+  }
+  if (prompts) drawPromptRow(ctx, prompts, CENTRE, ORIGIN.y + (title ? 62 : 34), 6)
   ctx.globalAlpha = 1
 }

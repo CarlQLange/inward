@@ -27,8 +27,8 @@ export const LADDER = [
   'skill:drone', 'relic:wind', 'foe:worm', 'omen:swarm', 'skill:roar', 'relic:gem',
   'foe:mimic', 'foe:urchin', 'skill:charm', 'relic:crown', 'warden:brood', 'skill:alchemy',
   'foe:lantern', 'omen:glass', 'relic:skull', 'skill:mirror', 'foe:shade', 'relic:acidskull',
-  'skill:stop', 'relic:dice', 'omen:blackout', 'skill:rewind', 'relic:eye', 'skill:echo',
-  'relic:phoenix', 'skill:pact',
+  'skill:stop', 'relic:dice', 'omen:blackout', 'skill:rewind', 'relic:eye',
+  'relic:phoenix',
 ]
 
 const CATALOGUE = [...BASE, ...LADDER]
