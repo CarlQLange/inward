@@ -9,6 +9,7 @@ const RED = css(SCARF_RED)
 const DEEP = css(SCARF_DEEP)
 
 const SEGMENT = 2
+const BEND = 3.3
 const SEGMENTS_PER_HEART = 2
 const SHRED_LIFE = 2.4
 
@@ -304,6 +305,17 @@ const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
       }
     }
   }
+  for (let i = 2; i < nodes.length; i++) {
+    const a = nodes[i - 2]
+    const b = nodes[i]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const d = Math.hypot(dx, dy) || 1
+    if (d >= BEND) continue
+    const push = ((BEND - d) / d) * 0.5
+    b.x += dx * push
+    b.y += dy * push
+  }
   nodes.forEach((n, i) => {
     if ((i === 0 && pinned) || !solidAt(world, n.x, n.y) || solidAt(world, n.px, n.py)) return
     if (!solidAt(world, n.px, n.y)) n.x = n.px
@@ -455,7 +467,7 @@ export const stepHero = (g, p, dt, carried = false) => {
   }
   const pose = poseFor(g, p, h)
   h.pose = pose
-  if (p.dashing > 0 && !carried) addGhost(g, p, h, pose)
+  if (p.dashing > 0 && !carried && Math.floor(h.clock * 30) % 2 === 0) addGhost(g, p, h, pose)
   for (const ghost of h.ghosts) ghost.life -= dt
   h.ghosts = h.ghosts.filter(ghost => ghost.life > 0)
   if (dead && !h.dead) dieHero(p, h, pose)

@@ -91,7 +91,7 @@ const omenOf = g => String(g.omen?.id ?? g.omen ?? '').toLowerCase()
 
 export const ambientOf = g => {
   if (g.ambient !== undefined) return g.ambient
-  return omenOf(g) === 'blackout' ? 0.07 : null
+  return omenOf(g) === 'blackout' ? 0.12 : null
 }
 
 const actorLights = (g, dark) => {

@@ -164,7 +164,7 @@ const rumble = (g, amount) => { g.rumble = Math.max(g.rumble, amount) }
 
 export const cameraOffset = g => {
   const trauma = Math.min(14, g.shake)
-  const amp = (trauma * trauma) / 11
+  const amp = (trauma * trauma) / 16
   const t = g.fxClock
   const wobbleX = Math.sin(t * 61.3) + Math.sin(t * 37.1 + 1.3) * 0.7
   const wobbleY = Math.sin(t * 53.7 + 2.1) + Math.sin(t * 43.9) * 0.7
@@ -267,7 +267,7 @@ export const blastFx = (g, { x, y, reach }) => {
   const px = (x + 0.5) * BLOCK
   const py = (y + 0.5) * BLOCK
   const heavy = reach >= 2
-  shakeTo(g, 6 + reach * 3)
+  shakeTo(g, 5 + reach * 2.5)
   rumble(g, heavy ? 1 : 0.6)
   g.aberr = Math.max(g.aberr, heavy ? 1 : 0.7)
   addRing(g, px, py, 190 + reach * 55, 3 + reach * 2.2, 0.32 + reach * 0.06, 6 + reach)
@@ -435,7 +435,15 @@ const stepParticles = (g, dt) => {
   if (g.particles.length > MAX_PARTICLES) g.particles.splice(0, g.particles.length - MAX_PARTICLES)
 }
 
-const emitWorld = (g, dt) => {
+const splashShots = g => {
+  for (const s of g.shots) {
+    if (s.wet || !liquidAtPx(g.world, s.x, s.y)) continue
+    s.wet = true
+    splash(g, s.x, s.y, 40)
+  }
+}
+
+const emitWorld = g => {
   const w = g.world
   const size = ROOM * ROOM
   const samples = 26
@@ -460,10 +468,10 @@ const stepHeroSide = (g, dt) => {
   if (g.phase !== 'playing') return
   if (h.stance === 'swim' && Math.random() < dt * 2.4) bubble(g, p.x + 3 + p.facing * 3, p.y + 4)
   if (h.stance === 'cling' && Math.random() < dt * 22) spark(g, p.x + (p.facing > 0 ? p.w : 0), p.y + p.h - 2, -p.facing * 12, -20, 'pale', 0.14)
-  if (!grounded && p.grounded && fell > 150) {
+  if (!grounded && p.grounded && fell > 235) {
     const c = p.x + p.w / 2
-    shakeTo(g, Math.min(4, fell / 80))
-    punch(g, 0, Math.min(1.4, fell / 220))
+    shakeTo(g, 3.2)
+    punch(g, 0, 1.3)
     dustAt(g, c - 3, p.y + p.h, 4)
     dustAt(g, c + 3, p.y + p.h, 4)
   }
@@ -542,7 +550,8 @@ export const stepFx = (g, realDt, dt) => {
   if (held) return
   stepParticles(g, dt)
   stepHeroSide(g, dt)
-  if (g.world && g.phase !== 'title') emitWorld(g, dt)
+  if (g.world) emitWorld(g)
+  if (g.phase === 'playing') splashShots(g)
 }
 
 const drawSpark = (ctx, p) => {

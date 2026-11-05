@@ -46,7 +46,7 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   e.iframes = TUNING.enemyIframes
   e.flash = TUNING.feel.enemyFlash
   e.lastSource = source
-  g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
+  if (source === 'player') g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
   hitFx(g, e)
 }
 

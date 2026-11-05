@@ -169,7 +169,7 @@ const paintSolids = (ctx, world, depth, skin, theme) => {
 const cache = { canvas: blank(ROOM_PX, ROOM_PX), mat: new Uint8Array(ROOM * ROOM), world: null, key: '' }
 
 const drawSolids = (ctx, world, depth, skin, theme) => {
-  const key = `${theme}|${depth > 0.5}|${skin}|${world.scorches?.length ?? 0}`
+  const key = `${theme}|${depth > 0.5}|${skin}|${world.scorches?.length ?? 0}|${world.scorches?.at(-1)?.x}`
   const stale = cache.world !== world || cache.key !== key || !world.mat.every((m, i) => m === cache.mat[i])
   if (stale) {
     paintSolids(cache.canvas.getContext('2d'), world, depth, skin, theme)
@@ -348,10 +348,25 @@ const drawBurning = (ctx, world, x, y, time) => {
   ctx.drawImage(tongue, 0, 0, BLOCK, height + 2, x * BLOCK, y * BLOCK - height, BLOCK, height + 2)
 }
 
+const drawGlint = (ctx, x, y, time, m) => {
+  const h = hash(x, y)
+  const beat = Math.sin(time * (m === M.VOLATILE ? 5 : 1.3) + h)
+  if (beat < 0.55) return
+  ctx.fillStyle = m === M.VOLATILE ? '#ffd8fa' : '#ffffff'
+  const at = Math.floor(time * 2 + h) % 6
+  ctx.fillRect(x * BLOCK + 1 + at, y * BLOCK + 1 + ((h >> 2) % 5), m === M.VOLATILE ? 2 : 1, 1)
+  if (m === M.VOLATILE && beat > 0.9) {
+    ctx.fillStyle = 'rgba(255, 120, 240, 0.35)'
+    ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
+  }
+}
+
 const drawOverlays = (ctx, world, time) => {
   const busy = world.charged > 80
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
+      const m = matAt(world, x, y)
+      if (m === M.VOLATILE || m === M.ICE) drawGlint(ctx, x, y, time, m)
       if (burningAt(world, x, y)) drawBurning(ctx, world, x, y, time)
       if (chargedAt(world, x, y)) {
         if (!busy || hash(x, y) % 3 === 0) drawArc(ctx, x, y)

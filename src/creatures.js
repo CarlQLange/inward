@@ -89,7 +89,10 @@ const stepAnim = (e, a, time) => {
   a.flash = e.flash ?? 0
   if (e.grounded) a.walked = true
   if (e.grounded && !a.grounded && a.vy > 50) a.stretch = -Math.min(0.42, a.vy / 420)
-  if (!e.grounded && a.grounded && e.vy < -40) a.stretch = 0.32
+  if (!e.grounded && a.grounded && e.vy < -40) {
+    a.stretch = 0.32
+    a.hopper = true
+  }
   a.grounded = e.grounded
   a.vy = e.vy
   a.speed += (-SPRING * a.stretch - DAMP * a.speed) * dt
@@ -103,15 +106,16 @@ const poseOf = (e, a, time) => {
   const phase = time * 8 + (e.wander ?? 0)
   const windup = e.windup && e.stun <= 0 && !e.friendly
   const swell = windup ? 0.12 + Math.sin(time * 26) * 0.04 : e.lit ? 0.14 + Math.sin(time * 40) * 0.08 : 0
-  const crouched = !flyer && e.grounded && e.cooldown < 0.14 && e.cooldown > 0 && (e.kind === 'imp' || e.kind === 'mimic') ? -0.28 : 0
+  const crouched = a.hopper && e.grounded && e.cooldown < 0.14 && e.cooldown > 0 ? -0.28 : 0
   const airborne = !flyer && !e.grounded ? Math.max(-0.12, Math.min(0.2, -e.vy / 900)) : 0
-  const flap = flyer ? Math.sin(phase * 1.4) * 0.07 : 0
+  const drifting = flyer && !e.heavy && Math.hypot(e.vx ?? 0, e.vy ?? 0) > 1
+  const flap = drifting ? Math.sin(phase * 1.4) * 0.07 : 0
   const stretch = a.stretch + crouched + airborne + flap
   return {
     sx: 1 + swell - stretch * 0.75,
     sy: 1 + swell + stretch,
     lean: Math.round(Math.max(-2, Math.min(2, (e.vx ?? 0) / 22))),
-    bob: flyer ? Math.round(Math.sin(phase) * 1.2) : moving && e.grounded ? -Math.round(Math.abs(Math.sin(phase)) * 1) : 0,
+    bob: drifting ? Math.round(Math.sin(phase) * 1.2) : moving && e.grounded ? -Math.round(Math.abs(Math.sin(phase)) * 1) : 0,
   }
 }
 
@@ -132,16 +136,14 @@ const ring = (ctx, art, x, y, pose, colour) => {
 }
 
 const telegraphColour = (e, time) => {
-  if (e.lit) return Math.floor(time * 20) % 2 ? '#ffffff' : FIRE
-  if (e.windup && e.stun <= 0 && !e.friendly) return Math.floor(time * 13) % 2 ? '#ffffff' : HURT
-  return null
+  const pattern = e.lit ? [FIRE, null, '#ffffff', null] : e.windup && e.stun <= 0 && !e.friendly ? [HURT, null, '#ffffff', null] : null
+  return pattern ? pattern[Math.floor(time * (e.lit ? 26 : 18)) % 4] : null
 }
 
 const drawOne = (ctx, g, e) => {
   const time = g.time
   const a = animOf(e, time)
   stepAnim(e, a, time)
-  if (e.iframes > 0 && (e.flash ?? 0) <= 0 && Math.floor(time * 24) % 2) return
   const art = creatureArt(e, time)
   const pose = poseOf(e, a, time)
   const jitter = e.stun > 0 && e.frozen <= 0 ? Math.round(Math.sin(time * 60)) : 0

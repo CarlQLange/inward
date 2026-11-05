@@ -3,7 +3,7 @@ export const BLOCK = 8
 export const ROOM = 28
 export const ORIGIN = { x: 101, y: 8 }
 export const TICK = 1 / 60
-export const HUD_ANCHORS = { xp: { x: 365, y: 112 }, coin: { x: 340, y: 104 } }
+export const HUD_ANCHORS = { xp: { x: 375, y: 120 }, coin: { x: 339, y: 113 } }
 
 export const TUNING = {
   world: {

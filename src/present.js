@@ -14,6 +14,26 @@ void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }`
 
+const DISPLAY = `
+precision mediump float;
+varying vec2 uv;
+uniform sampler2D scene;
+uniform vec2 view;
+uniform vec4 room;
+uniform float depth;
+
+void main() {
+  vec3 colour = texture2D(scene, vec2(uv.x, 1.0 - uv.y)).rgb;
+  float deep = smoothstep(0.35, 1.0, depth);
+  bool inRoom = uv.x > room.x && uv.y > room.y && uv.x < room.z && uv.y < room.w;
+  vec2 cell = fract(uv * view);
+  float grid = step(0.86, cell.x) + step(0.86, cell.y);
+  float lcd = (1.0 - smoothstep(0.0, 0.35, depth)) * 0.16;
+  if (inRoom) colour *= 1.0 - min(grid, 1.0) * lcd;
+  colour *= 1.0 - deep * 0.14 * (0.5 + 0.5 * sin(uv.y * view.y * 6.283));
+  gl_FragColor = vec4(colour, 1.0);
+}`
+
 const FRAGMENT = `
 precision highp float;
 varying vec2 uv;
@@ -76,7 +96,7 @@ vec2 worldWarp(vec2 p) {
 void main() {
   float deep = smoothstep(0.35, 1.0, depth);
   float core = smoothstep(0.8, 1.0, depth);
-  vec2 pix = (floor(uv * view) + 0.5) / view;
+  vec2 pix = uv;
   bool inRoom = uv.x > room.x && uv.y > room.y && uv.x < room.z && uv.y < room.w;
   vec2 p = inRoom ? worldWarp(pix) : pix;
 
@@ -89,14 +109,15 @@ void main() {
   float spot = max(step(distance(centre, SPOT), 0.012), step(distance(centre, SPOT_DEEP), 0.012));
 
   vec2 fromCentre = p - 0.5;
-  float spread = (depth * depth * 1.3 + pulse * 2.2 + aberration * 1.7) / view.x;
+  float kick = inRoom ? pulse * 2.2 + aberration * 1.7 : 0.0;
+  float spread = (depth * depth * 1.3 + kick) / view.x;
   vec3 colour = vec3(
     texture2D(screen, p + fromCentre * spread * 2.0).r,
     centre.g,
     texture2D(screen, p - fromCentre * spread * 2.0).b
   );
 
-  float glow = smoothstep(0.2, 0.8, depth) + pulse * 0.8;
+  float glow = smoothstep(0.2, 0.8, depth) + (inRoom ? pulse * 0.8 : 0.0);
   if (glow > 0.01) {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < 8; i++) {
@@ -110,7 +131,8 @@ void main() {
   if (inRoom && lighting.y > 0.001) {
     vec2 lightUv = (p - room.xy) / (room.zw - room.xy);
     vec3 light = texture2D(lightMap, lightUv).rgb;
-    light = floor(light * 7.0 + 0.5) / 7.0;
+    float peak = max(light.r, max(light.g, light.b));
+    if (peak > 0.0) light *= (floor(peak * 7.0 + 0.5) / 7.0) / peak;
     float already = luma(colour);
     vec3 lit = colour * (lighting.x + light * (1.5 - already * 1.3)) + light * light * 0.16 * (1.0 - already);
     colour = mix(colour, lit, lighting.y);
@@ -125,13 +147,6 @@ void main() {
   if (handheld > 0.0 && (inRoom || lit > 0.5)) {
     colour = mix(colour, gameBoy(colour), handheld);
   }
-
-  vec2 cell = fract(uv * view);
-  float grid = step(0.86, cell.x) + step(0.86, cell.y);
-  float lcd = (1.0 - smoothstep(0.0, 0.35, depth)) * 0.16;
-  if (inRoom) colour *= 1.0 - min(grid, 1.0) * lcd;
-
-  colour *= 1.0 - deep * 0.14 * (0.5 + 0.5 * sin(uv.y * view.y * 6.283));
 
   float reach = length(fromCentre);
   colour += vec3(0.08, 0.32, 0.38) * core * (0.5 + 0.5 * sin(time * 1.7)) * pow(max(0.0, 1.0 - reach * 2.0), 2.0) * 0.7;
@@ -162,10 +177,11 @@ const compile = (gl, type, source) => {
   return shader
 }
 
-const createProgram = gl => {
+const createProgram = (gl, fragment) => {
   const program = gl.createProgram()
   gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX))
-  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT))
+  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragment))
+  gl.bindAttribLocation(program, 0, 'position')
   gl.linkProgram(program)
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program))
   return program
@@ -197,19 +213,32 @@ const toUvY = y => (ORIGIN.y + y) / VIEW.h
 
 export const createPresenter = canvas => {
   const gl = canvas.getContext('webgl', { antialias: false, alpha: false })
-  const program = createProgram(gl)
-  gl.useProgram(program)
+  const program = createProgram(gl, FRAGMENT)
+  const display = createProgram(gl, DISPLAY)
 
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
-  const position = gl.getAttribLocation(program, 'position')
-  gl.enableVertexAttribArray(position)
-  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
+  gl.enableVertexAttribArray(0)
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
 
+  texture(gl, 2, gl.NEAREST)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, VIEW.w, VIEW.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+  const target = gl.createFramebuffer()
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target)
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gl.getParameter(gl.TEXTURE_BINDING_2D), 0)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   texture(gl, 1, gl.LINEAR)
   texture(gl, 0, gl.NEAREST)
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
+  gl.useProgram(display)
+  const shown = name => gl.getUniformLocation(display, name)
+  gl.uniform1i(shown('scene'), 2)
+  gl.uniform2f(shown('view'), VIEW.w, VIEW.h)
+  gl.uniform4f(shown('room'), toUvX(0), toUvY(0), toUvX(SIZE), toUvY(SIZE))
+  const shownDepth = shown('depth')
+
+  gl.useProgram(program)
   const uniform = name => gl.getUniformLocation(program, name)
   gl.uniform1i(uniform('screen'), 0)
   gl.uniform1i(uniform('lightMap'), 1)
@@ -228,10 +257,7 @@ export const createPresenter = canvas => {
   const lighting = uniform('lighting')
   const ringData = new Float32Array(RING_SLOTS * 4)
 
-  const resize = () => {
-    fitCanvas(canvas)
-    gl.viewport(0, 0, canvas.width, canvas.height)
-  }
+  const resize = () => fitCanvas(canvas)
   window.addEventListener('resize', resize)
   resize()
 
@@ -275,6 +301,14 @@ export const createPresenter = canvas => {
     gl.uniform1f(desaturate, state.desat ?? 0)
     gl.uniform1f(hurt, Math.max(state.hurtFlash ?? 0, state.danger ?? 0))
     gl.uniform2f(lighting, ambient, amount)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target)
+    gl.viewport(0, 0, VIEW.w, VIEW.h)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, canvas.width, canvas.height)
+    gl.useProgram(display)
+    gl.uniform1f(shownDepth, state.depth)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.useProgram(program)
   }
 }
