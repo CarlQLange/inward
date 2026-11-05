@@ -55,22 +55,22 @@ export const ENEMY_DEFS = {
 }
 
 export const ENEMY_TRAITS = {
-  crawler: 'MAGNETS MOVE IT',
+  crawler: 'MAGNETS PULL IT',
   spitter: 'BURSTS INTO FLAME',
   fish: 'DIES IN THE AIR',
   spore: 'BURSTS INTO GAS',
   bat: 'WAKES WHEN CLOSE',
   slug: 'LEAVES OIL',
   jelly: 'SHOCKS THE WATER',
-  worm: 'EATS THROUGH TERRAIN',
+  worm: 'DIGS THROUGH BLOCKS',
   turret: 'FIRES STRAIGHT',
   bomber: 'LIGHTS ITS FUSE',
   imp: 'FREEZES WATER, SNUFFS FIRE',
   emberbat: 'LIGHTS WHAT IT PASSES',
   slime: 'LEAVES ACID',
-  crab: 'SHIELD STOPS SHOTS',
+  crab: 'ITS SHIELD STOPS SHOTS FROM THE FRONT',
   nest: 'BREEDS UNTIL DESTROYED',
-  mimic: 'NOT A CHEST',
+  mimic: 'LOOKS LIKE A CHEST',
   gasbag: 'LEAKS GAS',
   tick: 'LEAPS, CLINGS TO WALLS',
   pillbug: 'ROLLS UP, DEFLECTS SHOTS',
@@ -80,21 +80,21 @@ export const ENEMY_TRAITS = {
   scrapper: 'THROWS SCRAP',
   dripper: 'DRIPS FROM CEILINGS',
   shade: 'DRIFTS THROUGH ROCK',
-  urchin: 'STOMP OR BLAST ONLY',
+  urchin: 'ONLY STOMPS AND BLASTS HURT IT',
   coil: 'CHARGES METAL',
   puffer: 'SWELLS, BURSTS SPINES',
-  lantern: 'A LIGHT THAT LURES',
+  lantern: 'LUNGES WHEN YOU NEAR ITS LIGHT',
   mole: 'SELLS THINGS',
   hermit: 'TEACHES AN EVOLUTION',
   miner: 'TEACHES A SKILL',
   cartographer: 'REVEALS THE MAP',
   tinker: 'SWAPS A RELIC',
-  bloodletter: 'HEARTS FOR A LEVEL',
+  bloodletter: 'TRADES HEARTS FOR A LEVEL',
   bellows: 'LIGHT ITS GAS',
   crucible: 'LAVA MAKES NEW GROUND',
   colossus: 'STOMPS LOOSEN THE ROOF',
   eel: 'SHOCKS ITS POOL',
-  brood: 'BURN HER VINES',
+  brood: 'BURN ITS VINES TO DROP IT',
   conductor: 'OVERLOAD IT WITH WATER',
   core: 'THE CENTRE',
 }
@@ -805,7 +805,6 @@ export const onDeath = (g, e) => {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) < 4) puff(g.world, x + dx, y + dy, M.METHANE, [8, 12])
   }
   if (e.kind === 'bomber') explode(g.world, x, y, 2)
-  if (e.detonates) explode(g.world, x, y, 2)
   if (e.shatters) explode(g.world, x, y, 1)
   if (e.kind === 'snapweed') for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ignite(g.world, x + dx, y + dy)
   if (e.kind === 'dripper') for (const dx of [-1, 0, 1, -2, 2]) puff(g.world, x + dx, y + 1, e.drips ?? M.OIL, [1, 1])

@@ -31,6 +31,9 @@ rooms and time per run, deaths per ring, kills by source, secrets met and tick c
 lists the flags, such as `--god`, `--found rand`, `--career`, `--warden bellows --gun` and, to reach and pass the
 Core, `--god --express --deeper --loops 2`. The bot walks badly, so read its time-per-run numbers as an upper bound
 and its deaths as pessimistic.
+`node scripts/builds.mjs` forces a loadout and a region and reports kills per minute, time to clear, hearts
+lost, casts and time fed, for single skills, named pairs (`--pairs ember+gust`), every pair or finished forms.
+Its bot never dodges or sets up a combo on purpose, so its numbers are comparative.
 
 `node scripts/bundle.mjs` packs everything into `dist/inward.html`, the one page published as the artifact
 at https://claude.ai/artifact/6mA22hzMWHpUoG5f7wEdBS. Republish that file to update it. Add `?touch` to the
@@ -188,6 +191,13 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Each skill evolves through two forks of two exclusive forms, so two picks and four possible
   ends. Carl rejected "the same but slightly better": a form must change what the skill does,
   never only how much. Taking a form renames the skill and changes how it looks in play.
+- Every skill eats something (`src/feed.js`): a material or live state near you, foes in some state, how you
+  move, or an event such as a blast kill. Eating shows as motes flying to the hero and a lit slot, and recharges the
+  skill several times faster, so one skill can make what another eats and the region decides how far that goes. Skills
+  feel different in the hand too: most are a tap, some hold stock (dash, mason, mine), and some forms stream while
+  held, toggle, or swell while held.
+- Level-up cards show the actual skill or form, leaning towards skills that make what yours eat and what the
+  region offers (`src/offers.js`). Once a run's forks are spent, picks widen what a skill eats or change a form taken.
 - Eight random starter rooms, each teaching its own first skill, and a quickstart for any
   ring with a matching random loadout. Quickstarts don't count towards records.
 - Each room has one of eight layouts, such as tunnels, chasm or chimney, and regions have

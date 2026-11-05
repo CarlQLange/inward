@@ -9,55 +9,55 @@ import { zap } from './skills.js'
 const keystone = (id, name, gift, cost, tint, glyph, extra = {}) => ({ id, name, gift, cost, tint, glyph, ...extra })
 
 export const KEYSTONES = [
-  keystone('echo', 'ECHO', 'EVERY CAST HAPPENS TWICE', 'RECHARGE AT HALF SPEED', '#6fd0ff', [
+  keystone('echo', 'ECHO', 'SKILLS CAST TWICE', 'SKILLS RECHARGE AT HALF SPEED', '#6fd0ff', [
     '#...#....', '.#...#...', '..#...#..', '...#...#.', '....#...#', '...#...#.', '..#...#..', '.#...#...', '#...#....',
   ]),
-  keystone('fists', 'BARE HANDS', 'SKILLS RECHARGE THREE TIMES AS FAST', 'NO GUN, ONLY A PUNCH', '#ff5a4a', [
+  keystone('fists', 'BARE HANDS', 'SKILLS RECHARGE THREE TIMES AS FAST', 'YOUR GUN BECOMES A SHORT PUNCH', '#ff5a4a', [
     '..#.#.#..', '.########', '.########', '.########', '#########', '#.#######', '.#######.', '..#####..', '..#####..',
   ]),
-  keystone('stain', 'STAIN', 'SHOTS BECOME WHAT YOU STAND ON', 'THE GUN ITSELF DOES NOTHING', '#c8ff5a', [
+  keystone('stain', 'STAIN', 'SHOTS ARE MADE OF WHAT YOU STAND ON', 'SHOTS DO NO DAMAGE OF THEIR OWN', '#c8ff5a', [
     '.........', '#...###..', '.#.#####.', '#..#####.', '.#.#####.', '#...###..', '....#.#..', '....#....', '......#..',
   ]),
-  keystone('fourth', 'FOURTH HAND', 'A FOURTH SKILL', 'THREE HEARTS', '#f4f8f2', [
+  keystone('fourth', 'FOURTH HAND', 'A FOURTH SKILL SLOT', 'LOSE THREE HEARTS', '#f4f8f2', [
     '####.####', '####.####', '####.####', '####.####', '.........', '####.####', '####.####', '####.####', '####.####',
   ], { hearts: 3 }),
-  keystone('salamander', 'SALAMANDER', 'FIRE AND LAVA MEND YOU', 'WATER BURNS', '#ff9a2e', [
+  keystone('salamander', 'SALAMANDER', 'FIRE AND LAVA HEAL YOU', 'WATER HURTS YOU', '#ff9a2e', [
     '....#....', '...##....', '..###.#..', '..#####..', '.#######.', '.###.###.', '.##...##.', '.###.###.', '..#####..',
   ]),
-  keystone('unbroken', 'UNBROKEN', 'CHAINS NEVER BREAK', 'A LAPSE COSTS A HEART', '#ffe84a', [
+  keystone('unbroken', 'UNBROKEN', 'CHAINS NEVER BREAK', 'LOSE A HEART WHEN A CHAIN RUNS OUT', '#ffe84a', [
     '###......', '#.#......', '#.###....', '###.#....', '..#.###..', '..###.#..', '....#.###', '....###.#', '......###',
   ]),
-  keystone('glutton', 'GLUTTON', 'ALL LIVE MATTER FEEDS ALL SKILLS', 'NOTHING ELSE DOES', '#8ae04a', [
+  keystone('glutton', 'GLUTTON', 'ANY MATERIAL NEAR YOU RECHARGES SKILLS', 'SKILLS DO NOT RECHARGE WITHOUT IT', '#8ae04a', [
     '..####...', '.######..', '#####....', '####..#.#', '####.....', '#####....', '.######..', '..####...', '.........',
   ]),
-  keystone('powder', 'POWDER', 'FOES DIE IN BLASTS', 'YOU ARE NOT SPARED', '#f07ae0', [
+  keystone('powder', 'POWDER', 'FOES EXPLODE WHEN THEY DIE', 'THE BLASTS HURT YOU TOO', '#f07ae0', [
     '#...#...#', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '#...#...#',
   ]),
-  keystone('overload', 'OVERLOAD', 'ALL STONE BURNS AND CONDUCTS', 'ROOMS FALL APART', '#ffb347', [
+  keystone('overload', 'OVERLOAD', 'ROCK BURNS AND CARRIES CHARGE', 'FLOORS AND WALLS CAN BURN AWAY', '#ffb347', [
     '#########', '#####.###', '####.####', '###...###', '####.####', '###.#####', '##.######', '#########', '.........',
   ]),
-  keystone('quarry', 'QUARRY', 'BOMBS NEVER RUN OUT', 'NO COINS, EVER', '#b6a080', [
+  keystone('quarry', 'QUARRY', 'UNLIMITED BOMBS', 'NO MORE COINS', '#b6a080', [
     '.#####...', '#....##..', '......##.', '.....#.##', '....#...#', '...#....#', '..#......', '.#.......', '#........',
   ]),
-  keystone('livewire', 'LIVE WIRE', 'YOU ARE THE CHARGE', 'YOU LIGHT WHAT YOU TOUCH', '#ffe84a', [
+  keystone('livewire', 'LIVE WIRE', 'YOU SHOCK FOES YOU TOUCH', 'YOU SET FIRE TO WHAT YOU STAND ON', '#ffe84a', [
     '.....##..', '....##...', '...##....', '..#####..', '....##...', '...##....', '..##.....', '.##......', '.#.......',
   ]),
-  keystone('bounty', 'BOUNTY', 'ELITES PAY THREEFOLD', 'ALL FOES ARE ELITE', '#ffe84a', [
+  keystone('bounty', 'BOUNTY', 'ELITES PAY THREE TIMES AS MUCH', 'ALL FOES ARE ELITE', '#ffe84a', [
     '...###...', '..#.#.#..', '.#..#..#.', '#...#...#', '#########', '#...#...#', '.#..#..#.', '..#.#.#..', '...###...',
   ]),
-  keystone('wake', 'THE WAKE', 'THE DEAD FIGHT FOR YOU', 'CLEARED ROOMS GIVE NOTHING', '#c79ae0', [
+  keystone('wake', 'THE WAKE', 'KILLED FOES FIGHT FOR YOU', 'CLEARING A ROOM GIVES NOTHING', '#c79ae0', [
     '..#####..', '.#######.', '.#..#..#.', '.#######.', '..#.#.#..', '.........', '....#....', '...###...', '..#.#.#..',
   ]),
-  keystone('monomania', 'MONOMANIA', 'ONE SKILL WITH NO WAIT', 'THE OTHERS GO', '#f4f8f2', [
+  keystone('monomania', 'MONOMANIA', 'ONE SKILL, NO RECHARGE', 'LOSE YOUR OTHER SKILLS', '#f4f8f2', [
     '...###...', '..####...', '.#####...', '...###...', '...###...', '...###...', '...###...', '.#######.', '.#######.',
   ], { slots: 1 }),
-  keystone('breath', 'HELD BREATH', 'THE WORLD WAITS WHILE YOU STAND STILL', 'THREE HEARTS', '#bff2ff', [
+  keystone('breath', 'HELD BREATH', 'TIME STOPS WHILE YOU STAND STILL', 'LOSE THREE HEARTS', '#bff2ff', [
     '#########', '.#.....#.', '..#...#..', '...#.#...', '....#....', '...#.#...', '..#.#.#..', '.#.###.#.', '#########',
   ], { hearts: 3 }),
-  keystone('slough', 'SLOUGH', 'NEW SKILLS, FULLY GROWN', 'YOURS ARE GONE', '#7dff8a', [
+  keystone('slough', 'SLOUGH', 'NEW SKILLS, FULLY EVOLVED', 'LOSE YOUR SKILLS', '#7dff8a', [
     '...#.....', '..##.....', '.#######.', '..##...#.', '...#...#.', '.#...#...', '.#...##..', '.#######.', '.....#...',
   ]),
-  keystone('onecut', 'ONE CUT', 'ANY HIT KILLS A FOE', 'TWO HEARTS LEFT', '#ff3a3a', [
+  keystone('onecut', 'ONE CUT', 'ANY HIT KILLS A FOE', 'DROP TO TWO HEARTS', '#ff3a3a', [
     '.......##', '......###', '.....###.', '....###..', '...###...', '..###....', '#.##.....', '.##......', '#.#......',
   ], { hearts: 6 }),
 ]

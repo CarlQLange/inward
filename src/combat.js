@@ -6,6 +6,7 @@ import { rumble } from './pad.js'
 import { burstSparks, hitFx, hurtFx, woundFx } from './fx.js'
 import { bounced, schoolOf, wardShare } from './wards.js'
 import { hasKeystone } from './keystones.js'
+import { feedEvent } from './feed.js'
 
 export const burst = burstSparks
 
@@ -17,10 +18,18 @@ const spillCoins = (g, p, count) => {
   }
 }
 
+const bonded = g => g.enemies.find(e => e.ally > 0 && e.bond && e.hp > 0)
+
 const hurtPlayer = (g, p, cause) => {
   const paid = p.relics.has('crown') && g.gold >= TUNING.run.crownHit
-  if (paid) spillCoins(g, p, TUNING.run.crownHit)
+  const stand = bonded(g)
+  if (stand) {
+    stand.hp -= TUNING.skills.charm.bondCost
+    stand.flash = TUNING.feel.enemyFlash
+    g.bolts.push({ points: [centre(p), centre(stand)], life: 0.2, colour: '#6fd0ff' })
+  } else if (paid) spillCoins(g, p, TUNING.run.crownHit)
   else p.hp -= 1
+  feedEvent(g, 'hit', centre(p).x, centre(p).y)
   if (p.relics.has('chain') && !hasKeystone(p, 'unbroken')) {
     g.chain = 0
     g.chainTime = 0

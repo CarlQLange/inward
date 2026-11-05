@@ -54,7 +54,7 @@ const openOptions = g => openMenu(g, {
       : [{ label: 'CONTROLS', run: g2 => openControls(g2) }]),
     { label: 'RECORDS', run: g2 => openRecords(g2) },
     {
-      label: 'FORGET ALL',
+      label: 'DELETE SAVE',
       run: gm => openMenu(gm, {
         page: 'confirm',
         items: [
@@ -183,7 +183,7 @@ const CARDS = {
   new: () => ({ name: 'NEW', text: '', mystery: true }),
   upgrade: ({ skill, node }) => ({ icon: skill, tint: node.tint, name: node.name, text: node.text, parent: null }),
   relic: ({ relic }) => ({ icon: RELIC_BY_ID[relic].icon, name: RELIC_BY_ID[relic].name, text: RELIC_BY_ID[relic].text }),
-  mend: () => ({ icon: 'heart', name: 'MEND', text: 'ALL HEARTS, A BOMB' }),
+  mend: () => ({ icon: 'heart', name: 'HEAL', text: 'REFILLS HEARTS AND GIVES A BOMB' }),
 }
 
 export const cardFor = option => CARDS[option.type](option)

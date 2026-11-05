@@ -7,7 +7,8 @@ import { heartCap, slotsOf } from './keystones.js'
 import { drawMapGrid } from './screens.js'
 import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
-import { FORKS, cooldownOf, formOf } from './skills.js'
+import { FORKS, formOf } from './skills.js'
+import { feedColour, pipsOf, waitingOf } from './feed.js'
 import { tintedIcon } from './skillart.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
 import { LAYOUT, isTall, isTouchLayout } from './layout.js'
@@ -44,6 +45,44 @@ const corners = (ctx, x, y, size, colour) => {
   ]) ctx.fillRect(cx, cy, w, h)
 }
 
+const perimeter = (x, y, size, t) => {
+  const side = size - 1
+  const d = ((t % 4) + 4) % 4
+  if (d < 1) return { x: x + d * side, y }
+  if (d < 2) return { x: x + side, y: y + (d - 1) * side }
+  if (d < 3) return { x: x + side - (d - 2) * side, y: y + side }
+  return { x, y: y + side - (d - 3) * side }
+}
+
+const drawFed = (ctx, g, skill, x, y, size) => {
+  const fed = skill.fed ?? 0
+  const gulp = skill.gulp ?? 0
+  if (fed < 0.04 && gulp <= 0) return
+  const colour = feedColour(skill)
+  const strength = Math.max(fed, gulp)
+  ctx.globalAlpha = 0.16 + strength * 0.2
+  ctx.fillStyle = colour
+  ctx.fillRect(x + 1, y + 1, size - 2, size - 2)
+  ctx.globalAlpha = 0.4 + strength * 0.6
+  box(ctx, x - 1, y - 1, size + 2, size + 2, colour)
+  ctx.globalAlpha = 1
+  const count = 1 + Math.round(strength * 3)
+  ctx.fillStyle = WHITE
+  for (let n = 0; n < count; n++) {
+    const at = perimeter(x - 1, y - 1, size + 2, g.time * (1 + strength * 3) + (n * 4) / count)
+    ctx.fillRect(Math.round(at.x), Math.round(at.y), 1, 1)
+  }
+}
+
+const drawPips = (ctx, g, skill, x, y) => {
+  const pips = pipsOf(g.player, skill)
+  if (!pips) return
+  for (let n = 0; n < pips.most; n++) {
+    ctx.fillStyle = n < pips.have ? WHITE : DIM
+    ctx.fillRect(x + n * 4, y, 3, 2)
+  }
+}
+
 const drawSkillSlot = (ctx, g, slot) => {
   const top = ORIGIN.y + slot * slotGap(g.player)
   const skill = g.player.skills[slot]
@@ -51,14 +90,14 @@ const drawSkillSlot = (ctx, g, slot) => {
     corners(ctx, SLOT_X, top, SLOT, DIM)
     return
   }
-  const whole = cooldownOf(g.player, skill.kind)
   const { tint, stage } = formOf(g.player, skill.kind)
-  const waiting = Math.max(0, Math.min(1, skill.ready / whole))
+  const waiting = waitingOf(g.player, skill)
   const wasWaiting = readiness.get(skill) ?? 0
   const flash = wasWaiting > 0 && waiting === 0 ? 0.18 : Math.max(0, (skill.flash ?? 0) - 1 / 60)
   skill.flash = flash
   readiness.set(skill, waiting)
   box(ctx, SLOT_X, top, SLOT, SLOT, waiting > 0 ? MID : tint ?? GREEN)
+  drawFed(ctx, g, skill, SLOT_X, top, SLOT)
   ctx.globalAlpha = waiting > 0 ? 0.45 : 1
   ctx.drawImage(tintedIcon(skill.kind, tint), SLOT_X + 8, top + 8)
   ctx.globalAlpha = 1
@@ -71,6 +110,11 @@ const drawSkillSlot = (ctx, g, slot) => {
     ctx.fillStyle = 'rgba(118, 214, 72, 0.22)'
     ctx.fillRect(SLOT_X + 1, top + SLOT - 1 - h, SLOT - 2, h)
   }
+  if (skill.swelling) {
+    ctx.fillStyle = tint ?? WHITE
+    ctx.fillRect(SLOT_X + 1, top + SLOT - 2 - Math.round((SLOT - 3) * skill.swell), 2, Math.round((SLOT - 3) * skill.swell))
+  }
+  drawPips(ctx, g, skill, SLOT_X + 2, top + 2)
   if (flash > 0) {
     ctx.fillStyle = `rgba(255, 255, 255, ${flash * 5})`
     ctx.fillRect(SLOT_X, top, SLOT, SLOT)
@@ -230,13 +274,26 @@ const drawSkillButton = (ctx, g, b, held) => {
     ring(ctx, b.x, b.y, b.r, DIM)
     return
   }
-  const whole = cooldownOf(g.player, skill.kind)
-  const waiting = Math.max(0, Math.min(1, skill.ready / whole))
+  const waiting = waitingOf(g.player, skill)
   const { tint } = formOf(g.player, skill.kind)
   const wasWaiting = readiness.get(skill) ?? 0
   readiness.set(skill, waiting)
   skill.flash = wasWaiting > 0 && waiting === 0 ? 0.18 : Math.max(0, (skill.flash ?? 0) - 1 / 60)
-  ring(ctx, b.x, b.y, b.r, skill.flash > 0 ? WHITE : waiting > 0 ? MID : tint ?? GREEN, held ? '#1a3a24' : INK)
+  const fed = Math.max(skill.fed ?? 0, skill.gulp ?? 0)
+  if (fed > 0.04) {
+    ctx.globalAlpha = 0.4 + fed * 0.6
+    ring(ctx, b.x, b.y, b.r + 2, feedColour(skill), 'rgba(0, 0, 0, 0)')
+    ctx.globalAlpha = 1
+  }
+  ring(ctx, b.x, b.y, b.r, skill.flash > 0 ? WHITE : fed > 0.04 ? feedColour(skill) : waiting > 0 ? MID : tint ?? GREEN, held ? '#1a3a24' : INK)
+  if (fed > 0.04) {
+    ctx.fillStyle = WHITE
+    const count = 1 + Math.round(fed * 2)
+    for (let n = 0; n < count; n++) {
+      const a = g.time * (3 + fed * 7) + (n * Math.PI * 2) / count
+      ctx.fillRect(Math.round(b.x + Math.cos(a) * (b.r + 1)), Math.round(b.y + Math.sin(a) * (b.r + 1)), 2, 2)
+    }
+  }
   ctx.globalAlpha = waiting > 0 ? 0.4 : 1
   ctx.drawImage(tintedIcon(skill.kind, tint), Math.round(b.x) - 8, Math.round(b.y) - 8)
   ctx.globalAlpha = 1
@@ -244,6 +301,12 @@ const drawSkillButton = (ctx, g, b, held) => {
     ctx.fillStyle = GREEN
     ctx.fillRect(Math.round(b.x) - 8, Math.round(b.y) + b.r - 3, Math.round(16 * (1 - waiting)), 2)
   }
+  if (skill.swelling) {
+    ctx.fillStyle = tint ?? WHITE
+    ctx.fillRect(Math.round(b.x) - 8, Math.round(b.y) + b.r - 3, Math.round(16 * skill.swell), 2)
+  }
+  const pips = pipsOf(g.player, skill)
+  if (pips) drawPips(ctx, g, skill, Math.round(b.x) - pips.most * 2, Math.round(b.y) - b.r + 2)
 }
 
 const drawActionButton = (ctx, g, b, held) => {
