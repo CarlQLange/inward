@@ -3,6 +3,7 @@ import { M, props } from './materials.js'
 import { matAt } from './world.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
+import { MATERIAL_COLOURS } from './fx.js'
 
 const S = TUNING.skills
 
@@ -97,7 +98,60 @@ const hammerHead = (ctx, f, colour) => {
   for (let d = -3; d <= 3; d++) dot(ctx, f.x + Math.cos(a) * 6 - Math.sin(a) * d, f.y + Math.sin(a) * 6 + Math.cos(a) * d, 2, 2, colour)
 }
 
+const CORD = '#c9b48a'
+const CORD_DARK = '#7a6a4a'
+const GLASS = '#dfe8e4'
+
+const liquidOf = mat => MATERIAL_COLOURS[mat]?.[0] ?? MAGNET
+
+const fusePoint = ([x, y]) => ({ x: x * BLOCK + 4, y: y * BLOCK + 7 })
+
+const drawCord = (ctx, g, f) => {
+  const shown = f.laying && !f.trail ? Math.floor(f.laid) : f.cells.length
+  const dark = f.sleeper ? GAS : CORD_DARK
+  for (let i = 0; i < shown; i++) {
+    if (f.burnt[i]) continue
+    const a = fusePoint(f.cells[i])
+    const b = f.cells[i + 1] && i + 1 < shown && !f.burnt[i + 1] ? fusePoint(f.cells[i + 1]) : a
+    dotted(ctx, a, b, CORD, 1)
+    dot(ctx, a.x, a.y, 1, 1, (i + Math.floor(g.time * (f.laying ? 12 : 0))) % 3 ? CORD : dark)
+  }
+  if (f.end >= 0 && !f.burnt[f.end]) {
+    const e = fusePoint(f.cells[f.end])
+    dot(ctx, e.x - 2, e.y - 3, 5, 4, '#2a2a2a')
+    dot(ctx, e.x - 1, e.y - 2, 3, 1, Math.floor(g.time * (f.lit ? 14 : 3)) % 2 ? BLOOD : dark)
+  }
+  if (f.laying && shown > 0) dot(ctx, fusePoint(f.cells[shown - 1]).x - 1, fusePoint(f.cells[shown - 1]).y - 1, 2, 2, Math.floor(g.time * 12) % 2 ? WHITE : CORD)
+}
+
+const drawSparks = (ctx, g, f) => {
+  for (const s of f.sparks) {
+    const at = fusePoint(f.cells[s.i])
+    const flicker = Math.floor(g.time * 24 + s.i) % 2
+    dot(ctx, at.x - 1, at.y - 2, 3, 3, flicker ? CHARGE : FIRE)
+    dot(ctx, at.x, at.y - 1, 1, 1, WHITE)
+  }
+  for (const e of f.towing ?? []) dotted(ctx, { x: e.x + e.w / 2, y: e.y + e.h / 2 }, fusePoint(f.cells[f.sparks[0]?.i ?? 0]), BLOOD, 2, g.time * 30)
+}
+
+const drawBottle = (ctx, x, y, colour, fullness) => {
+  const [bx, by] = [Math.round(x) - 2, Math.round(y) - 3]
+  dot(ctx, bx + 1, by - 1, 2, 1, GLASS)
+  dot(ctx, bx, by, 4, 5, GLASS)
+  dot(ctx, bx + 1, by + 1, 2, 3, '#2a3430')
+  const level = Math.ceil(fullness * 4)
+  if (level) dot(ctx, bx + 1, by + 5 - level, 2, level, colour)
+}
+
 const ART = {
+  wick: (ctx, g, f) => {
+    drawCord(ctx, g, f)
+    drawSparks(ctx, g, f)
+  },
+  bottle: (ctx, g, f) => {
+    drawBottle(ctx, f.x, f.y, liquidOf(f.mat), Math.min(1, f.cells / S.flask.most))
+    if (Math.floor(g.time * 3 + f.x) % 5 === 0) dot(ctx, f.x - 1, f.y - 2, 1, 1, WHITE)
+  },
   globe: (ctx, g, f) => {
     const c = { x: f.x + 3, y: f.y + 3 }
     circle(ctx, c.x, c.y, 4 + Math.sin(g.time * 18), MAGNET, 12)
@@ -114,7 +168,13 @@ const ART = {
   },
   thrown: (ctx, g, f) => {
     if (f.lands === 'floe' && iceTile()) ctx.drawImage(iceTile(), Math.round(f.x), Math.round(f.y))
-    else dot(ctx, f.x, f.y, f.w, f.h, f.colour)
+    else if (f.lands === 'splash' && f.bottle) drawBottle(ctx, f.x + 2, f.y + 3, f.colour, f.cells / S.flask.most)
+    else if (f.lands === 'splash') {
+      const speed = Math.max(1, Math.hypot(f.vx, f.vy))
+      for (let i = 1; i <= 3; i++) dot(ctx, f.x + 2 - (f.vx / speed) * i * 3, f.y + 2 - (f.vy / speed) * i * 3, 2, 2, f.colour)
+      dot(ctx, f.x, f.y, f.w, f.h, f.colour)
+      dot(ctx, f.x + 1, f.y + 1, 1, 1, WHITE)
+    } else dot(ctx, f.x, f.y, f.w, f.h, f.colour)
   },
   fuse: (ctx, g, f) => {
     dot(ctx, f.x - 2, f.y - 2, 5, 5, '#2a2a2a')
@@ -346,7 +406,22 @@ const drawCreatureStates = (ctx, g) => {
     if (e.ally && e.plague) dot(ctx, e.x + e.w / 2 - 1, e.y - 4, 2, 2, ACID)
     if (e.ally && e.pact) dot(ctx, e.x + e.w / 2 - 2, e.y - 4, 4, 1, WHITE)
     if (e.ally && e.bond) dotted(ctx, { x: e.x + e.w / 2, y: e.y + e.h / 2 }, { x: g.player.x + 3, y: g.player.y + 8 }, MAGNET, 4, g.time * 16)
+    if (e.coat) {
+      const colour = liquidOf(e.coat.mat)
+      for (let i = 0; i < 3; i++) dot(ctx, e.x + ((i * 5 + Math.round(e.x)) % Math.max(1, e.w)), e.y + ((Math.floor(g.time * 8) + i * 3) % Math.max(1, e.h)), 1, 2, colour)
+      dot(ctx, e.x, e.y - 1, e.w, 1, colour)
+    }
   }
+}
+
+const drawFlask = (ctx, g) => {
+  const p = g.player
+  const skill = p.skills.find(s => s.kind === 'flask')
+  if (!skill) return
+  const side = p.facing > 0 ? p.x - 3 : p.x + p.w + 3
+  const cells = p.flask?.cells ?? 0
+  drawBottle(ctx, side, p.y + 9 + (p.crouching ? 3 : 0), cells ? liquidOf(p.flask.mat) : GLASS, cells / S.flask.most)
+  if (skill.holding && !skill.pouring) circle(ctx, p.x + p.w / 2, p.y + 8, S.flask.reach * (1 - ((g.time * 2.5) % 1)), cells ? liquidOf(p.flask.mat) : GLASS, 20)
 }
 
 const MOTE_SIZE = { blob: 3, tumble: 2, puff: 3, shard: 2, streak: 1, rise: 2, drip: 2, leaf: 2, hop: 2, zig: 2, curl: 2, gather: 2 }
@@ -411,6 +486,7 @@ export const drawSkillEffects = (ctx, g) => {
   for (const f of g.effects) ART[f.kind]?.(ctx, g, f)
   drawCreatureStates(ctx, g)
   drawLungs(ctx, g)
+  drawFlask(ctx, g)
   drawHeldSkills(ctx, g)
   drawFeedMotes(ctx, g)
   drawEvolving(ctx, g)

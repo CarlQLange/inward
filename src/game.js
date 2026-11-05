@@ -63,8 +63,8 @@ const lean = g => {
   const owned = new Set(g.player.skills.map(s => s.kind))
   return {
     metal: owned.has('repel') || owned.has('bolt'),
-    water: owned.has('bolt') || owned.has('frost'),
-    fuel: owned.has('ember') || owned.has('gust'),
+    water: owned.has('bolt') || owned.has('frost') || owned.has('flask'),
+    fuel: owned.has('ember') || owned.has('gust') || owned.has('wick'),
     scrap: owned.has('repel'),
   }
 }
@@ -76,10 +76,10 @@ const depthFor = (g, ring) => {
 }
 
 const LOCK_OPENERS = {
-  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash'],
-  gate: ['bolt', 'rod', 'acid', 'blink', 'melt'],
-  brick: ['hammer', 'melt', 'acid', 'blink', 'mine'],
-  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy'],
+  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick'],
+  gate: ['bolt', 'rod', 'acid', 'blink', 'melt', 'wick'],
+  brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
+  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick'],
   scrap: ['repel', 'hammer', 'well', 'grapple', 'acid', 'blink'],
 }
 const LOCKS = Object.keys(LOCK_OPENERS)
