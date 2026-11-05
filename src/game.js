@@ -556,7 +556,7 @@ export const createGame = (depthOverride = null, phase = 'playing', quickRing = 
     Object.assign(g, {
       phase: 'title', titleTime: 0, toast: null, shownDepth: 0.25,
       world: createWorld(TITLE_ROOM.map, false), enemies: [], cards: [], wares: [], pickups: [],
-      player: createPlayer(TITLE_ROOM.spawn),
+      player: { ...createPlayer(TITLE_ROOM.spawn), grounded: true },
     })
     openTitle(g)
   }
@@ -1145,9 +1145,18 @@ const stepCore = (g, dt) => {
   if (matAt(g.world, x, y) === M.ROCK && !props(matAt(g.world, x, y + 1)).solid) setCell(g.world, x, y, M.SAND)
 }
 
+const crumble = (g, count) => {
+  for (let n = 0; n < count; n++) {
+    const x = 1 + Math.floor(Math.random() * 26)
+    const y = 1 + Math.floor(Math.random() * 26)
+    if (props(matAt(g.world, x, y)).solid) setCell(g.world, x, y, M.SAND)
+  }
+}
+
 const stepEnding = (g, dt) => {
   g.ending.life -= dt
   g.player.iframes = 1
+  crumble(g, 2)
   g.shake = Math.max(g.shake, 6)
   g.pulse = Math.max(g.pulse, 0.6)
   if (Math.random() < dt * 8) {
@@ -1780,6 +1789,10 @@ export const step = (g, input, realDt) => {
     return
   }
   if (g.phase === 'title') stepTitle(g, dt)
+  if (g.phase === 'cleared') {
+    g.depth = 0
+    crumble(g, 1)
+  }
   if (g.phase === 'dead' || g.phase === 'cleared') {
     g.phaseTime += dt
     stepWorld(g.world, dt, g.depth)

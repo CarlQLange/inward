@@ -1,11 +1,13 @@
 import { TICK, TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
+import { almanac } from './discover.js'
 import { SKILL_NAMES, formOf } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
 const P = TUNING.player
+const ALMANAC_COLUMNS = 19
 
 export const openMenu = (g, menu) => g.menus.push({ selected: 0, armed: false, layout: 'list', back: true, age: 0, opened: g.time, ...menu })
 
@@ -81,7 +83,7 @@ const openQuickstart = g => openMenu(g, {
   items: Array.from({ length: 8 }, (_, ring) => ({ run: quickstart(ring) })),
 })
 
-const openNotes = g => openMenu(g, { page: 'notes', title: 'ALMANAC', scroll: 0, items: [back] })
+const openNotes = g => openMenu(g, { page: 'almanac', cursor: 0, items: [back] })
 
 export const openTitle = g => openMenu(g, {
   page: 'title',
@@ -253,16 +255,17 @@ export const stepMenus = (g, input) => {
   if (!menu.armed) {
     menu.armed = settled(g, menu, input)
   } else if (!stepTitlePress(menu, pressed('jump') || pressed('confirm') || pressed('click'))) {
-    const swallowed = menu.page === 'pause' && stepPauseFocus(g, menu, moved)
+    const swallowed = menu.page === 'almanac' || (menu.page === 'pause' && stepPauseFocus(g, menu, moved))
     const [previous, next] = menu.layout === 'cards' ? ['left', 'right'] : ['up', 'down']
     const count = menu.items.length
     if (!swallowed) {
       if (moved[previous]) menu.selected = cycle(menu.selected, -1, count)
       if (moved[next]) menu.selected = cycle(menu.selected, 1, count)
     }
-    if (menu.page === 'notes') {
-      if (moved.up) menu.scroll = Math.max(0, menu.scroll - 1)
-      if (moved.down) menu.scroll += 1
+    if (menu.page === 'almanac') {
+      const total = almanac().groups.reduce((n, group) => n + group.total, 0)
+      const by = (moved.right ? 1 : 0) - (moved.left ? 1 : 0) + ((moved.down ? 1 : 0) - (moved.up ? 1 : 0)) * ALMANAC_COLUMNS
+      menu.cursor = Math.max(0, Math.min(total - 1, menu.cursor + by))
     }
     const clicked = stepPointer(g, menu, input, pressed)
     const confirm = pressed('jump') || pressed('confirm') || clicked

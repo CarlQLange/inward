@@ -6,7 +6,8 @@ import { tintedIcon } from './skillart.js'
 import { SPRITES, creatureFrames } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { almanac } from './discover.js'
-import { drawWardenMarks } from './overlay.js'
+import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
+import { drawWardenMarks, revealArt } from './overlay.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
@@ -197,55 +198,69 @@ const drawRecords = (ctx, menu) => {
   drawList(ctx, menu, ORIGIN.y + 196 + rise)
 }
 
-const MATERIAL_ORDER = [
-  M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.METAL, M.SCRAP, M.SAND, M.WATER,
-  M.OIL, M.LAVA, M.ACID, M.VINE, M.SOURCE, M.ICE, M.SMOKE, M.STEAM, M.METHANE, M.VOLATILE, M.BRICK, M.GATE, M.BEDROCK,
-]
-const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS'], ['bubble', 'SPLITS'], ['grow', 'GROWS'], ['rain', 'RAINS'], ['dissolve', 'DISSOLVES']]
+const shadows = new WeakMap()
 
-const knownReactions = () => [...knownNotes].filter(note => !/^(seen|met|killed):/.test(note))
-
-const noteLines = () => {
-  const materials = MATERIAL_ORDER.filter(m => knownNotes.has(`seen:${m}`)).map(m => ({
-    tile: m,
-    name: MATERIAL_NAMES[m],
-    text: TAGS.filter(([tag]) => knownNotes.has(`${tag}:${m}`)).map(([, word]) => word).join(' ') || '?',
-  }))
-  const creatures = Object.keys(ENEMY_DEFS).filter(k => knownNotes.has(`met:${k}`)).map(k => ({
-    creature: k,
-    name: k.toUpperCase(),
-    text: knownNotes.has(`killed:${k}`) ? ENEMY_TRAITS[k] : '?',
-  }))
-  return [...materials, ...creatures]
+const shadowOf = art => {
+  if (!shadows.has(art)) {
+    const canvas = document.createElement('canvas')
+    canvas.width = art.width
+    canvas.height = art.height
+    const c = canvas.getContext('2d')
+    c.drawImage(art, 0, 0)
+    c.globalCompositeOperation = 'source-in'
+    c.fillStyle = FAINT
+    c.fillRect(0, 0, art.width, art.height)
+    shadows.set(art, canvas)
+  }
+  return shadows.get(art)
 }
 
-const TILE_NAME = {
-  [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat', [M.WOOD]: 'wood', [M.METAL]: 'metal',
-  [M.SCRAP]: 'scrap', [M.SAND]: 'sand', [M.ICE]: 'ice', [M.VOLATILE]: 'volatile', [M.BEDROCK]: 'bedrock',
-  [M.BRICK]: 'brick', [M.GATE]: 'gate',
-}
-const SWATCH = { [M.ACID]: '#7fd03a', [M.VINE]: '#4f9c3a', [M.SOURCE]: '#70767a', [M.LAVA]: '#ff7a1c', [M.WATER]: '#10606e', [M.OIL]: '#5a3a64', [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#a878c8' }
+const ALMANAC_COLUMNS = 19
+const ALMANAC_PITCH = 21
+const ALMANAC_CELL = 18
+const ALMANAC_LEFT = Math.floor((VIEW.w - ALMANAC_COLUMNS * ALMANAC_PITCH) / 2)
+const ALMANAC_TOP = 30
 
-const drawNotes = (ctx, menu) => {
-  sheet(ctx, menu)
-  const lines = noteLines()
-  const perPage = 11
-  menu.scroll = Math.min(menu.scroll, Math.max(0, lines.length - perPage))
-  lines.slice(menu.scroll, menu.scroll + perPage).forEach((line, i) => {
-    const y = ORIGIN.y + 34 + i * 14
-    const x = ORIGIN.x + 14
-    if (line.tile !== undefined && TILE_NAME[line.tile]) ctx.drawImage(SPRITES.tiles[TILE_NAME[line.tile]][0], x, y)
-    else if (line.tile !== undefined) {
-      ctx.fillStyle = SWATCH[line.tile]
-      ctx.fillRect(x, y, 8, 8)
-    } else {
-      const sprite = creatureFrames(line.creature)[0][0]
-      ctx.drawImage(sprite, x - 3, y - 2, 14, 14)
-    }
-    drawText(ctx, line.name, x + 16, y - 1, WHITE)
-    drawText(ctx, line.text, x + 16, y + 5, PALE)
+const blurbOf = ({ kind, id }) => ({
+  skill: () => SKILL_DETAILS[id],
+  relic: () => RELIC_BY_ID[id]?.text,
+  foe: () => ENEMY_TRAITS[id],
+  inhabitant: () => ENEMY_TRAITS[id],
+  warden: () => ENEMY_TRAITS[id],
+})[kind]?.() ?? ''
+
+const drawAlmanacCell = (ctx, item, x, y, on) => {
+  const art = revealArt(item)
+  if (art) {
+    const scale = Math.min(1, ALMANAC_CELL / Math.max(art.width, art.height))
+    const w = Math.round(art.width * scale)
+    const h = Math.round(art.height * scale)
+    ctx.drawImage(item.found ? art : shadowOf(art), x + Math.floor((ALMANAC_CELL - w) / 2), y + Math.floor((ALMANAC_CELL - h) / 2), w, h)
+  }
+  if (!on) return
+  ctx.strokeStyle = YELLOW
+  ctx.strokeRect(x - 1.5, y - 1.5, ALMANAC_CELL + 3, ALMANAC_CELL + 3)
+}
+
+const drawAlmanac = (ctx, g, menu) => {
+  shade(ctx, 0.92)
+  const book = almanac(knownReactions())
+  centred(ctx, `${book.found}/${book.total}`, 12, GREEN, 2, VIEW.w / 2)
+  ctx.imageSmoothingEnabled = false
+  book.groups.flatMap(group => group.items).forEach((item, i) => {
+    const x = ALMANAC_LEFT + (i % ALMANAC_COLUMNS) * ALMANAC_PITCH
+    const y = ALMANAC_TOP + Math.floor(i / ALMANAC_COLUMNS) * ALMANAC_PITCH
+    drawAlmanacCell(ctx, item, x, y, i === menu.cursor)
   })
-  drawList(ctx, menu, ORIGIN.y + 196)
+  const chosen = book.groups.flatMap(group => group.items)[menu.cursor]
+  if (!chosen) return
+  const y = VIEW.h - 30
+  if (!chosen.found) {
+    centred(ctx, '?', y, FAINT, 2, VIEW.w / 2)
+    return
+  }
+  centred(ctx, chosen.name, y, WHITE, 1, VIEW.w / 2)
+  centred(ctx, blurbOf(chosen), y + 9, PALE, 1, VIEW.w / 2)
 }
 
 const roll = (value, t) => Math.round(value * easeOut(t))
@@ -264,7 +279,7 @@ const drawSummary = (ctx, g, menu) => {
     [g.kills, 'KILLS'],
     [g.environmentKills, 'BY THE WORLD'],
     [`X${g.chainPeak}`, 'CHAIN'],
-    [`${almanac(knownReactions()).found}/${almanac().total}`, 'FOUND'],
+    [`${almanac().found}/${almanac().total}`, 'FOUND'],
   ]
   rows.forEach(([value, name], i) => {
     const y = ORIGIN.y + 76 + rise + i * 10
@@ -272,8 +287,19 @@ const drawSummary = (ctx, g, menu) => {
     drawText(ctx, value, CENTRE + 6, y, i === 2 ? YELLOW : WHITE)
     drawText(ctx, name, CENTRE - 2 - textWidth(name), y, DIM)
   })
-  if (!won && g.player.lastCause && age > 1.2) centred(ctx, g.player.lastCause, ORIGIN.y + 122 + rise, RED)
-  if (age > 1.4) drawList(ctx, menu, ORIGIN.y + 170 + rise)
+  if (!won && g.player.lastCause && age > 1.2) drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, CENTRE, ORIGIN.y + 128 + rise, RED)
+  if (age > 1.3) {
+    const found = g.foundThisRun ?? []
+    found.forEach((key, i) => {
+      const [kind, id] = key.split(':')
+      const art = revealArt({ kind, id })
+      if (!art) return
+      const scale = Math.min(1, 24 / Math.max(art.width, art.height))
+      const x = CENTRE - (found.length * 28) / 2 + i * 28 + 2
+      ctx.drawImage(art, Math.round(x), ORIGIN.y + 140 + rise, Math.round(art.width * scale), Math.round(art.height * scale))
+    })
+  }
+  if (age > 1.4) drawList(ctx, menu, ORIGIN.y + 172 + rise)
 }
 
 const drawCard = (ctx, card, x, y, w, h, on, time) => {
@@ -373,7 +399,7 @@ const PAGES = {
   options: (ctx, g, menu) => drawOptions(ctx, menu),
   controls: (ctx, g, menu) => drawControls(ctx, menu),
   records: (ctx, g, menu) => drawRecords(ctx, menu),
-  notes: (ctx, g, menu) => drawNotes(ctx, menu),
+  almanac: drawAlmanac,
   summary: drawSummary,
   offer: (ctx, g, menu) => drawCards(ctx, g, menu, menu.items.map(item => item.card ?? cardFor(item.option))),
   swap: (ctx, g, menu) => drawCards(ctx, g, menu, menu.items.map(item => item.card)),
@@ -384,7 +410,7 @@ export const drawMenus = (ctx, g) => {
   if (!menu) return
   menu.hits = []
   PAGES[menu.page](ctx, g, menu)
-  drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
+  if (menu.page !== 'title' && menu.page !== 'almanac') drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
 }
 
 const drawToastPrompts = (ctx, prompts, y) => {

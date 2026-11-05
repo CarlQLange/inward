@@ -9,7 +9,7 @@ const ROOM_PX = ROOM * BLOCK
 const REVEAL_COLOURS = { skill: '#f5e663', relic: '#ffb347', foe: '#ff6a5a', inhabitant: '#7dff8a', event: '#c78bff', warden: '#ff3a3a', omen: '#6fd0e0', seal: '#ffffff' }
 const EVENT_ICONS = { arena: 'skull', chest: 'chest', flood: 'gills', gasworks: 'ember', collapse: 'hammer', vault: 'chest', nest: 'seed', altar: 'altar' }
 
-const revealArt = ({ kind, id }) => {
+export const revealArt = ({ kind, id }) => {
   if (kind === 'skill') return SPRITES.icons[id]
   if (kind === 'relic') return SPRITES.icons[RELIC_BY_ID[id]?.icon]
   if (kind === 'omen') return SPRITES.icons[`omen_${id}`]

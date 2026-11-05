@@ -7,6 +7,14 @@ import { burstSparks, hitFx, hurtFx } from './fx.js'
 
 export const burst = burstSparks
 
+const spillCoins = (g, p, count) => {
+  g.gold -= count
+  const here = centre(p)
+  for (let i = 0; i < count; i++) {
+    g.pickups.push({ kind: 'coin', x: here.x - 2, y: here.y - 2, w: 5, h: 5, vx: (Math.random() - 0.5) * 160, vy: -70 - Math.random() * 70 })
+  }
+}
+
 const hurtPlayer = (g, p, cause) => {
   const paid = p.relics.has('crown') && g.gold >= TUNING.run.crownHit
   if (paid) spillCoins(g, p, TUNING.run.crownHit)
