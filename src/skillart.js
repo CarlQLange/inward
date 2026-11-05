@@ -74,6 +74,17 @@ const line = (ctx, a, b, size, colour) => {
   ctx.fill()
 }
 
+const dazzled = (ctx, g, e) => {
+  const reach = 3 + (Math.floor(g.time * 16) % 2)
+  const [l, r, t, b] = [e.x - 2, e.x + e.w + 1, e.y - 2, e.y + e.h + 1]
+  for (let k = 0; k < reach; k++) {
+    dot(ctx, l - k, t - k, 1, 1, WHITE)
+    dot(ctx, r + k, t - k, 1, 1, WHITE)
+    dot(ctx, l - k, b + k, 1, 1, WHITE)
+    dot(ctx, r + k, b + k, 1, 1, WHITE)
+  }
+}
+
 const drawPieces = (ctx, g, f, still) => {
   for (const piece of f.pieces) {
     const bob = still ? Math.round(Math.sin(g.time * 3 + piece.seed) * 2) : 0
@@ -355,6 +366,7 @@ const ART = {
       line(ctx, a, b, 1, index >= 3 ? WHITE : colour)
     }
     for (const end of f.ends ?? []) {
+      if (f.dazzle && end.foe) dazzled(ctx, g, end.foe)
       if (index >= 4) softDisc(ctx, Math.round(end.x), Math.round(end.y), 6, warm, 0.35)
       ctx.globalAlpha = 1
       const r = 1 + (Math.floor(g.time * 30) % 2)
@@ -362,10 +374,11 @@ const ART = {
     }
   },
   peal: (ctx, g, f) => {
-    const grown = Math.min(1, (1 - f.life / S.chime.ringTime) * 1.3)
-    const r = S.chime.reach * grown
+    const index = eraIndex(g)
+    if (index >= 2) return
+    const r = S.chime.reach * Math.min(1, (1 - f.life / S.chime.ringTime) * 1.3)
     circle(ctx, f.x, f.y, r, f.tint ?? COLD, 44)
-    if (eraIndex(g) >= 1) circle(ctx, f.x, f.y, r * 0.66, WHITE, 28)
+    if (index >= 1) circle(ctx, f.x, f.y, r * 0.66, WHITE, 28)
   },
   volley: (ctx, g, f) => drawPieces(ctx, g, f, false),
   hover: (ctx, g, f) => drawPieces(ctx, g, f, true),

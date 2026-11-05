@@ -1610,7 +1610,7 @@ const beamFrom = (g, p, start, dir, reach, splits, bounces, out, foes, tone = 0)
   for (let travelled = 0; travelled < reach; travelled += 2) {
     x += aim.x * 2
     y += aim.y * 2
-    const foe = foes.find(e => overlap(shotBox(e), { x, y, w: 1, h: 1 }))
+    const foe = foes.find(([, box]) => x >= box.x && x < box.x + box.w && y >= box.y && y < box.y + box.h)?.[0]
     if (foe) {
       out.segments.push([from, { x, y }, tone])
       out.ends.push({ foe, x, y })
@@ -1687,7 +1687,6 @@ const heatFoe = (g, p, e, dt) => {
   if (owns(p, 'lens.dazzle')) {
     if (e.heavy) return false
     e.stun = Math.max(e.stun, L.dazzle)
-    e.dazzled = L.dazzle
     return false
   }
   e.lensHeat = warm(e.lensHeat ?? 0, e.lensAt ?? g.time, g.time, dt)
@@ -1704,7 +1703,7 @@ const heatFoe = (g, p, e, dt) => {
 
 const shine = (g, p, dt) => {
   const out = { segments: [], ends: [], turns: [] }
-  const foes = hostile(g).filter(e => !e.intangible && !e.stowed)
+  const foes = hostile(g).filter(e => !e.intangible && !e.stowed).map(e => [e, shotBox(e)])
   beamFrom(g, p, muzzle(p), p.aim, S.lens.reach, S.lens.splits, S.lens.bounces, out, foes)
   out.ends.forEach(end => { end.changed = end.foe ? heatFoe(g, p, end.foe, dt) : heatCell(g, p, end, dt) })
   const beam = held(g, 'beam')
@@ -1770,7 +1769,7 @@ export const turnToGlass = g => {
   const p = g.player
   const inset = S.chime.statueInset
   for (const e of g.enemies) {
-    if (e.hp > 0 || e.flungBy !== 'chime' || e.statue || e.warden || e.partOf || e.prop) continue
+    if (e.hp > 0 || e.flungBy !== 'chime' || e.lastCause !== 'CRUSHED' || e.statue || e.warden || e.partOf || e.prop) continue
     e.statue = true
     cellsUnder({ x: e.x + inset, y: e.y + inset, w: Math.max(1, e.w - inset * 2), h: Math.max(1, e.h - inset * 2) })
       .filter(([x, y]) => inPlay(x, y) && !props(matAt(g.world, x, y)).solid && !overlap(p, { x: x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK }))

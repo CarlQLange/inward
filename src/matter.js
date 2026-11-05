@@ -994,6 +994,5 @@ export const pealRings = (g, f) => {
   const index = eraIndex(g)
   const colour = f.tint ?? '#d6f6f0'
   if (index >= 2) spawn(g, 'pop', f.x, f.y, 0, 0, 0.28, colour, '#ffffff', TUNING.skills.chime.reach)
-  if (index >= 4) spawn(g, 'pop', f.x, f.y, 0, 0, 0.4, '#ffffff', '#ffffff', TUNING.skills.chime.reach * 0.6)
   if (index >= 6 && f.broke) raysFrom(g, f.x, f.y, isTouchLayout() ? 4 : 8, 30, mix(colour, '#ffffff', 0.4))
 }
