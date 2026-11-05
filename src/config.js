@@ -110,7 +110,7 @@ export const TUNING = {
     mine: { every: 2.4, stock: 3, reach: 40, life: 40, trigger: 16, damage: 3, radius: 28, limpetFuse: 1.6, farReach: 130 },
     roar: { every: 4, reach: 62, shoutStep: 0.03, shoutRange: 190, shoutShove: 300, swellTime: 1.4, swellMin: 0.6, swellMax: 2.1, swellBreaks: 1.6, forms: { 'roar.shout': 3 } },
     mirror: { every: 4.5, life: 1.3, parryLife: 0.3, paneLife: 5, paneReach: 26, paneHalf: 15, shotReturn: 200, seekLife: 2, seekTurn: 9 },
-    clay: { every: 1.6, stock: 3, speed: 180, lift: 22, damage: 2, splatStun: 0.4, daubTime: 6, dripEvery: 0.25, sag: 45, bakeHold: 3, bakeDamage: 2, rollSpeed: 64, rollLife: 5, rollMost: 18, rollDamage: 2, bogRadius: 3, castStun: 1.4, forms: { 'clay.roll': 2.2, 'clay.cast': 2 } },
+    clay: { every: 1.6, stock: 3, speed: 180, lift: 22, damage: 2, splatStun: 0.4, daubTime: 6, dripEvery: 0.25, sag: 45, bakeHold: 3, bakeDamage: 2, rollSpeed: 64, rollLife: 5, rollMost: 18, rollDamage: 2, bogRadius: 3, castStun: 1.4, forms: { 'clay.roll': 2.2 } },
     burrow: { every: 3, time: 2.6, speed: 86, mudSpeed: 112, rockSpeed: 42, wakeEvery: 0.07, breach: 280, breachDrift: 0.3, sinkDepth: 2, sinkStun: 0.9, sinkEvery: 1.6, sinkReach: 4, surfaceSpeed: 130, surfaceLimit: 2 },
   },
   feed: {

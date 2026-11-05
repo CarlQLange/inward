@@ -25,7 +25,7 @@ const OFFSETS = (() => {
 const inPlay = (x, y) => x >= 1 && y >= 1 && x <= ROOM - 2 && y <= ROOM - 2
 const cellBox = (x, y) => ({ x: x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK })
 const open = m => m === M.EMPTY || m === M.ASH || props(m).gas === true
-const sticks = (w, x, y) => N4.some(([dx, dy]) => props(matAt(w, x + dx, y + dy)).solid)
+const sticks = (w, x, y) => N4.some(([dx, dy]) => props(matAt(w, x + dx, y + dy)).solid || props(matAt(w, x + dx, y + dy)).liquid)
 const end = f => {
   f.life = 0
   f.done = true
