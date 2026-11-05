@@ -1814,6 +1814,8 @@ const peal = (g, p) => {
   g.pulse = Math.max(g.pulse, 0.4)
 }
 
+export const ringBell = g => peal(g, g.player)
+
 const chime = (g, p) => {
   const bell = held(g, 'bell')
   if (owns(p, 'chime.bell') && !bell) {

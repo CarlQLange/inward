@@ -6,7 +6,7 @@ import { burst, hurt } from './combat.js'
 import { MATERIAL_COLOURS, drop, ripple } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, muzzle, orbitFires, owns,
-  prey, recordPast, releaseMatter, returnedShot, ring, setAblaze, shardAt, shoutFront, smash, spend, strike, turnToGlass, zap,
+  prey, recordPast, releaseMatter, returnedShot, ring, ringBell, setAblaze, shardAt, shoutFront, smash, spend, strike, turnToGlass, zap,
 } from './skills.js'
 import { beamSparks, pealRings } from './matter.js'
 
@@ -1081,7 +1081,7 @@ const STEP = {
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall,
-  volley: dropPieces, hover: dropPieces,
+  volley: dropPieces, hover: dropPieces, bell: g => ringBell(g),
 }
 
 const stepAblaze = (g, e, dt) => {

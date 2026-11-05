@@ -119,7 +119,7 @@ export const TUNING = {
     chime: {
       every: 3.2, reach: 64, most: 12, shards: 3, speed: [130, 200], lift: 30, scatter: 0.7, life: 0.8, damage: 2, aimSpeed: 230,
       ringTime: 0.35, piecesMost: 36, volleyLife: 6, volleyEvery: 0.09, volleyReach: 180, hoverLife: 8, hoverReach: 48,
-      bellLife: 10, statueWatch: 1.2, statueInset: 2,
+      bellLife: 5, statueWatch: 1.2, statueInset: 2,
     },
   },
   feed: {

@@ -84,6 +84,7 @@ const worker = async () => {
     blink: (g, foe, bot, me) => foe && distance(middle(foe), me) > 80,
     drone: (g, foe) => Boolean(foe) && g.effects.filter(f => f.kind === 'drone').length < 2,
     seed: (g, foe, bot, me) => Boolean(foe) && distance(middle(foe), me) < 90,
+    chime: (g, foe, bot, me) => g.effects.some(f => f.kind === 'bell' && !f.done) || (Boolean(foe) && distance(middle(foe), me) < REACH.chime),
   }
 
   const foodNear = (g, p, me, kinds) => {
