@@ -22,8 +22,22 @@ const TEACH = {
   SHOT: 'THEIR SHOTS CAN BE DODGED. WATCH FOR THE WARNING.',
 }
 
+const spillCoins = (g, p, count) => {
+  g.gold -= count
+  const here = centre(p)
+  for (let i = 0; i < count; i++) {
+    g.pickups.push({ kind: 'coin', x: here.x - 2, y: here.y - 2, w: 5, h: 5, vx: (Math.random() - 0.5) * 160, vy: -80 - Math.random() * 80, spilt: 0.6 })
+  }
+}
+
 const hurtPlayer = (g, p, cause) => {
-  p.hp -= 1
+  const paid = p.relics.has('crown') && g.gold >= TUNING.run.crownHit
+  if (paid) spillCoins(g, p, TUNING.run.crownHit)
+  else p.hp -= 1
+  if (p.relics.has('chain')) {
+    g.chain = 0
+    g.chainTime = 0
+  }
   p.iframes = TUNING.player.iframes
   p.lastCause = cause
   g.hurtFlash = 1

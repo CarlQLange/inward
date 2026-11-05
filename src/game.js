@@ -1,13 +1,13 @@
 import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
+import { burningAt, createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
 import { STARTERS, TITLE_ROOM } from './room.js'
 import { THEMES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
-import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, pourAcid, recordTrail, spillNapalm, stepDash } from './skills.js'
+import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { chunks, dust } from './feel.js'
 import { scheme, skillKey, usesMouse } from './controls.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
@@ -29,7 +29,7 @@ const createPlayer = ({ x, row }) => ({
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
   shotReady: 0, skills: [], upgrades: new Set(), relics: new Set(), aim: { x: 1, y: 0 }, drift: 0,
   wasJump: false, wasSkills: [false, false, false, false], bombs: P.startBombs, wasBomb: false,
-  airJumps: 0, dashing: 0, frenzy: 0, mending: 0, trail: [], clinging: 0,
+  airJumps: 0, dashing: 0, trail: [], clinging: 0,
 })
 
 const nextRelic = g => g.relicPool.shift() ?? null
@@ -174,6 +174,7 @@ const settleFlung = (g, f) => {
 }
 
 const leaveRoom = g => {
+  releaseMatter(g)
   g.flung.forEach(f => settleFlung(g, f))
   Object.assign(g.rooms[keyOf(g.x, g.y)], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
@@ -210,7 +211,6 @@ const enterRoom = (g, x, y) => {
     depth: g.depthOverride ?? depthFor(g, room.ring),
     shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [],
     timeStop: 0,
-    echo: 0,
   })
   if (firstVisit && room.theme !== g.lastTheme && !(room.ring > g.deepestRing)) showToast(g, THEMES[room.theme].name, EVENT_TEXT[room.event] ?? '')
   else if (firstVisit && room.event && EVENT_TEXT[room.event]) showToast(g, '', EVENT_TEXT[room.event])
@@ -283,8 +283,10 @@ const applyQuickstart = (g, ring) => {
   const p = g.player
   const kinds = shuffled(ALL_SKILLS).slice(0, Math.min(P.skillSlots, 1 + ring))
   p.skills = kinds.map(kind => ({ kind, ready: 0 }))
-  const nodes = shuffled(kinds.flatMap(kind => TREES[kind]))
-  nodes.slice(0, ring * 2).forEach(node => p.upgrades.add(node.id))
+  for (let n = 0; n < ring * 2; n++) {
+    const [pick] = shuffled(availableUpgrades(p))
+    if (pick) p.upgrades.add(pick.node.id)
+  }
   g.relicPool.splice(0, ring).forEach(id => p.relics.add(id))
   applyRelic(p)
   p.bombs = 1 + ring
@@ -335,7 +337,6 @@ const createRun = (depthOverride, quickRing = null) => {
     effects: [],
     spawns: [],
     timeStop: 0,
-    echo: 0,
     lastTheme: 0,
     time: 0,
     phase: 'playing',
@@ -397,13 +398,30 @@ export const createGame = (depthOverride = null, phase = 'playing', quickRing = 
 }
 
 const availableUpgrades = p =>
-  p.skills.flatMap(({ kind }) =>
-    TREES[kind].filter(node => !p.upgrades.has(node.id)).map(node => ({ type: 'upgrade', skill: kind, node })))
+  p.skills.flatMap(({ kind }) => openFork(p, kind).map(node => ({ type: 'upgrade', skill: kind, node })))
 
 const unownedSkills = g => {
   const carried = new Set(g.player.skills.map(s => s.kind))
   const lying = new Set(g.cards.map(c => c.kind))
   return ALL_SKILLS.filter(s => !carried.has(s) && !lying.has(s))
+}
+
+const evolve = (g, skill, node) => {
+  const p = g.player
+  p.upgrades.add(node.id)
+  g.evolving = { skill, name: node.name, tint: node.tint, life: R.evolveLife }
+  const c = centre(p)
+  ring(g, c.x, c.y, node.tint, 32, 150)
+  g.pulse = 1
+  g.shake = Math.max(g.shake, 4)
+  p.iframes = Math.max(p.iframes, 0.6)
+}
+
+const arrivesEvolved = (g, kind) => {
+  const p = g.player
+  if (!hasRelic(p, 'dice')) return
+  const [node] = shuffled(openFork(p, kind))
+  if (node) evolve(g, kind, node)
 }
 
 const learn = (g, kind) => {
@@ -412,6 +430,7 @@ const learn = (g, kind) => {
   g.cardPool = g.cardPool.filter(s => s !== kind)
   const key = skillKey(p.skills.length - 1)
   showToast(g, `${SKILL_NAMES[kind]}: PRESS ${key}`, SKILL_DETAILS[kind])
+  arrivesEvolved(g, kind)
   g.pulse = 1
   g.shake = Math.max(g.shake, 3)
   if (!g.awake) {
@@ -429,36 +448,52 @@ const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
   openSwap(g, kind, gm => {
     gm.cardPool = gm.cardPool.filter(s => s !== kind)
     showToast(gm, `${SKILL_NAMES[kind]}: LEARNED`, SKILL_DETAILS[kind])
+    arrivesEvolved(gm, kind)
     onTake(gm)
   }, onLeave)
 }
 
-const chooseOption = (g, option) => {
-  const p = g.player
-  g.menus.pop()
-  if (option.type === 'new') {
+const OPTION_RESULTS = {
+  new: g => {
     const kind = shuffled(unownedSkills(g))[0]
     learnOrSwap(g, kind, () => {}, gm => dropCard(gm, kind))
-  } else {
-    p.upgrades.add(option.node.id)
-    showToast(g, option.node.name, option.node.text)
+  },
+  upgrade: (g, option) => {
+    evolve(g, option.skill, option.node)
+    showToast(g, option.node.name)
+  },
+  relic: g => gainRelic(g, nextRelic(g)),
+  mend: g => {
+    g.player.hp = P.hp
+    g.player.bombs += 1
     g.pulse = 1
-  }
-  if (g.menus.length === 0) p.wasJump = true
+  },
+}
+
+const chooseOption = (g, option) => {
+  g.menus.pop()
+  OPTION_RESULTS[option.type](g, option)
+  if (g.menus.length === 0) g.player.wasJump = true
+}
+
+const forkChoices = p => {
+  const open = shuffled(availableUpgrades(p))
+  const chosen = open[0]?.skill
+  return [...open.filter(o => o.skill === chosen), ...open.filter(o => o.skill !== chosen)]
+}
+
+const fallbacks = g => [...(g.relicPool.length ? [{ type: 'relic', relic: g.relicPool[0] }] : []), { type: 'mend' }]
+
+const offersFor = (g, kinds) => {
+  const forks = kinds.includes('upgrade') ? forkChoices(g.player) : []
+  const fresh = kinds.includes('new') && unownedSkills(g).length > 0 ? [{ type: 'new' }] : []
+  const rest = kinds.length > 1 ? fallbacks(g) : []
+  return [...forks.slice(0, 2), ...fresh, ...forks.slice(2), ...rest].slice(0, 3)
 }
 
 const openOffer = (g, kinds = ['new', 'upgrade'], title = 'LEVEL UP') => {
-  const p = g.player
-  const options = []
-  if (kinds.includes('new') && unownedSkills(g).length > 0) options.push({ type: 'new' })
-  if (kinds.includes('new') && hasRelic(p, 'dice') && unownedSkills(g).length > 1) options.push({ type: 'new' })
-  if (kinds.includes('upgrade')) options.push(...shuffled(availableUpgrades(p)).slice(0, Math.max(0, 3 - options.length)))
-  if (options.length === 0) {
-    p.hp = Math.min(P.hp, p.hp + 2)
-    g.score += 100
-    showToast(g, 'NOTHING LEFT TO LEARN', 'THE WORLD MENDS YOU INSTEAD.')
-    return
-  }
+  const options = offersFor(g, kinds)
+  if (options.length === 0) return
   openMenu(g, {
     page: 'offer',
     layout: 'cards',
@@ -493,8 +528,7 @@ const applyRelic = p => {
   p.smokeproof = hasRelic(p, 'gills')
 }
 
-const gainXp = (g, base) => {
-  const amount = hasRelic(g.player, 'gem') ? base * 2 : base
+const gainXp = (g, amount) => {
   g.xp += amount
   while (g.xp >= g.nextLevel) {
     g.xp -= g.nextLevel
@@ -507,15 +541,14 @@ const gainXp = (g, base) => {
 
 const dropLoot = (g, e, base) => {
   const c = centre(e)
-  const count = hasRelic(g.player, 'sack') ? base * 2 + 1 : base
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < base; i++) {
     g.pickups.push({
       kind: 'coin', x: c.x - 2, y: c.y - 2, w: 5, h: 5,
       vx: (Math.random() - 0.5) * 80, vy: -60 - Math.random() * 60,
     })
   }
   if (Math.random() < 0.12) g.pickups.push({ kind: 'heart', x: c.x - 3, y: c.y - 3, w: 7, h: 6, vx: 0, vy: -90 })
-  if (Math.random() < R.bombDropChance * (hasRelic(g.player, 'sack') ? 3 : 1)) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
+  if (Math.random() < R.bombDropChance) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
 }
 
 const onKill = (g, e) => {
@@ -532,17 +565,18 @@ const onKill = (g, e) => {
   }
   if (e.kind === 'mimic') gainRelic(g, nextRelic(g))
   const p = g.player
-  if (hasRelic(p, 'battery')) p.skills.forEach(s => { s.ready -= R.batteryRecharge })
-  if ((hasRelic(p, 'skull') && Math.random() < R.skullHeal) || p.mending > 0) p.hp = Math.min(P.hp, p.hp + 1)
   const environmental = e.lastSource !== 'player'
+  if (hasRelic(p, 'battery') && environmental) p.skills.forEach(s => { s.ready = 0 })
+  if (hasRelic(p, 'sack')) spillMatter(g, e, 3)
   g.chain = g.chainTime > 0 ? g.chain + 1 : 1
-  g.chainTime = hasRelic(p, 'chain') ? R.chainWindow * 2.5 : R.chainWindow
+  g.chainTime = hasRelic(p, 'chain') ? Infinity : R.chainWindow
+  if (hasRelic(p, 'skull') && g.chain % R.skullChain === 0) p.hp = Math.min(P.hp, p.hp + 1)
   g.chainPeak = Math.max(g.chainPeak, g.chain)
   const points = def.value * g.chain * (environmental ? 2 : 1)
   g.score += points
   g.kills += 1
   if (environmental) g.environmentKills += 1
-  gainXp(g, environmental ? R.environmentXp : 1)
+  gainXp(g, hasRelic(p, 'gem') ? (environmental ? R.worldXpSworn : 0) : (environmental ? R.environmentXp : 1))
   addPopup(g, c.x, c.y - 6, g.chain > 1 ? `${points} X${g.chain}` : String(points), environmental ? 'charge' : 'white')
   dropLoot(g, e, environmental ? 2 : 1)
 }
@@ -607,12 +641,12 @@ const assisted = (g, p, aim) => {
   return best ?? aim
 }
 
-const ASSISTED_SKILLS = new Set(['bolt', 'swap', 'charm', 'grapple', 'melt', 'ember', 'acid'])
+const ASSISTED_SKILLS = new Set(['bolt', 'swap', 'charm', 'grapple', 'melt', 'ember', 'acid', 'mine', 'frost'])
 
-const fireShot = (g, p, aim) => {
+const fireShot = (g, p, aim, life = P.shotLife) => {
   const from = muzzle(p)
   g.shots.push({
-    x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: aim.x * P.shotSpeed, vy: aim.y * P.shotSpeed, life: P.shotLife,
+    x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: aim.x * P.shotSpeed, vy: aim.y * P.shotSpeed, life,
     bounces: hasRelic(p, 'ricochet') ? 3 : 0, friendly: true,
   })
 }
@@ -621,21 +655,17 @@ const turned = ({ x, y }, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * 
 
 const shoot = (g, p) => {
   const aim = assisted(g, p, p.aim)
-  fireShot(g, p, aim)
-  if (hasRelic(p, 'spread')) {
-    fireShot(g, p, turned(aim, 0.2))
-    fireShot(g, p, turned(aim, -0.2))
-  }
+  const scatter = hasRelic(p, 'spread')
+  if (scatter) {
+    for (let n = 0; n < R.scatterShots; n++) fireShot(g, p, turned(aim, (n - (R.scatterShots - 1) / 2) * 0.2), R.scatterLife)
+    p.vx -= aim.x * R.scatterKick
+    p.vy -= aim.y * R.scatterKick
+    p.drift = Math.max(p.drift, 0.15)
+    p.jumpHeld = false
+  } else fireShot(g, p, aim)
   const from = muzzle(p)
   dust(g, from.x + aim.x * 5, from.y + aim.y * 5, 1)
-  p.shotReady = P.shotEvery * (p.frenzy > 0 ? 0.5 : 1)
-}
-
-const cooldownOf = (p, kind) => {
-  const base = TUNING.skills[kind].every
-  const quick = hasRelic(p, 'hands') ? 0.72 : 1
-  const echo = kind === 'echo' && p.upgrades.has('echo.quick') ? 0.5 : 1
-  return base * quick * echo
+  p.shotReady = P.shotEvery * (scatter ? 3 : 1)
 }
 
 const castSkill = (g, p, skill) => {
@@ -644,15 +674,21 @@ const castSkill = (g, p, skill) => {
   SKILLS[skill.kind](g, p)
   p.aim = aim
   skill.ready = cooldownOf(p, skill.kind)
-  if (skill.kind === 'echo' || !g.echo) return
-  for (let n = 0; n < g.echo; n++) g.effects.push({ kind: 'repeat', skill: skill.kind, age: 0, life: 2, delay: R.echoDelay * (n + 1) })
-  if (p.upgrades.has('echo.free')) skill.ready = 0
-  g.echo = 0
+}
+
+const nearFire = (g, p) => {
+  const reach = Math.ceil(R.hotHandsReach / BLOCK)
+  const [cx, cy] = [cell(p.x + p.w / 2), cell(p.y + p.h / 2)]
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) if (burningAt(g.world, cx + dx, cy + dy)) return true
+  }
+  return false
 }
 
 const useSkills = (g, p, input, stunned, dt) => {
+  const rate = hasRelic(p, 'hands') && nearFire(g, p) ? R.hotHandsRate : 1
   p.skills.forEach((skill, slot) => {
-    skill.ready -= dt
+    skill.ready -= dt * rate
     const pressed = input[SKILL_KEYS[slot]] === true
     if (!stunned && pressed && !p.wasSkills[slot] && skill.ready <= 0) castSkill(g, p, skill)
   })
@@ -752,7 +788,22 @@ const buyWares = (g, p) => {
   g.pulse = Math.max(g.pulse, 0.5)
 }
 
+const stepMagnetism = (g, p, dt) => {
+  if (!hasRelic(p, 'coinmagnet')) return
+  const c = centre(p)
+  const pulled = [...g.enemies.filter(e => e.magnetic && !e.heavy && !e.friendly), ...g.fireballs.filter(f => f.pellet && !f.friendly)]
+  for (const e of pulled) {
+    const [dx, dy] = [c.x - centre(e).x, c.y - centre(e).y]
+    const d = Math.max(4, Math.hypot(dx, dy))
+    if (d > R.magnetReach) continue
+    e.vx += (dx / d) * R.magnetPull * dt
+    e.vy += (dy / d) * R.magnetPull * dt
+    if (e.kind) e.shoved = Math.max(e.shoved, 0.05)
+  }
+}
+
 const usePickups = (g, p, dt) => {
+  stepMagnetism(g, p, dt)
   for (const c of g.pickups) {
     if (c.kind === 'coin' && hasRelic(p, 'coinmagnet')) {
       const dx = p.x - c.x
@@ -770,11 +821,11 @@ const usePickups = (g, p, dt) => {
       c.vx *= 0.5
       c.vy = 0
     }
-    if (!overlap(p, { x: c.x - 3, y: c.y - 3, w: c.w + 6, h: c.h + 6 })) continue
+    c.spilt = Math.max(0, (c.spilt ?? 0) - dt)
+    if (c.spilt > 0 || !overlap(p, { x: c.x - 3, y: c.y - 3, w: c.w + 6, h: c.h + 6 })) continue
     c.taken = true
     if (c.kind === 'coin') {
       g.gold += 1
-      if (hasRelic(p, 'crown')) g.score += R.crownScore
     } else if (c.kind === 'bomb') p.bombs += 1
     else p.hp = Math.min(P.hp, p.hp + 1)
   }
@@ -942,9 +993,8 @@ const stepPlayer = (g, input, dt) => {
   const plant = input.plant && p.grounded
   crouch(world, p, input.down && !input.jump && p.grounded && !swimming && !plant)
   const wish = stunned ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
-  const wind = hasRelic(p, 'wind') ? 1.25 : 1
   const fins = hasRelic(p, 'gills') && swimming ? 1.5 : 1
-  const top = P.run * wind * fins * (swimming ? P.swimRun : 1)
+  const top = P.run * fins * (swimming ? P.swimRun : 1)
   const towards = p.crouching || plant ? 0 : wish * top
   const change = P.accel * dt * (p.drift > 0 ? 0.15 : 1)
   p.drift -= dt
@@ -960,6 +1010,7 @@ const stepPlayer = (g, input, dt) => {
   if (climbing) p.vy = input.up ? -R.climbSpeed : R.climbSpeed
   else if (p.dashing <= 0 && !(p.zipping > 0)) p.vy = Math.min(maxFall, p.vy + gravity * dt)
   p.zipping = Math.max(0, (p.zipping ?? 0) - dt)
+  if (hasRelic(p, 'wind') && props(matAt(world, cell(middle), cell(p.y + p.h / 2))).gas) p.vy = Math.max(-R.updraft, p.vy - P.gravity * 2.2 * dt)
 
   const pushingWall = !p.grounded && hasRelic(p, 'claws') && p.hitWall && wish !== 0
   p.clinging = pushingWall ? R.clingGrace : Math.max(0, p.clinging - dt)
@@ -977,7 +1028,7 @@ const stepPlayer = (g, input, dt) => {
       p.vy = -P.swimStroke
       p.sinceJump = 1
     } else if (p.sinceGround < P.coyote || vine) {
-      p.vy = -P.jump * (wind > 1 ? 1.08 : 1)
+      p.vy = -P.jump
       p.jumpHeld = true
       p.sinceJump = 1
       p.sinceGround = 1
@@ -1013,8 +1064,7 @@ const stepPlayer = (g, input, dt) => {
   stepDash(g, p, dt)
   if (p.slam && p.grounded) {
     p.slam = false
-    explode(world, cell(p.x + 3), cell(p.y + p.h + 2), 1)
-    p.iframes = Math.max(p.iframes, 0.3)
+    landSlam(g, p)
   }
   if (hasRelic(p, 'stomp') && falling > R.stompSpeed) {
     const under = { x: p.x, y: p.y + p.h - 2, w: p.w, h: 4 }
@@ -1026,8 +1076,6 @@ const stepPlayer = (g, input, dt) => {
       p.iframes = Math.max(p.iframes, 0.15)
     }
   }
-  p.frenzy = Math.max(0, p.frenzy - dt)
-  p.mending = Math.max(0, p.mending - dt)
   recordTrail(p, dt)
 
   p.shotReady -= dt
@@ -1140,7 +1188,7 @@ const stepShots = (g, dt) => {
         if (hasRelic(g.player, 'pierce')) (s.passed ??= new Set()).add(victim)
         else s.life = 0
       }
-    } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid) {
+    } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid && (matAt(g.world, cell(s.x), cell(s.y)) === M.BEDROCK || !hasRelic(g.player, 'pierce'))) {
       shotEffects(g, s, cell(s.x), cell(s.y))
       chunks(g, s.x, s.y, matAt(g.world, cell(s.x), cell(s.y)), 3)
       if (s.bounces > 0) {
@@ -1173,7 +1221,7 @@ const landFireball = (g, f) => {
     return
   }
   if (f.acid) {
-    pourAcid(g, x, y - 1, f.acid, f.fumes)
+    pourAcid(g, x, y - 1, f.acid)
     f.age = -1
     return
   }
@@ -1183,6 +1231,7 @@ const landFireball = (g, f) => {
     if (matAt(g.world, x + dx, y + dy) === M.ICE) setCell(g.world, x + dx, y + dy, M.WATER)
   }
   if (f.napalm) spillNapalm(g, x, y - 1)
+  if (f.torch) torchNear(g, f.x + 2, f.y + 2)
   burst(g, f.x + 2, f.y + 2, 'fire', 6)
   f.age = -1
 }
@@ -1229,7 +1278,7 @@ const stepFlung = (g, dt) => {
       hurt(g, victim, F.damage)
       victim.stun = Math.max(victim.stun, F.stun)
     }
-    if (f.age > F.friendlyAfter && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
+    if (!f.safe && f.age > F.friendlyAfter && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
     if (blocked) {
       settleFlung(g, f)
       burst(g, f.x + 4, f.y + 4, 'pale', 6)
@@ -1240,10 +1289,7 @@ const stepFlung = (g, dt) => {
 }
 
 const stepEffects = (g, dt) => {
-  if (g.timeStop > 0) {
-    g.timeStop -= dt
-    if (g.timeStop <= 0 && g.stopShatter) g.enemies.forEach(e => { e.stun = Math.max(e.stun, 1.5) })
-  }
+  if (g.timeStop > 0) g.timeStop -= dt
   for (const b of g.bolts) b.life -= dt
   g.bolts = g.bolts.filter(b => b.life > 0)
   for (const p of g.particles) {
@@ -1395,7 +1441,7 @@ export const step = (g, input, realDt) => {
   }
   const stopped = g.timeStop > 0
   if (!stopped) {
-    stepWorld(g.world, dt, g.depth)
+    if (!g.matterHeld) stepWorld(g.world, dt, g.depth)
     handleWorldEvents(g)
     stepCore(g, dt)
     stepFirstRoom(g, dt)

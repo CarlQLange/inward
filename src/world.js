@@ -87,8 +87,8 @@ export const setCell = (w, x, y, mat, life = 0) => {
   if (inside(x, y)) place(w, idx(x, y), mat, life)
 }
 
-const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE])
-const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.SCRAP]
+const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE, M.RIME, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE])
+const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.FLOE, M.RIME, M.SCRAP]
 
 const flammabilityOf = (w, mat) => {
   if (w.overloaded && mat === M.ROCK) return T.overloadBurn
@@ -141,6 +141,10 @@ const conduct = (w, i, energy) => {
 const fall = (w, x, y) => {
   const i = idx(x, y)
   const below = matAt(w, x, y + 1)
+  if (props(w.mat[i]).floats && matAt(w, x, y - 1) === M.WATER) {
+    swap(w, i, idx(x, y - 1))
+    return
+  }
   const sinks = below === M.WATER && props(w.mat[i]).sinks === true
   if (below === M.WATER && w.mat[i] === M.ASH) {
     place(w, i, M.EMPTY)
@@ -217,7 +221,7 @@ const stepLava = (w, x, y, dt) => {
       place(w, i, M.ROCK)
       return true
     }
-    if (other === M.ICE) place(w, idx(nx, ny), M.WATER)
+    if (props(other).melts) place(w, idx(nx, ny), M.WATER)
     if (props(other).flammability && Math.random() < T.lavaBurn * dt * 8) ignite(w, nx, ny)
   }
   return Math.random() > T.lavaFlow
@@ -235,7 +239,8 @@ const stepAcid = (w, x, y) => {
     }
     if (ACID_EATS.has(other) && Math.random() < T.acidEat) {
       note(w, 'dissolve', other)
-      place(w, idx(nx, ny), M.EMPTY)
+      const metal = other === M.METAL || other === M.GATE
+      place(w, idx(nx, ny), w.rusting && metal ? M.SCRAP : w.offgas ? M.METHANE : M.EMPTY, w.offgas ? T.offgasLife : 0)
       if (Math.random() < T.acidSpent) {
         place(w, i, M.EMPTY)
         return true
@@ -361,7 +366,7 @@ const stepFire = (w, dt, excite) => {
           w.burn[i] = 0
           place(w, idx(nx, ny), M.STEAM, between(T.steamLife))
         }
-        if (other === M.ICE && Math.random() < T.melt * dt) {
+        if (props(other).melts && Math.random() < T.melt * dt) {
           note(w, 'melt', M.ICE)
           place(w, idx(nx, ny), M.WATER)
         }

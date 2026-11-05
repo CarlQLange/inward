@@ -1,6 +1,7 @@
 import { TICK, TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
-import { SKILL_NAMES } from './skills.js'
+import { SKILL_NAMES, formOf } from './skills.js'
+import { RELIC_BY_ID } from './relics.js'
 import { skillKey } from './controls.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
@@ -142,7 +143,7 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
     title: SKILL_NAMES[kind],
     items: [
       ...p.skills.map((skill, slot) => ({
-        card: { icon: skill.kind, name: SKILL_NAMES[skill.kind], text: 'DROP', sub: skillKey(slot) },
+        card: { icon: skill.kind, tint: formOf(p, skill.kind).tint, name: formOf(p, skill.kind).name, text: 'DROP', sub: skillKey(slot) },
         run: gm => {
           dropCard(gm, skill.kind)
           p.skills[slot] = { kind, ready: 0 }
@@ -162,10 +163,14 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
   })
 }
 
-export const cardFor = option =>
-  option.type === 'new'
-    ? { name: 'NEW', text: '', mystery: true }
-    : { icon: option.skill, name: option.node.name, text: option.node.text, parent: null }
+const CARDS = {
+  new: () => ({ name: 'NEW', text: '', mystery: true }),
+  upgrade: ({ skill, node }) => ({ icon: skill, tint: node.tint, name: node.name, text: node.text, parent: null }),
+  relic: ({ relic }) => ({ icon: RELIC_BY_ID[relic].icon, name: RELIC_BY_ID[relic].name, text: RELIC_BY_ID[relic].text }),
+  mend: () => ({ icon: 'heart', name: 'MEND', text: 'ALL HEARTS, A BOMB' }),
+}
+
+export const cardFor = option => CARDS[option.type](option)
 
 const pressedFrom = (g, input) => key => input[key] && !g.menuHeld[key]
 

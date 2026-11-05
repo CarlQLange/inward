@@ -11,6 +11,7 @@ import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
 import { keyOf } from './map.js'
 import { scheme, skillKey, usesMouse } from './controls.js'
+import { drawSkillEffects, drawSkillMatter } from './skillart.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -269,7 +270,7 @@ const drawEnemies = (ctx, g) => {
 }
 
 const drawBolt = (ctx, bolt) => {
-  ctx.fillStyle = COLOURS[bolt.colour] ?? COLOURS.charge
+  ctx.fillStyle = COLOURS[bolt.colour] ?? bolt.colour ?? COLOURS.charge
   bolt.points.slice(1).forEach((b, i) => {
     const a = bolt.points[i]
     const steps = Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)))
@@ -428,6 +429,7 @@ export const draw = (ctx, g, pointer) => {
   const theme = g.phase === 'title' ? 0 : g.rooms[keyOf(g.x, g.y)]?.theme ?? 0
   ctx.drawImage(backdrops[theme], 0, 0)
   drawSolids(ctx, g.world, g.depth, THEMES[theme]?.skin, theme)
+  drawSkillMatter(ctx, g)
   drawCards(ctx, g)
   drawWares(ctx, g)
   drawPickups(ctx, g)
@@ -438,6 +440,7 @@ export const draw = (ctx, g, pointer) => {
   drawLiquids(ctx, g.world, g.time)
   drawGas(ctx, g.world)
   drawOverlays(ctx, g.world, g.time)
+  drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
   if (usesMouse() && pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
