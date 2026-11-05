@@ -8,9 +8,9 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap,
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, pourAcid, recordTrail, spillNapalm, stepDash } from './skills.js'
-import { chunks, dust } from './feel.js'
+import { dust } from './feel.js'
+import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
-import { rumble } from './pad.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
 import { dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
@@ -208,7 +208,7 @@ const enterRoom = (g, x, y) => {
     wares: room.wares,
     pickups: room.pickups,
     depth: g.depthOverride ?? depthFor(g, room.ring),
-    shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [],
+    shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [], rings: [], lights: [], ripples: [],
     timeStop: 0,
     echo: 0,
   })
@@ -228,7 +228,7 @@ const walkThrough = (g, dir) => {
   leaveRoom(g)
   enterRoom(g, nx, ny)
   g.hinted = false
-  storeRun(g)
+  beginDoor(g, dir, here)
   const p = g.player
   const door = g.rooms[keyOf(nx, ny)].doors[OPPOSITE[dir]]
   if (dir === 'right' || dir === 'left') {
@@ -240,6 +240,7 @@ const walkThrough = (g, dir) => {
     p.y = dir === 'down' ? 1 : WORLD_PX - p.h - 1
     p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
   }
+  storeRun(g)
 }
 
 const RUN_FIELDS = [
@@ -366,6 +367,7 @@ const createRun = (depthOverride, quickRing = null) => {
     rekindle: 0,
     newBest: false,
     summaryShown: false,
+    ...createFx(),
   }
   if (quickRing !== null) {
     applyQuickstart(g, quickRing)
@@ -527,9 +529,8 @@ const onKill = (g, e) => {
   onDeath(g, e)
   knownNotes.add(`killed:${e.kind}`)
   const c = centre(e)
-  burst(g, c.x, c.y, 'pale', 16)
+  killFx(g, e)
   g.hitstop = Math.max(g.hitstop, TUNING.feel.killStop)
-  g.shake = Math.max(g.shake, 2)
   const def = ENEMY_DEFS[e.kind]
   if (e.friendly) {
     dropLoot(g, e, 5)
@@ -548,6 +549,7 @@ const onKill = (g, e) => {
   g.kills += 1
   if (environmental) g.environmentKills += 1
   gainXp(g, environmental ? R.environmentXp : 1)
+  xpMotes(g, c, environmental ? R.environmentXp : 1)
   addPopup(g, c.x, c.y - 6, g.chain > 1 ? `${points} X${g.chain}` : String(points), environmental ? 'charge' : 'white')
   dropLoot(g, e, environmental ? 2 : 1)
 }
@@ -559,7 +561,7 @@ const stepMotionFeel = (g, p, input, dt, wasGrounded, falling, swimming) => {
     g.dustClock = TUNING.feel.dustEvery
     dust(g, p.x + (p.vx > 0 ? 0 : p.w), p.y + p.h, 1)
   }
-  if (swimming && !p.wasSwimming && Math.abs(falling) > 40) chunks(g, p.x + p.w / 2, p.y + p.h, M.WATER, 12)
+  if (swimming && !p.wasSwimming && Math.abs(falling) > 40) splash(g, p.x + p.w / 2, p.y + p.h / 2, falling)
   p.wasSwimming = swimming
 }
 
@@ -653,8 +655,7 @@ const shoot = (g, p) => {
     fireShot(g, p, turned(aim, 0.2))
     fireShot(g, p, turned(aim, -0.2))
   }
-  const from = muzzle(p)
-  dust(g, from.x + aim.x * 5, from.y + aim.y * 5, 1)
+  shotFx(g, p, aim)
   p.shotReady = P.shotEvery * (p.frenzy > 0 ? 0.5 : 1)
 }
 
@@ -781,26 +782,28 @@ const buyWares = (g, p) => {
 
 const usePickups = (g, p, dt) => {
   for (const c of g.pickups) {
-    if (c.kind === 'coin' && hasRelic(p, 'coinmagnet')) {
+    c.age = (c.age ?? 0) + dt
+    if (c.kind === 'coin' && c.age > R.coinSettle) {
       const dx = p.x - c.x
       const dy = p.y - c.y
       const d = Math.max(1, Math.hypot(dx, dy))
-      if (d < R.magnetReach) {
+      if (d < (hasRelic(p, 'coinmagnet') ? R.magnetReach : R.coinReach)) {
         c.x += (dx / d) * 140 * dt
         c.y += (dy / d) * 140 * dt
-        continue
+        c.vy = 0
       }
     }
     c.vy = Math.min(200, c.vy + 300 * dt)
     moveAxis(g.world, c, 'x', c.vx * dt)
     if (moveAxis(g.world, c, 'y', c.vy * dt)) {
       c.vx *= 0.5
-      c.vy = 0
+      c.vy = c.vy > 40 ? -c.vy * 0.4 : 0
     }
     if (!overlap(p, { x: c.x - 3, y: c.y - 3, w: c.w + 6, h: c.h + 6 })) continue
     c.taken = true
     if (c.kind === 'coin') {
       g.gold += 1
+      coinMote(g, c.x, c.y)
       if (hasRelic(p, 'crown')) g.score += R.crownScore
     } else if (c.kind === 'bomb') p.bombs += 1
     else p.hp = Math.min(P.hp, p.hp + 1)
@@ -907,8 +910,9 @@ const stepRoomEvents = (g, dt) => {
     if (p.hp < P.hp) {
       p.hp = Math.min(P.hp, p.hp + TUNING.feel.roomClearHeal)
       const c = centre(p)
-      g.popups.push({ x: c.x, y: c.y - 12, text: 'ROOM CLEAR +1', colour: 'heal', life: 1.4 })
+      g.popups.push({ x: c.x, y: g.player.y - 11, icon: 'HEAL', colour: 'heal', life: 1.2 })
     }
+    roomClearFx(g)
   }
   if (room.event === 'arena' && !room.cleared) {
     const hostile = g.enemies.some(e => !e.friendly && !e.ally)
@@ -1170,7 +1174,7 @@ const stepShots = (g, dt) => {
       }
     } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid) {
       shotEffects(g, s, cell(s.x), cell(s.y))
-      chunks(g, s.x, s.y, matAt(g.world, cell(s.x), cell(s.y)), 3)
+      wallHitFx(g, s, matAt(g.world, cell(s.x), cell(s.y)))
       if (s.bounces > 0) {
         s.bounces -= 1
         const hitX = props(matAt(g.world, cell(s.x - s.vx * dt), cell(s.y))).solid
@@ -1274,13 +1278,6 @@ const stepEffects = (g, dt) => {
   }
   for (const b of g.bolts) b.life -= dt
   g.bolts = g.bolts.filter(b => b.life > 0)
-  for (const p of g.particles) {
-    p.x += p.vx * dt
-    p.y += p.vy * dt
-    p.vy += 200 * dt
-    p.life -= dt
-  }
-  g.particles = g.particles.filter(p => p.life > 0)
   for (const p of g.popups) {
     p.y -= 14 * dt
     p.life -= dt
@@ -1300,11 +1297,8 @@ const stepEffects = (g, dt) => {
 
 const handleWorldEvents = g => {
   for (const event of g.world.events) {
-    g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.5 + event.reach * 0.25 : 1)
-    if (event.type !== 'blast') continue
-    g.shake = Math.max(g.shake, 3 + event.reach * 2)
-    rumble(0.35 + event.reach * 0.2, 120 + event.reach * 60)
-    burst(g, (event.x + 0.5) * BLOCK, (event.y + 0.5) * BLOCK, 'fire', 8 + event.reach * 6)
+    g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.12 + event.reach * 0.1 : 1)
+    if (event.type === 'blast') blastFx(g, event)
   }
   g.world.events.length = 0
 }
@@ -1372,16 +1366,18 @@ const edges = (g, input) => {
 
 export const step = (g, input, realDt) => {
   g.looking = input.look === true && g.phase === 'playing' && g.menus.length === 0
-  const dt = g.looking ? realDt * TUNING.feel.lookSlow : realDt
+  const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g)
   g.time += dt
   stepEffects(g, dt)
+  stepFx(g, realDt, dt)
   const { pausePressed, skillsPressed } = edges(g, input)
+  if (g.door) return
   if (g.phase === 'title') stepTitle(g, dt)
   if (g.phase === 'dead' || g.phase === 'cleared') {
     g.phaseTime += dt
     stepWorld(g.world, dt, g.depth)
     handleWorldEvents(g)
-    if (g.phaseTime > 0.8 && !g.summaryShown) {
+    if (g.phaseTime > TUNING.feel.deathHold && !g.summaryShown) {
       g.summaryShown = true
       openSummary(g)
     }
@@ -1417,7 +1413,7 @@ export const step = (g, input, realDt) => {
     return
   }
   g.wasMap = input.map
-  if (g.pendingOffers > 0) {
+  if (g.pendingOffers > 0 && levelBurstDone(g)) {
     g.pendingOffers -= 1
     openOffer(g)
     return

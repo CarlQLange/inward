@@ -3,6 +3,7 @@ export const BLOCK = 8
 export const ROOM = 28
 export const ORIGIN = { x: 101, y: 8 }
 export const TICK = 1 / 60
+export const HUD_ANCHORS = { xp: { x: 375, y: 117 }, coin: { x: 22, y: 148 } }
 
 export const TUNING = {
   world: {
@@ -102,6 +103,8 @@ export const TUNING = {
     batteryRecharge: 0.4,
     skullHeal: 0.12,
     magnetReach: 70,
+    coinReach: 30,
+    coinSettle: 0.5,
     crownScore: 5,
     collapseEvery: 4,
     arenaLimit: 45,
@@ -156,9 +159,13 @@ export const TUNING = {
     guardian: { speed: 14, every: 3.5 },
   },
   feel: {
-    hurtStop: 0.09,
-    hitStop: 0.025,
-    killStop: 0.05,
+    hurtStop: 0.1,
+    hitStop: 0.03,
+    killStop: 0.065,
+    blastStop: 0.05,
+    doorTime: 0.34,
+    levelBurst: 0.55,
+    deathHold: 1.1,
     hurtKick: 135,
     hurtShove: 95,
     enemyFlash: 0.1,

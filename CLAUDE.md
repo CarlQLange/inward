@@ -36,7 +36,16 @@ Plain JavaScript modules with no build step, so a reload shows the latest code.
 The game draws to a low-resolution 2D canvas, and a WebGL pass presents it, which
 is where distance-from-core effects live. Tuning values live together in
 `src/config.js`. Tiles, creatures and icons are generated sheets in `art/raw/`,
-reduced to chunky atlases in `assets/`. The player and flames are bitmaps in code.
+reduced to chunky atlases in `assets/`. Flames are bitmaps in code, and the player
+is drawn procedurally each frame.
+
+Presentation is separate from the simulation. `hero.js` animates and draws the player,
+`fx.js` holds particles, shake, slow motion, door slides and the moments, `creatures.js`
+draws foes and their squash, `scene.js` draws the room and its materials, `light.js`
+builds a small light map, and `present.js` runs the WebGL passes. The scene pass runs at
+game resolution, which keeps it cheap and keeps every distortion in chunky pixels. These
+modules hold anything that shouldn't be saved in WeakMaps or in fields left out of the save.
+The scarf reds are exact key colours that the shader lets through untouched.
 
 Mechanically it draws on the archived `magicschool` project, where everything
 has properties and changing one can trigger rules that change others. That game

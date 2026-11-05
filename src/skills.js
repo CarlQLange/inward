@@ -7,7 +7,7 @@ import { chunks } from './feel.js'
 
 const S = TUNING.skills
 
-export const muzzle = p => ({ x: p.x + p.w / 2, y: p.y + (p.crouching ? 4 : 5) })
+export const muzzle = p => ({ x: p.x + p.w / 2, y: p.y + (p.crouching ? 5 : 8) })
 
 const owns = (p, node) => p.upgrades.has(node)
 const rotate = ({ x, y }, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) })

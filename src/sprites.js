@@ -1,4 +1,4 @@
-const paint = (rows, colours, flip = false) => {
+const paint = (rows, colours) => {
   const h = rows.length
   const w = rows[0].length
   const canvas = document.createElement('canvas')
@@ -8,12 +8,10 @@ const paint = (rows, colours, flip = false) => {
   rows.forEach((row, y) => [...row].forEach((c, x) => {
     if (!colours[c]) return
     ctx.fillStyle = colours[c]
-    ctx.fillRect(flip ? w - 1 - x : x, y, 1, 1)
+    ctx.fillRect(x, y, 1, 1)
   }))
   return canvas
 }
-
-const pair = (rows, colours) => [paint(rows, colours), paint(rows, colours, true)]
 
 const ASH = [
   '........', '..c.....', '.....c..', '........',
@@ -26,21 +24,6 @@ const FLAMES = [
   ['..f.....', '..ff..f.', '.fgf.ff.', '.fgffgf.', '.fgggygf', 'ffgyyygf', 'fggyyggf', 'ffggggff'],
 ]
 
-const PLAYER_TOP = [
-  '...WW...', '..WWWW..', '..WKKW..', '..WWWW..', '...WW...',
-  '.WWWWWW.', 'W.WWWW.W', 'W.WWWW.W', 'W.WWWW.W', '..WWWW..',
-]
-const LEGS = {
-  stand: ['..W..W..', '..W..W..', '..W..W..', '..W..W..', '.WW..WW.', '........'],
-  stepA: ['..W..W..', '.W....W.', '.W....W.', 'W......W', 'W.......', '........'],
-  stepB: ['..W..W..', '..WW.W..', '...W.W..', '...WW...', '...WW...', '........'],
-  jump: ['.WW..WW.', '.W....W.', '........', '........', '........', '........'],
-}
-const CROUCH = [
-  '...WW...', '..WWWW..', '..WKKW..', '..WWWW..', '.WWWWWW.',
-  'W.WWWW.W', '.WW..WW.', '.WW..WW.', '........',
-]
-const WHITE = { W: '#f4f8f2', K: '#10181a' }
 const HEART = ['.gg.gg.', 'ggggggg', 'ggggggg', '.ggggg.', '..ggg..', '...g...']
 
 const TILE_INDEX = {
@@ -103,10 +86,6 @@ export const SPRITES = {
   icons: {},
   ash: paint(ASH, { b: '#5a5a52', c: '#8a8a80' }),
   flames: FLAMES.map(rows => paint(rows, { f: '#d9531c', g: '#ff9a2e', y: '#ffe84a' })),
-  player: {
-    ...Object.fromEntries(Object.entries(LEGS).map(([name, legs]) => [name, pair([...PLAYER_TOP, ...legs], WHITE)])),
-    crouch: pair(CROUCH, WHITE),
-  },
   heart: paint(HEART, { g: '#76d648' }),
   heartEmpty: paint(HEART, { g: '#26542a' }),
 }
