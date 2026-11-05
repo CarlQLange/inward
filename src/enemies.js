@@ -277,7 +277,7 @@ const slug = (g, e, dt) => {
   puff(g.world, cell(c.x), cell(e.y + e.h - 1), M.OIL, [1, 1])
 }
 
-const DIGS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.VOLATILE, M.SCRAP])
+const DIGS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.VOLATILE, M.SCRAP, M.SNOW])
 
 const worm = (g, e, dt) => {
   if (e.stun > 0) return

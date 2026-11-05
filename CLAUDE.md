@@ -26,7 +26,7 @@ options, so snapshot localStorage in sessionStorage first and restore it afterwa
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
-`node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
+`node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes, and on a second line how often each newer world rule fires per minute and the sand, mud, snow and glass a room starts with. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
 lists the flags, such as `--god`, `--found rand`, `--career`, `--warden bellows --gun` and, to reach and pass the
 Core, `--god --express --deeper --loops 2`. The bot walks badly, so read its time-per-run numbers as an upper bound
@@ -218,7 +218,12 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Eight region themes change materials, tiles and foes. Room events: arena, flood,
   gasworks, collapse, vault, nest, altar and chests. Elite foes can burn, shock or be armoured.
 - Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, lava, acid,
-  vine, brick, smoke, steam, methane, and volatile crystal.
+  vine, brick, smoke, steam, methane, volatile crystal, glass, mud and snow.
+- Lava or charge glazes sand into glass, which lets light through and shatters into flying shards under a blast,
+  a falling block or a hammer. Water soaks sand and ash into mud, which slows anything in it, smothers fire and
+  bakes into brick. Steam freezes into snow against ice and falls as snow in the Ice Shafts. Blasts throw sand,
+  scrap, floes, snow and mud outward, ash beside water grows back as moss, and charged metal pulls scrap and
+  magnetic foes. The world reports shatters and throws as events, and `src/loose.js` turns them into flying matter.
 - Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
   (electrifies water), worm (digs), turret, bomber, imp
   (freezes water), ember bat (lights things), slime (leaves acid), shield crab, nest, mimic,
@@ -248,7 +253,7 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   room. Three Wardens at rings 1, 3 and 5 break seals that open the Core, a three-phase final boss. One
   omen per run once found. Everything nameable is gated by a persistent found set, with one or two secrets
   planted per run and a brief reveal when met. Hanging props give the gun a way to set things off: a lamp drops fire, a battery arcs charge into nearby metal,
-  water and foes, a tank pours water, a carboy pours acid, and a ladle pours lava, which crusts over when thin. Ceiling
+  water and foes, a tank pours water, a carboy pours acid, a sandbag pours sand, and a ladle pours lava, which crusts over when thin. Ceiling
   loads are held by a strut that suits the region, and metal rails carry charge to the gates that hold them. Shooting a
   hanging icicle drops it.
 
