@@ -41,8 +41,8 @@ Regenerate the sprite atlases with
 ## Technology
 
 Plain JavaScript modules with no build step, so a reload shows the latest code.
-The game draws to a low-resolution 2D canvas, and a WebGL pass presents it, which
-is where distance-from-core effects live. Tuning values live together in
+Actors, HUD and menus draw to a low-resolution 2D canvas with a transparent background.
+The world behind them is drawn in WebGL, which is where distance-from-core effects live. Tuning values live together in
 `src/config.js`. Tiles, creatures and icons are generated sheets in `art/raw/`,
 reduced to chunky atlases in `assets/`. Flames are bitmaps in code, and the player
 is drawn procedurally each frame. Creatures are named clips listed in `art/anim.py`;
@@ -51,11 +51,31 @@ is drawn procedurally each frame. Creatures are named clips listed in `art/anim.
 
 Presentation is separate from the simulation. `hero.js` animates and draws the player,
 `fx.js` holds particles, shake, slow motion, door slides and the moments, `creatures.js`
-draws foes and their squash, `scene.js` draws the room and its materials, `light.js`
-builds a small light map, and `present.js` runs the WebGL passes. The scene pass runs at
-game resolution, which keeps it cheap and keeps every distortion in chunky pixels. These
-modules hold anything that shouldn't be saved in WeakMaps or in fields left out of the save.
-The scarf reds are exact key colours that the shader lets through untouched.
+draws foes and their squash, `scene.js` paints the terrain layer and draws everything that
+lives on the actor layer, `backdrop.js` holds the silhouette masks and each region's air
+colours, `cells.js` turns the world into small textures, `light.js` builds an occluded light
+map, and `present.js` runs the passes in `shaders.js`. These modules hold anything that
+shouldn't be saved in WeakMaps or in fields left out of the save. The scarf reds are exact key
+colours that the shader lets through untouched.
+
+The picture is built in layers, all at game resolution so distortion stays in chunky pixels:
+
+- The world pass draws terrain fronts, side faces traced back from the play plane through the
+  cell texture, the far wall and its silhouettes, all lit from the light map.
+- The optics pass adds what moves over the world: liquids, haze, fog, shafts and gas.
+- The frame pass places that room in the view with door slides, shake and warps, bleeds its edges
+  into the pit in the margins, then composites the actor canvas on top. Nothing but zoom and the
+  colour grade touches actors, which is what lets the world go wild.
+
+`era.js` is the look of the game: a table with one column per ring and one row per technique,
+cross-fading as depth changes. To change how a ring looks, start there. Terrain only uploads
+when its painted cells change, and the light map is only built from ring 3 inward.
+
+For moments that take over the picture, `setStage(fn)` in `present.js` replaces the frame pass,
+and `fn` gets the WebGL context, `drawFrame()` for the normal picture and `drawRoom(mat4, options)`
+to put the finished room on any quad. `g.depthDrive` overrides how much of the ring's depth shows
+(0 is flat, 1 full, unset means on once a seal has broken) and `g.vanish` overrides the point depth
+recedes to, in room pixels. Both can change every frame.
 
 Mechanically it draws on the archived `magicschool` project, where everything
 has properties and changing one can trigger rules that change others. That game

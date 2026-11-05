@@ -599,9 +599,8 @@ void main() {
 
   float dull = luma(colour);
   colour = mix(colour, vec3(dull * 0.92), desaturate);
-  if (spot > 0.5) colour = f.rgb;
-
   if (ghost > 0.001 && inRoom) colour = mix(colour, texture2D(history, vec2(uv.x, 1.0 - uv.y)).rgb, ghost);
+  if (spot > 0.5) colour = f.rgb;
   gl_FragColor = vec4(colour, 1.0);
 }`
 

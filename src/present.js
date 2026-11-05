@@ -397,8 +397,12 @@ export const createPresenter = canvas => {
     const frame = frameTargets[shown.frame]
     const history = frameTargets[1 - shown.frame]
     const composed = () => drawFrame(state, era, lighting, roomNow, roomOld, frame, history, shake, power)
-    composed()
-    if (stageHook) stageHook(stageApi(roomNow, frame, composed), state)
+    if (stageHook) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, frame.fbo)
+      gl.viewport(0, 0, frame.w, frame.h)
+      stageHook(stageApi(roomNow, frame, composed), state)
+      useBuffer(triangle)
+    } else composed()
     drawDisplay(era, frame)
   }
   present.release = release

@@ -174,7 +174,11 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
         ctx.fillStyle = `rgba(5, 12, 10, ${look.buried})`
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
       } else {
-        ctx.drawImage(shapedTile(toned, name, look.detail), x * BLOCK, y * BLOCK)
+        ctx.drawImage(shapedTile(toned, name, name === 'scrap' ? look.detail * 0.55 : look.detail), x * BLOCK, y * BLOCK)
+        if (look.raised) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${look.raised})`
+          ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
+        }
         paintEdges(ctx, world, x, y)
       }
     }
@@ -185,7 +189,7 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
 
 const terrain = { canvas: blank(ROOM_PX, ROOM_PX), drawn: new Uint8Array(ROOM * ROOM), world: null, key: '', version: 0 }
 
-const drawnMat = m => (TILE[m] || m === M.ASH ? m : 0)
+const drawnMat = m => (props(m).solid || m === M.ASH ? m : 0)
 
 export const terrainLayer = (world, theme, look, seed) => {
   const key = `${theme}|${look.row}|${seed}|${world.scorches?.length ?? 0}|${world.scorches?.at(-1)?.x}`

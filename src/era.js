@@ -11,6 +11,7 @@ const LADDER = {
 
   detail:         [0,     0,    0.06, 0.42, 0.6,  0.8,  0.9,  1,    1],
   buried:         [0.4,   0.4,  0.5,  0.68, 0.76, 0.78, 0.8,  0.8,  0.8],
+  raised:         [0.2,   0.2,  0.1,  0,    0,    0,    0,    0,    0],
   bands:          [2,     2,    3,    4,    6,    10,   16,   32,   32],
   far:            [0,     0,    1,    1,    1,    1,    1,    1,    1],
   near:           [0,     0,    0,    1,    1,    1,    1,    1,    1],
@@ -72,6 +73,7 @@ export const tileLook = depth => {
     row,
     detail: LADDER.detail[row],
     buried: LADDER.buried[row],
+    raised: LADDER.raised[row],
     variety: row >= 3,
     fixtures: LADDER.fixtures[row] > 0,
   }
