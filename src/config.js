@@ -140,7 +140,7 @@ export const TUNING = {
     stillAfter: 0.3,
     stillFull: 1,
     airAfter: 0.12,
-    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3, lens: 3, chime: 2 },
+    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3, lens: 3, chime: 4 },
     full: { fire: 4, charge: 4, water: 18, ice: 18, lava: 6, scrap: 6, moss: 16, vine: 30, metal: 24, rubble: 8, steam: 4, gas: 4, acid: 5, falling: 2, variety: 3, stun: 2, crowd: 4, drawn: 3, glass: 10, mud: 12, snow: 14, flying: 3 },
     refund: { blast: 0.35, blastKill: 0.7, hit: 0.6, returned: 0.5, allyKill: 0.6, dashHit: 0.6, crossed: 0.22, coin: 0.1, smashed: 0.3 },
     blastWindow: 0.3,

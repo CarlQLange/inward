@@ -98,7 +98,7 @@ const OTHERS = {
     colours: ['#d6f6f0', '#c9b48a'], flight: 'tumble',
     sense: (g, p) => {
       const c = centre(p)
-      const near = g.flung.filter(f => Math.hypot(f.x + f.w / 2 - c.x, f.y + f.h / 2 - c.y) < REACH_PX * 2)
+      const near = g.flung.filter(f => f.by !== 'chime' && Math.hypot(f.x + f.w / 2 - c.x, f.y + f.h / 2 - c.y) < REACH_PX * 2)
       return { amount: near.length / F.full.flying, spots: near.map(f => ({ x: f.x + f.w / 2, y: f.y + f.h / 2 })) }
     },
   },
