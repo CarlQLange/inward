@@ -338,10 +338,10 @@ const stepWick = (g, f, dt) => {
       advanceSpark(g, f, s)
     }
     if (f.tow && !s.out) towAlong(g, f, s, dt)
+    if (s.out && f.kiln && s.i !== f.end) bake(g, f.cells[s.i])
   }
   f.sparks = f.sparks.filter(s => !s.out)
   if (f.sparks.length > 0) return
-  if (f.kiln) f.cells.filter((c, i) => f.burnt[i] && i !== f.end).forEach(c => bake(g, c))
   letGoTowed(f)
   end(f)
 }
