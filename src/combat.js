@@ -2,14 +2,9 @@ import { TUNING } from './config.js'
 import { props } from './materials.js'
 import { acidAt, burningAt, chargedAt, crushingAt, explode, lavaAt, matAt, vineAt } from './world.js'
 import { cell, cellsUnder, centre } from './physics.js'
+import { burstSparks, hitFx, hurtFx } from './fx.js'
 
-export const burst = (g, x, y, colour, count) => {
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = 20 + Math.random() * 60
-    g.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.25 + Math.random() * 0.35, colour })
-  }
-}
+export const burst = burstSparks
 
 const TEACH = {
   FIRE: 'FIRE BURNS WHAT TOUCHES IT. STAY OFF BURNING BLOCKS.',
@@ -28,14 +23,12 @@ const hurtPlayer = (g, p, cause) => {
   p.lastCause = cause
   g.hurtFlash = 1
   g.hitstop = Math.max(g.hitstop, TUNING.feel.hurtStop)
-  g.shake = Math.max(g.shake, 5)
   p.vy = -TUNING.feel.hurtKick
   p.vx = -p.facing * TUNING.feel.hurtShove
   p.drift = 0.2
   p.jumpHeld = false
   const here = centre(p)
-  burst(g, here.x, here.y, 'hurt', 10)
-  g.popups.push({ x: here.x, y: here.y - 12, text: cause, colour: 'hurt', life: 1.2 })
+  hurtFx(g, p, cause)
   if (!g.taught.has(cause) && TEACH[cause]) {
     g.taught.add(cause)
     g.toast = { title: cause, text: TEACH[cause], life: TUNING.run.toastLife }
@@ -54,8 +47,7 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   e.flash = TUNING.feel.enemyFlash
   e.lastSource = source
   g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
-  const c = centre(e)
-  burst(g, c.x, c.y, 'pale', 5)
+  hitFx(g, e)
 }
 
 export const applyCrush = (g, e) => {
