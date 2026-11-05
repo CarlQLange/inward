@@ -100,6 +100,8 @@ const addRing = (g, x, y, speed, strength, life, width = 7) => {
   if (g.rings.length > MAX_RINGS) g.rings.shift()
 }
 
+export const ripple = (g, x, y, speed, strength, life, width) => addRing(g, x, y, speed, strength, life, width)
+
 export const punch = (g, dx, dy) => {
   g.kick.vx += dx * 66
   g.kick.vy += dy * 66

@@ -107,9 +107,9 @@ const OTHERS = {
   },
   flying: {
     colours: ['#d6f6f0', '#c9b48a'], flight: 'tumble',
-    sense: (g, p) => {
+    sense: (g, p, kind) => {
       const c = centre(p)
-      const near = g.flung.filter(f => Math.hypot(f.x + f.w / 2 - c.x, f.y + f.h / 2 - c.y) < REACH_PX * 2)
+      const near = g.flung.filter(f => f.by !== kind && Math.hypot(f.x + f.w / 2 - c.x, f.y + f.h / 2 - c.y) < REACH_PX * 2)
       return { amount: near.length / F.full.flying, spots: near.map(f => ({ x: f.x + f.w / 2, y: f.y + f.h / 2 })) }
     },
   },
@@ -143,6 +143,7 @@ export const DIETS = {
   float: ['airborne'],
   link: ['worldKill'],
   clay: ['fire', 'lava'], burrow: ['mud', 'falling'],
+  lens: ['glass', 'snow'], chime: ['flying'],
 }
 
 const foodOf = (_, kind) => DIETS[kind]
@@ -237,7 +238,7 @@ const scan = (g, p) => {
   scanCells(g, p, eaters)
   for (const eater of eaters) {
     for (const tag of eater.others) {
-      const { amount, spots } = OTHERS[tag].sense(g, p)
+      const { amount, spots } = OTHERS[tag].sense(g, p, eater.skill.kind)
       if (amount <= 0) continue
       eater.amount += amount
       eater.tag ??= tag

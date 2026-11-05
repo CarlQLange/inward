@@ -18,16 +18,18 @@ const MAKES = {
   link: ['worldKill', 'stun'], 'link.cable': ['fire', 'charge'], 'link.stake': ['fire', 'charge'],
   clay: ['mud'], 'clay.daub': ['stun'], 'clay.bog': ['mud'], 'clay.roll': ['falling'],
   'burrow.tunnel': ['falling'], 'burrow.grind': ['rubble', 'falling'], 'burrow.quicksand': ['stun', 'falling'], 'burrow.breach': ['air'],
+  lens: ['glass', 'fire'], chime: ['flying', 'stun'], 'lens.kiln': ['glass'], 'lens.dazzle': ['stun'], 'chime.bell': ['glass'], 'chime.statue': ['glass'],
+  repel: ['flying'], 'grapple.yank': ['flying'],
 }
 
 const REGION_FOOD = [
   ['moss', 'fire', 'gas', 'rubble', 'fuel'],
   ['water', 'charge', 'rubble', 'mud', 'pouring'],
   ['fire', 'gas', 'moss', 'acid', 'mud', 'fuel'],
-  ['metal', 'scrap', 'charge', 'falling', 'blast'],
+  ['metal', 'scrap', 'charge', 'falling', 'blast', 'flying'],
   ['lava', 'water', 'steam', 'metal', 'scrap', 'glass', 'pouring'],
   ['ice', 'falling', 'water', 'snow'],
-  ['blast', 'blastKill', 'gas', 'acid', 'glass', 'fuel'],
+  ['blast', 'blastKill', 'gas', 'acid', 'glass', 'fuel', 'flying'],
 ]
 
 const BAND_OF_RING = [0, 0, 1, 1, 2, 2, 3]

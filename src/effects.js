@@ -3,14 +3,15 @@ import { M, props } from './materials.js'
 import { burningAt, chargedAt, crushingAt, energize, explode, ignite, lavaAt, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, centre, forEachCell, hitsSolid, moveAxis, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
-import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, splash } from './fx.js'
+import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, ripple, splash } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
-  orbitFires, owns, recordPast, releaseMatter, returnedShot, ring, setAblaze, settleFuse, shoutFront, smash, spend, spill, strike, zap,
+  orbitFires, owns, prey, recordPast, releaseMatter, returnedShot, ring, ringBell, setAblaze, settleFuse, shardAt, shoutFront, smash, spend, spill, strike, turnToGlass, zap,
 } from './skills.js'
 import { endFloat, stepFloat } from './float.js'
 import { endLink, stepLink } from './link.js'
 import { clodLands, endKiln, stepBall, stepDaub, stepKiln } from './earth.js'
+import { beamSparks, pealRings } from './matter.js'
 
 const S = TUNING.skills
 
@@ -1230,6 +1231,42 @@ const stepShout = (g, f, dt) => {
 
 const endMatter = g => releaseMatter(g)
 
+const stepBeam = (g, f) => beamSparks(g, f)
+
+const stepPeal = (g, f) => {
+  if (f.rung) return
+  f.rung = true
+  pealRings(g, f)
+  ripple(g, f.x, f.y, S.chime.reach * 4, f.broke ? 3 : 1.5, S.chime.ringTime, 5)
+}
+
+const stepVolley = (g, f, dt) => {
+  const C = S.chime
+  if (!f.pieces.length) {
+    end(f)
+    return
+  }
+  f.clock -= dt
+  if (f.clock > 0) return
+  const foes = prey(g)
+  const shot = f.pieces.map((piece, i) => [i, nearest(foes, piece.x, piece.y, C.volleyReach)]).find(([, foe]) => foe)
+  if (!shot) return
+  shardAt(g, f.pieces.splice(shot[0], 1)[0], shot[1])
+  f.clock = C.volleyEvery
+}
+
+const stepHover = (g, f) => {
+  const foes = prey(g)
+  f.pieces = f.pieces.filter(piece => {
+    const foe = nearest(foes, piece.x, piece.y, S.chime.hoverReach)
+    if (foe) shardAt(g, piece, foe)
+    return !foe
+  })
+  if (!f.pieces.length) end(f)
+}
+
+const dropPieces = (g, f) => f.pieces.forEach(piece => shardAt(g, { ...piece, from: { x: piece.x, y: piece.y - BLOCK } }))
+
 const STEP = {
   well: stepWell, decoy: stepDecoy, drone: stepDrone, rod: stepRod, mine: stepMine, mirror: stepMirror,
   globe: stepGlobe, nail: stepNail, thrown: stepThrown, fuse: stepFuse, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
@@ -1237,11 +1274,13 @@ const STEP = {
   bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
   seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle, float: stepFloat, link: stepLink,
   ball: (...args) => stepBall(...args), daub: (...args) => stepDaub(...args), kiln: (...args) => stepKiln(...args),
+  beam: stepBeam, peal: stepPeal, volley: stepVolley, hover: stepHover, statues: g => turnToGlass(g),
 }
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle, float: endFloat, link: endLink,
   kiln: (...args) => endKiln(...args),
+  volley: dropPieces, hover: dropPieces, bell: g => ringBell(g),
 }
 
 const stepAblaze = (g, e, dt) => {

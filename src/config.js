@@ -116,6 +116,17 @@ export const TUNING = {
     link: { every: 6.5, reach: 130, width: 28, hop: 80, most: 4, life: 8, burn: 2.2, energy: 22, ropeLeast: 20, ropeMost: 96, ropeSlack: 1.15, ropeHaul: 6, hopTime: 0.12, liveTime: 0.4, yokeEvery: 0.45, stakeEvery: 0.4, forms: { 'link.stake': 7.5 } },
     clay: { every: 1.6, stock: 3, speed: 180, lift: 22, damage: 2, splatStun: 0.4, daubTime: 6, dripEvery: 0.25, sag: 45, bakeHold: 3, bakeDamage: 2, rollSpeed: 64, rollLife: 5, rollMost: 18, rollDamage: 2, bogRadius: 3, castStun: 1.4, forms: { 'clay.roll': 2.2 } },
     burrow: { every: 3, time: 2.6, speed: 86, mudSpeed: 112, rockSpeed: 42, wakeEvery: 0.07, breach: 280, breachDrift: 0.3, sinkDepth: 2, sinkStun: 0.9, sinkEvery: 1.6, sinkReach: 4, surfaceSpeed: 130, surfaceLimit: 2 },
+    lens: {
+      every: 3, time: 2.2, reach: 230, linger: 0.06, cool: 1.2, gap: 0.05,
+      lightAfter: 0.12, meltAfter: 0.2, glazeAfter: 0.3, bakeAfter: 0.4, kilnAfter: 0.55,
+      foeEvery: 0.3, foeDamage: 1, igniteAfter: 0.9, dazzle: 0.6,
+      splits: 2, spread: 0.42, beamsMost: 14, bounces: 4,
+    },
+    chime: {
+      every: 3.2, reach: 64, most: 12, shards: 3, speed: [130, 200], lift: 30, scatter: 0.7, life: 0.8, damage: 2, aimSpeed: 230,
+      ringTime: 0.35, piecesMost: 36, volleyLife: 6, volleyEvery: 0.09, volleyReach: 180, hoverLife: 8, hoverReach: 48,
+      bellLife: 5, statueWatch: 1.2, statueInset: 2,
+    },
   },
   feed: {
     reach: 7,
@@ -134,7 +145,7 @@ export const TUNING = {
     stillAfter: 0.3,
     stillFull: 1,
     airAfter: 0.12,
-    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3, wick: 3 },
+    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3, wick: 3, lens: 3, chime: 4 },
     full: { fire: 4, charge: 4, water: 18, ice: 18, lava: 6, scrap: 6, moss: 16, vine: 30, metal: 24, rubble: 8, steam: 4, gas: 4, acid: 5, falling: 2, variety: 3, stun: 2, crowd: 4, drawn: 3, glass: 10, mud: 12, snow: 14, flying: 3, pouring: 5, fuel: 30, airborne: 3 },
     refund: { blast: 0.35, blastKill: 0.7, hit: 0.6, returned: 0.5, allyKill: 0.6, dashHit: 0.6, crossed: 0.22, coin: 0.1, smashed: 0.3, worldKill: 0.3 },
     blastWindow: 0.3,

@@ -78,6 +78,7 @@ const worker = async () => {
     flask: 110, wick: 120,
     float: 80, link: 120,
     clay: 110, burrow: 0,
+    lens: 160, chime: 110,
   }
   const WHEN = {
     rewind: (g, foe, bot) => g.time - bot.lastHit < 1.5,
@@ -87,6 +88,7 @@ const worker = async () => {
     drone: (g, foe) => Boolean(foe) && g.effects.filter(f => f.kind === 'drone').length < 2,
     seed: (g, foe, bot, me) => Boolean(foe) && distance(middle(foe), me) < 90,
     burrow: (g, foe, bot, me) => Boolean(foe) && distance(middle(foe), me) < 80 && (bot.dug = (bot.dug ?? 0) + 1) % 240 < 150,
+    chime: (g, foe, bot, me) => g.effects.some(f => f.kind === 'bell' && !f.done) || (Boolean(foe) && distance(middle(foe), me) < REACH.chime),
   }
 
   const foodNear = (g, p, me, kinds) => {

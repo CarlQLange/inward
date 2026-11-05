@@ -78,10 +78,10 @@ const depthFor = (g, ring) => {
 }
 
 const LOCK_OPENERS = {
-  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick', 'burrow'],
+  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick', 'burrow', 'lens'],
   gate: ['bolt', 'rod', 'acid', 'blink', 'melt', 'wick'],
   brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
-  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick'],
+  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick', 'lens', 'chime'],
   scrap: ['repel', 'hammer', 'well', 'grapple', 'acid', 'blink'],
 }
 const LOCKS = Object.keys(LOCK_OPENERS)
@@ -1952,6 +1952,7 @@ const stepFlung = (g, dt) => {
     const blocked = moveAxis(g.world, f, 'x', f.vx * dt) || moveAxis(g.world, f, 'y', f.vy * dt)
     const victim = g.enemies.find(e => e !== f.thrower && !e.stowed && !e.intangible && !(f.thrower?.warden && e.partOf) && overlap(f, e))
     if (victim) {
+      victim.flungBy = f.by
       hurt(g, victim, f.damage ?? F.damage, 'world', f.cause)
       victim.stun = Math.max(victim.stun, F.stun)
       if (f.shard) f.life = 0

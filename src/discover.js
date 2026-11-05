@@ -19,8 +19,8 @@ export const BASE = new Set([
 ])
 
 export const LADDER = [
-  'skill:flask', 'foe:bomber', 'event:vault', 'relic:claws', 'skill:float', 'skill:dash', 'foe:spore',
-  'inhabitant:miner', 'skill:wick', 'omen:tinder', 'relic:fireboots', 'foe:crab', 'skill:link', 'event:flood',
+  'skill:flask', 'foe:bomber', 'event:vault', 'relic:claws', 'skill:float', 'skill:lens', 'skill:dash', 'foe:spore',
+  'inhabitant:miner', 'skill:wick', 'omen:tinder', 'relic:fireboots', 'foe:crab', 'skill:link', 'skill:chime', 'event:flood',
   'skill:spring', 'foe:pillbug', 'skill:clay', 'keystone:quarry', 'relic:stomp', 'foe:gasbag', 'skill:burrow',
   'event:gasworks', 'omen:deluge', 'skill:mason', 'foe:imp', 'keystone:livewire', 'relic:rubber', 'foe:gnat',
   'event:collapse', 'warden:eel', 'skill:acid', 'omen:moon', 'keystone:overload', 'relic:incendiary', 'foe:slime',

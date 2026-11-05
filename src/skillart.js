@@ -4,7 +4,7 @@ import { matAt } from './world.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { MATERIAL_COLOURS } from './fx.js'
-import { eraIndex } from './particles.js'
+import { eraIndex, eraOf, softDisc } from './particles.js'
 import { PULLS } from './float.js'
 import { endOf, knotOf, tiesOf } from './link.js'
 
@@ -150,6 +150,40 @@ const drawTies = (ctx, g, f) => {
 }
 
 const iceTile = () => SPRITES.tiles.ice?.[0]
+
+const BEAM = '#fff3b4'
+const PRISM_TONES = { [-1]: '#ffb39a', 1: '#9ad8ff' }
+const PIECE_LOOK = { [M.GLASS]: '#d6f6f0', [M.ICE]: '#bff2ff' }
+
+const line = (ctx, a, b, size, colour) => {
+  const length = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y))
+  const off = (size - 1) / 2
+  ctx.fillStyle = colour
+  ctx.beginPath()
+  for (let d = 0; d <= length; d += 1) ctx.rect(Math.round(a.x + ((b.x - a.x) * d) / length - off), Math.round(a.y + ((b.y - a.y) * d) / length - off), size, size)
+  ctx.fill()
+}
+
+const dazzled = (ctx, g, e) => {
+  const reach = 3 + (Math.floor(g.time * 16) % 2)
+  const [l, r, t, b] = [e.x - 2, e.x + e.w + 1, e.y - 2, e.y + e.h + 1]
+  for (let k = 0; k < reach; k++) {
+    dot(ctx, l - k, t - k, 1, 1, WHITE)
+    dot(ctx, r + k, t - k, 1, 1, WHITE)
+    dot(ctx, l - k, b + k, 1, 1, WHITE)
+    dot(ctx, r + k, b + k, 1, 1, WHITE)
+  }
+}
+
+const drawPieces = (ctx, g, f, still) => {
+  for (const piece of f.pieces) {
+    const bob = still ? Math.round(Math.sin(g.time * 3 + piece.seed) * 2) : 0
+    const shake = still ? 0 : Math.sin(g.time * 50 + piece.seed) > 0 ? 1 : 0
+    const [x, y] = [Math.round(piece.x - 1 + shake), Math.round(piece.y - 2 + bob)]
+    dot(ctx, x, y, 2, 3, PIECE_LOOK[piece.mat] ?? COLD)
+    dot(ctx, x + (Math.floor(g.time * 6 + piece.seed) % 2), y, 1, 1, WHITE)
+  }
+}
 
 const STILL_LOOK = { [M.WATER]: '#3f9aa2', [M.OIL]: '#a06ab0', [M.LAVA]: '#ffb24a', [M.ACID]: '#a8e85a' }
 
@@ -463,6 +497,40 @@ const ART = {
     ctx.strokeRect(Math.round(f.x) - 0.5, Math.round(f.y) - 0.5, p.w + 1, p.h + 1)
     dotted(ctx, { x: f.x + p.w / 2, y: f.y + p.h / 2 }, { x: p.x + p.w / 2, y: p.y + p.h / 2 }, MAGNET, 5, g.time * 20)
   },
+  beam: (ctx, g, f) => {
+    const index = eraIndex(g)
+    const halo = eraOf(g).alpha
+    const warm = f.tint ?? BEAM
+    for (const [a, b, tone] of f.segments ?? []) {
+      if (index === 0) {
+        dotted(ctx, a, b, WHITE, 2, g.time * 90)
+        continue
+      }
+      const colour = index >= 2 && tone ? PRISM_TONES[tone] : warm
+      if (halo) {
+        ctx.globalAlpha = 0.2 + 0.08 * Math.sin(g.time * 40)
+        line(ctx, a, b, index >= 4 ? 3 : 2, colour)
+        ctx.globalAlpha = 1
+      }
+      line(ctx, a, b, 1, index >= 3 ? WHITE : colour)
+    }
+    for (const end of f.ends ?? []) {
+      if (f.dazzle && end.foe) dazzled(ctx, g, end.foe)
+      if (index >= 4) softDisc(ctx, Math.round(end.x), Math.round(end.y), 6, warm, 0.35)
+      ctx.globalAlpha = 1
+      const r = 1 + (Math.floor(g.time * 30) % 2)
+      dot(ctx, end.x - r, end.y - r, r * 2, r * 2, WHITE)
+    }
+  },
+  peal: (ctx, g, f) => {
+    const index = eraIndex(g)
+    if (index >= 2) return
+    const r = S.chime.reach * Math.min(1, (1 - f.life / S.chime.ringTime) * 1.3)
+    circle(ctx, f.x, f.y, r, f.tint ?? COLD, 44)
+    if (index >= 1) circle(ctx, f.x, f.y, r * 0.66, WHITE, 28)
+  },
+  volley: (ctx, g, f) => drawPieces(ctx, g, f, false),
+  hover: (ctx, g, f) => drawPieces(ctx, g, f, true),
   hold: (ctx, g, f) => {
     if (f.life > 0.5 || Math.floor(g.time * 12) % 2) {
       ctx.fillStyle = 'rgba(199, 154, 224, 0.1)'
