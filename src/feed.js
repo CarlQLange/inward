@@ -1,7 +1,7 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
-import { M } from './materials.js'
+import { M, props } from './materials.js'
 import { centre } from './physics.js'
-import { FREE, cooldownOf, handOf, hostile, streamOf } from './skills.js'
+import { FREE, cooldownOf, handOf, holdOf, hostile, streamOf } from './skills.js'
 import { hasRelic } from './relics.js'
 import { castWait } from './keystones.js'
 
@@ -35,6 +35,8 @@ export const TASTES = {
   gas: { name: 'SMOKE AND GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
   acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
   falling: { name: 'FALLING BLOCKS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
+  pouring: { name: 'POURING LIQUID', colours: ['#6fd0e0', '#f4f8f2'], flight: 'drip', cell: (w, i) => props(w.mat[i]).liquid === true && i + ROOM < w.mat.length && (w.mat[i + ROOM] === M.EMPTY || props(w.mat[i + ROOM]).gas === true) },
+  fuel: { name: 'THINGS THAT BURN', colours: ['#c49a54', '#ff9a2e'], flight: 'leaf', cell: (w, i) => props(w.mat[i]).flammability > 0 && !(w.burn[i] > 0) },
 }
 
 const DISTINCT = [M.WATER, M.OIL, M.LAVA, M.ACID, M.STEAM, M.SMOKE, M.METHANE]
@@ -116,7 +118,7 @@ export const DIETS = {
   ember: ['fire'], bolt: ['charge'], frost: ['water', 'ice'], melt: ['lava'], repel: ['scrap'], seed: ['moss', 'vine'], rod: ['metal'], mason: ['rubble'],
   spring: ['steam', 'ice'], gust: ['gas'], acid: ['acid'], hammer: ['smashed', 'falling'], alchemy: ['variety'], swap: ['stun'], roar: ['crowd'], decoy: ['drawn'],
   stop: ['still'], grapple: ['air'], mine: ['blastKill'], well: ['blast'], rewind: ['hit'], mirror: ['returned'], charm: ['allyKill'], dash: ['dashHit'],
-  blink: ['crossed'], drone: ['coin'],
+  blink: ['crossed'], drone: ['coin'], flask: ['pouring'], wick: ['fuel'],
 }
 
 const foodOf = (p, kind) => {
@@ -330,6 +332,21 @@ const HANDS = {
     skill.ready = waiting > 0 ? waiting : whole
   },
   stream: hands => flow(hands, hands.down),
+  hold: ({ g, p, skill, hand, whole, down, pressed, stunned, dt, cast, boost }) => {
+    const hold = holdOf(p, skill.kind)
+    if (!skill.holding || hand.anytime) skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    if (skill.holding) {
+      if (down && !stunned && hold.run(g, p, dt, skill)) return
+      skill.holding = false
+      if (hold.stop(g, p, skill) === FREE) return
+      skill.ready = whole
+      skill.casts = (skill.casts ?? 0) + 1
+      return
+    }
+    if (!pressed || stunned || (!hand.anytime && skill.ready > 0)) return
+    p.power = 0
+    skill.holding = cast(g, p, skill) !== FREE
+  },
   toggle: hands => flow(hands, !hands.pressed),
   swell: ({ g, p, skill, hand, whole, down, pressed, stunned, dt, cast, boost }) => {
     if (skill.swelling) {

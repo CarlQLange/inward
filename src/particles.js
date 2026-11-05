@@ -449,6 +449,20 @@ const STEP = {
     if ((hit & HIT_SIDE) && p.size >= 1 && p.tag !== LIQUID.lava) toWall(p, Math.sign(p.vx) || 1, rand(0.4, 0.9))
     else p.life = 0
   },
+  sip: (g, p, dt) => {
+    const [dx, dy] = [p.nx - p.x, p.ny - p.y]
+    const d = Math.hypot(dx, dy)
+    if (d < 3) {
+      p.life = 0
+      return
+    }
+    const speed = 80 + (1 - p.life / p.max) * 320
+    const turn = Math.min(1, dt * 9)
+    p.vx += ((dx / d) * speed - p.vx) * turn
+    p.vy += ((dy / d) * speed - p.vy) * turn
+    p.x += p.vx * dt
+    p.y += p.vy * dt
+  },
   bubble: (g, p, dt) => {
     p.seed += dt * 7
     p.x += Math.sin(p.seed) * 10 * dt
@@ -777,6 +791,7 @@ const DRAW = {
     }
     if (p.tag === LIQUID.lava) lit(era, p, 2, '#ff9a2e', 0.7)
   },
+  sip: (ctx, p, era) => DRAW.drop(ctx, p, era),
   bubble: (ctx, p, era) => {
     const x = Math.round(p.x)
     const y = Math.round(p.y)

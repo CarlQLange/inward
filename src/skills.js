@@ -3,7 +3,7 @@ import { M, props } from './materials.js'
 import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
-import { chunks } from './feel.js'
+import { chunks, liquidColour, sip } from './feel.js'
 import { shotBox } from './cast.js'
 import { feedEvent } from './feed.js'
 
@@ -126,6 +126,14 @@ export const FORKS = {
     [form('mirror.pane', 'PANE', 'LEAVES A MIRROR STANDING', COLD), form('mirror.maw', 'MAW', 'TAKES IN SHOTS, THEN FIRES THEM BACK', BLOOD)],
     [form('mirror.parry', 'PARRY', 'SHORTER. EACH RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
+  flask: [
+    [form('flask.hose', 'HOSE', 'HOLD TO POUR IT OUT IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'IT LANDS WHOLE. SHOOT IT TO BREAK IT', WHITE)],
+    [form('flask.drip', 'DRIP', 'FOES IT HITS DRIP IT WHERE THEY GO', ACID), form('flask.leech', 'LEECH', 'ALSO SOAKS FOES. IT HURTS THEM', BLOOD)],
+  ],
+  wick: [
+    [form('wick.trail', 'TRAIL', 'THE FUSE FOLLOWS YOUR FEET', CHARGE), form('wick.sleeper', 'SLEEPER', 'STAYS UNLIT UNTIL SHOT OR BURNED', GAS)],
+    [form('wick.tow', 'TOW', 'FOES ON THE FUSE ARE DRAGGED TO THE END', BLOOD), form('wick.kiln', 'KILN', 'THE BURNT FUSE TURNS TO BRICK', STONE)],
+  ],
 }
 
 export const TREES = Object.fromEntries(Object.entries(FORKS).map(([kind, forks]) => [kind, forks.flat()]))
@@ -159,6 +167,8 @@ const HANDS = {
   'dash.drive': { type: 'stream', time: S.dash.driveTime },
   'grapple.sling': { type: 'stream', time: S.grapple.slingTime },
   'frost.glide': { type: 'toggle', time: S.frost.glideTime },
+  flask: { type: 'hold', anytime: true },
+  wick: { type: 'hold' },
 }
 
 export const handOf = (p, kind) => ownedForms(p, kind).map(f => HANDS[f.id]).filter(Boolean).at(-1) ?? HANDS[kind] ?? TAP
@@ -504,9 +514,9 @@ const frost = (g, p) => {
   g.pulse = Math.max(g.pulse, 0.4)
 }
 
-export const thrown = (g, p, aim, lands, { speed, lift = 0, gravity = TUNING.fireball.gravity, size = 4, colour = WHITE, splashes = false }) => {
+export const thrown = (g, p, aim, lands, { speed, lift = 0, gravity = TUNING.fireball.gravity, size = 4, colour = WHITE, splashes = false }, extra = {}) => {
   const from = muzzle(p)
-  addEffect(g, { kind: 'thrown', lands, x: from.x - size / 2, y: from.y - size / 2, w: size, h: size, vx: aim.x * speed, vy: aim.y * speed - lift, gravity, colour, splashes, life: 5 })
+  addEffect(g, { kind: 'thrown', lands, x: from.x - size / 2, y: from.y - size / 2, w: size, h: size, vx: aim.x * speed, vy: aim.y * speed - lift, gravity, colour, splashes, life: 5, ...extra })
 }
 
 export const BREAKS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE, M.BRICK, M.SCRAP, M.VINE])
@@ -1193,7 +1203,7 @@ const melt = (g, p) => {
 const TRANSMUTE = { [M.WATER]: M.OIL, [M.OIL]: M.ACID, [M.ACID]: M.LAVA, [M.LAVA]: M.ROCK }
 const TRANSMUTE_SOLID = { [M.ROCK]: M.SAND, [M.SAND]: M.WATER, [M.ICE]: M.WATER, [M.FLOE]: M.WATER, [M.WOOD]: M.VINE, [M.MOSS]: M.VINE, [M.PEAT]: M.OIL }
 
-const MATTER = {
+export const MATTER = {
   crawler: M.SCRAP, crab: M.SCRAP, bomber: M.SCRAP, turret: M.SCRAP, spitter: M.LAVA, slug: M.OIL, slime: M.ACID, gasbag: M.METHANE, spore: M.METHANE,
   fish: M.WATER, jelly: M.WATER, imp: M.ICE, worm: M.SAND, nest: M.PEAT, mimic: M.WOOD,
 }
@@ -1567,6 +1577,230 @@ export const salvage = (g, e) => {
   burst(g, c.x, c.y, STONE, 8)
 }
 
+export const carried = p => p.flask?.cells ?? 0
+
+const fill = (p, mat, count) => {
+  if (carried(p) > 0 && p.flask.mat !== mat) return 0
+  const taken = Math.min(S.flask.most - carried(p), count)
+  if (taken > 0) p.flask = { mat, cells: carried(p) + taken }
+  return taken
+}
+
+const takeOne = p => {
+  const { mat } = p.flask
+  p.flask = carried(p) > 1 ? { mat, cells: carried(p) - 1 } : null
+  return mat
+}
+
+const inSight = (g, from, x, y) => {
+  let clear = true
+  lineCells(from, { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK }, (cx, cy) => {
+    if ((cx !== x || cy !== y) && props(matAt(g.world, cx, cy)).solid) clear = false
+  })
+  return clear
+}
+
+const nearestLiquid = (g, p, from) => {
+  const span = Math.ceil(S.flask.reach / BLOCK)
+  const [hx, hy] = [cell(from.x), cell(from.y)]
+  const want = carried(p) > 0 ? p.flask.mat : null
+  let best = null
+  for (let dy = -span; dy <= span; dy++) {
+    for (let dx = -span; dx <= span; dx++) {
+      const [x, y] = [hx + dx, hy + dy]
+      const m = matAt(g.world, x, y)
+      if (!props(m).liquid || (want !== null && m !== want)) continue
+      const d = Math.hypot(dx, dy + 0.1) * BLOCK
+      if (d > S.flask.reach || (best && d >= best.d)) continue
+      if (inSight(g, from, x, y)) best = { x, y, m, d }
+    }
+  }
+  return best
+}
+
+const soak = (g, p) => {
+  const from = muzzle(p)
+  const spot = carried(p) < S.flask.most && nearestLiquid(g, p, from)
+  if (!spot) return
+  setCell(g.world, spot.x, spot.y, M.EMPTY)
+  fill(p, spot.m, 1)
+  sip(g, (spot.x + 0.5) * BLOCK, (spot.y + 0.5) * BLOCK, from, liquidColour(spot.m))
+}
+
+const foeLiquid = e => (props(MATTER[e.kind] ?? M.EMPTY).liquid ? MATTER[e.kind] : M.WATER)
+
+const leech = (g, p, dt, skill) => {
+  skill.leeching = (skill.leeching ?? 0) - dt
+  if (skill.leeching > 0) return
+  const from = muzzle(p)
+  const foe = nearestTo(hostile(g).filter(e => !e.prop), from, S.flask.leechReach)
+  if (!foe) return
+  skill.leeching = S.flask.leechEvery
+  const c = centre(foe)
+  hurt(g, foe, S.flask.leechDamage, 'player')
+  foe.stun = Math.max(foe.stun, 0.3)
+  const mat = foeLiquid(foe)
+  const got = fill(p, mat, S.flask.leechCells)
+  zap(g, from, c, BLOOD)
+  for (let n = 0; n < 2 + got * 2; n++) sip(g, c.x + (Math.random() - 0.5) * foe.w, c.y + (Math.random() - 0.5) * foe.h, from, liquidColour(mat))
+}
+
+export const spill = (g, x, y, mat, count) => {
+  const seen = new Set()
+  const queue = [[x, y]]
+  let placed = 0
+  while (queue.length && placed < count && seen.size < count * 6) {
+    const [cx, cy] = queue.shift()
+    const key = cy * ROOM + cx
+    if (seen.has(key) || !inPlay(cx, cy)) continue
+    seen.add(key)
+    const m = matAt(g.world, cx, cy)
+    if (m !== M.EMPTY && m !== mat && !props(m).gas) continue
+    if (m !== mat) {
+      setCell(g.world, cx, cy, mat)
+      placed += 1
+    }
+    ;[[0, 1], [-1, 0], [1, 0], [0, -1]].forEach(([dx, dy]) => queue.push([cx + dx, cy + dy]))
+  }
+  return placed
+}
+
+const flaskSkill = p => p.skills.find(s => s.kind === 'flask')
+
+const flask = (g, p) => {
+  const skill = flaskSkill(p)
+  if (!skill || skill.holding) return FREE
+  skill.pouring = owns(p, 'flask.hose') && carried(p) > 0 && skill.ready <= 0
+  skill.clock = 0
+  skill.poured = 0
+}
+
+const throwFlask = (g, p) => {
+  const { mat, cells } = p.flask
+  p.flask = null
+  thrown(g, p, p.aim, 'splash', { speed: S.flask.throwSpeed, lift: S.flask.throwLift, size: 5, colour: liquidColour(mat), splashes: true },
+    { mat, cells, bottle: owns(p, 'flask.bottle'), drip: owns(p, 'flask.drip') })
+  g.pulse = Math.max(g.pulse, 0.3)
+}
+
+const pourDrop = (g, p) => {
+  const mat = takeOne(p)
+  const spread = (Math.random() - 0.5) * 0.12
+  const aim = { x: p.aim.x + p.aim.y * spread, y: p.aim.y - p.aim.x * spread }
+  thrown(g, p, aim, 'drop', { speed: S.flask.pourSpeed, lift: 10, size: 2, colour: liquidColour(mat), splashes: true }, { mat, cells: 1, drip: owns(p, 'flask.drip') })
+}
+
+const flaskRun = (g, p, dt, skill) => {
+  skill.clock = (skill.clock ?? 0) + dt
+  if (skill.pouring) {
+    for (; skill.clock >= S.flask.pourEvery; skill.clock -= S.flask.pourEvery) {
+      if (carried(p) <= 0) return false
+      pourDrop(g, p)
+      skill.poured += 1
+    }
+    return true
+  }
+  for (; skill.clock >= S.flask.soakEvery; skill.clock -= S.flask.soakEvery) soak(g, p)
+  if (owns(p, 'flask.leech')) leech(g, p, dt, skill)
+  return true
+}
+
+const flaskStop = (g, p, skill) => {
+  if (skill.pouring) {
+    skill.pouring = false
+    return skill.poured > 0 ? undefined : FREE
+  }
+  if (carried(p) <= 0 || skill.ready > 0 || owns(p, 'flask.hose')) return FREE
+  throwFlask(g, p)
+}
+
+export const contentsOf = (p, skill) => (skill.kind === 'flask' && carried(p) > 0
+  ? { colour: liquidColour(p.flask.mat), amount: carried(p) / S.flask.most }
+  : null)
+
+const open = (g, x, y) => inPlay(x, y) && !props(matAt(g.world, x, y)).solid
+
+export const footCell = p => [cell(p.x + p.w / 2), cell(p.y + p.h - 1)]
+
+const footing = (g, p) => {
+  const [x, top] = footCell(p)
+  for (let y = top; y <= top + S.wick.drop; y++) if (open(g, x, y) && !open(g, x, y + 1)) return [x, y]
+  return null
+}
+
+const climb = (g, x, y, dir) => [1, 2].find(h => open(g, x + dir, y - h) && Array.from({ length: h }, (_, k) => open(g, x, y - 1 - k)).every(Boolean))
+
+const groundPath = (g, start, dir, most) => {
+  const path = [start]
+  while (path.length < most) {
+    const [x, y] = path.at(-1)
+    const nx = x + dir
+    if (open(g, nx, y)) {
+      let floor = y
+      while (floor - y < S.wick.drop && open(g, nx, floor + 1)) floor++
+      if (open(g, nx, floor + 1)) break
+      for (let row = y; row <= floor; row++) path.push([nx, row])
+      continue
+    }
+    const rise = climb(g, x, y, dir)
+    if (!rise) break
+    for (let k = 1; k <= rise; k++) path.push([x, y - k])
+    path.push([nx, y - rise])
+  }
+  return path.slice(0, most)
+}
+
+const layingFuse = g => g.effects.find(f => f.kind === 'wick' && f.laying && !f.done)
+
+const wick = (g, p) => {
+  if (layingFuse(g)) return FREE
+  const trail = owns(p, 'wick.trail')
+  const foot = footing(g, p)
+  const dir = p.aim.x < 0 ? -1 : p.aim.x > 0 ? 1 : p.facing
+  const cells = trail ? [foot ?? footCell(p)] : foot ? groundPath(g, foot, dir, S.wick.most + 1).slice(1) : []
+  if (cells.length === 0) return FREE
+  addEffect(g, {
+    kind: 'wick', cells, laid: cells.length > 1 ? 0 : 1, laying: true, lit: false, end: -1, life: 999,
+    burnt: [], fresh: [], sparks: [], towing: [], struck: [],
+    trail, sleeper: owns(p, 'wick.sleeper'), tow: owns(p, 'wick.tow'), kiln: owns(p, 'wick.kiln'),
+  })
+}
+
+export const lightFuse = (f, i) => {
+  if (f.laying || f.burnt[i] || !f.cells[i]) return
+  f.lit = true
+  f.burnt[i] = true
+  f.fresh.push(i)
+  ;[-1, 1].filter(step => f.cells[i + step] && !f.burnt[i + step]).forEach(step => f.sparks.push({ i, step, clock: 0 }))
+}
+
+const retireSleepers = (g, keep) => {
+  const waiting = g.effects.filter(f => f.kind === 'wick' && f.sleeper && !f.lit && !f.done && f !== keep)
+  waiting.slice(0, Math.max(0, waiting.length - S.wick.sleepers + 1)).forEach(f => { f.life = 0; f.done = true })
+}
+
+const settleFuse = g => {
+  const f = layingFuse(g)
+  if (!f) return FREE
+  f.laying = false
+  if (!f.trail) f.cells = f.cells.slice(0, Math.max(S.wick.least, Math.floor(f.laid)))
+  if (f.cells.length < (f.trail ? S.wick.least : 3)) {
+    f.life = 0
+    f.done = true
+    return FREE
+  }
+  f.end = f.trail ? 0 : f.cells.length - 1
+  if (f.sleeper) retireSleepers(g, f)
+  else lightFuse(f, f.trail ? f.cells.length - 1 : 0)
+}
+
+const HOLDS = {
+  flask: { run: flaskRun, stop: flaskStop },
+  wick: { run: g => (layingFuse(g)?.age ?? Infinity) < S.wick.holdMost, stop: settleFuse },
+}
+
+export const holdOf = (p, kind) => HOLDS[kind]
+
 const held = (g, kind) => g.effects.find(f => f.kind === kind && !f.done)
 
 const jetFlow = (g, p, dt, skill) => {
@@ -1655,7 +1889,7 @@ export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id])
 
 export const SKILLS = {
   bolt, repel, ember, frost, hammer, gust, blink, grapple, dash, rewind, mason, seed, spring, acid, melt, alchemy,
-  well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror,
+  well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror, flask, wick,
 }
 
 export const SKILL_NAMES = Object.fromEntries(Object.keys(SKILLS).map(k => [k, k.toUpperCase()]))
@@ -1687,6 +1921,8 @@ export const SKILL_DETAILS = {
   mine: 'EXPLODES WHEN A FOE COMES NEAR.',
   roar: 'STUNS AND SCATTERS.',
   mirror: 'THROWS SHOTS BACK.',
+  flask: 'HOLD TO SOAK UP LIQUID. LET GO TO THROW IT.',
+  wick: 'HOLD TO LAY A FUSE. ITS END EXPLODES.',
 }
 
 export const spillNapalm = (g, x, y) => {

@@ -10,7 +10,7 @@ import { dustPuff, keepColour, spawn, stepParticles } from './particles.js'
 import { stepMarks } from './marks.js'
 import {
   MATERIAL_COLOURS, ashAt, blastDebris, breakAt, burstOf, dropOf, dustOf, emberAt, emitWorld, followBolts, followProjectiles,
-  hitOf, hurtMatter, hushCell, impactAt, killOf, muzzleOf, splashAt, swimBubble, watchWorld, wetAt,
+  fuseOf, hitOf, hurtMatter, hushCell, impactAt, killOf, muzzleOf, sipOf, splashAt, swimBubble, watchWorld, wetAt,
 } from './matter.js'
 
 export { MATERIAL_COLOURS, setPixelSource } from './matter.js'
@@ -72,6 +72,10 @@ export const ash = (g, x, y, colour) => ashAt(g, x, y, colour)
 export const drop = (g, x, y, vx, vy, colour) => dropOf(g, x, y, vx, vy, paint(colour))
 
 export const bubble = (g, x, y) => swimBubble(g, x, y)
+
+export const sip = (g, x, y, to, colour) => sipOf(g, x, y, to.x, to.y, paint(colour))
+
+export const fuseSpark = (g, x, y) => fuseOf(g, x, y)
 
 export const burstSparks = (g, x, y, colour, count, speed = 70) => burstOf(g, x, y, paint(colour), count, speed)
 

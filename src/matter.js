@@ -222,6 +222,18 @@ export const emberAt = (g, x, y, colour = '#ff9a2e', fall = false) => {
   p.tag = fall ? 1 : 0
 }
 
+export const sipOf = (g, x, y, tx, ty, colour) => {
+  const p = spawn(g, 'sip', x, y, rand(-30, 30), rand(-30, 10), 0.7, colour, mix(colour, '#ffffff', 0.5))
+  p.nx = tx
+  p.ny = ty
+}
+
+export const fuseOf = (g, x, y) => {
+  spawn(g, 'spark', x, y, rand(-40, 40), rand(-80, -20), rand(0.1, 0.24), '#ffe84a', '#ffffff')
+  if (rnd() < eraOf(g).count) flameAt(g, x + rand(-1, 1), y, 22)
+  if (rnd() < 0.25) emberAt(g, x, y, rnd() < 0.5 ? '#ffe84a' : '#ff9a2e')
+}
+
 export const ashAt = (g, x, y, colour = '#8c8c84') => spawn(g, 'ash', x, y, rand(-10, 10), rand(-16, -2), rand(1.2, 2.6), colour, colour, rnd() < 0.4 ? 2 : 1)
 
 const fireBurst = (g, x, y, count, speed) => {

@@ -1,12 +1,12 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
+import { burningAt, chargedAt, crushingAt, energize, explode, ignite, lavaAt, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, centre, forEachCell, hitsSolid, moveAxis, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
-import { MATERIAL_COLOURS, drop } from './fx.js'
+import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, splash } from './fx.js'
 import {
-  BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, muzzle, orbitFires, owns,
-  recordPast, releaseMatter, returnedShot, ring, setAblaze, shoutFront, smash, spend, strike, zap,
+  BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
+  orbitFires, owns, recordPast, releaseMatter, returnedShot, ring, setAblaze, shoutFront, smash, spend, spill, strike, zap,
 } from './skills.js'
 
 const S = TUNING.skills
@@ -107,6 +107,20 @@ const stepThrown = (g, f, dt) => {
 }
 
 const LANDS = {
+  splash: (g, f, was, at, foe) => {
+    splash(g, was.x, was.y, 120, f.colour)
+    if (f.bottle) {
+      plantBottle(g, f, was, foe)
+      return
+    }
+    if (foe) hurt(g, foe, S.flask.damage, 'player')
+    if (foe && f.drip) coat(foe, f.mat, f.cells)
+    else spill(g, cell(was.x), cell(was.y), f.mat, f.cells)
+  },
+  drop: (g, f, was, at, foe) => {
+    if (foe && f.drip) coat(foe, f.mat, 1)
+    else spill(g, cell(was.x), cell(was.y), f.mat, 1)
+  },
   floe: (g, f, was, at, foe) => {
     const p = g.player
     const [x, y] = [cell(was.x), cell(was.y)]
@@ -151,6 +165,180 @@ const LANDS = {
     g.effects.push({ age: 0, kind: 'setting', x: was.x, y: was.y, life: S.melt.slagSet, sets: M.LAVA })
     burst(g, at.x, at.y, 'fire', 14)
   },
+}
+
+const coat = (e, mat, cells) => {
+  e.coat = { mat, cells: (e.coat?.mat === mat ? e.coat.cells : 0) + cells, clock: 0 }
+}
+
+const breakBottle = (g, f) => {
+  if (f.done) return
+  end(f)
+  chipsAt(g, f.x, f.y, M.ICE, 5)
+  splash(g, f.x, f.y, 90, MATERIAL_COLOURS[f.mat]?.[0])
+  if (f.rider && f.rider.hp > 0 && f.drip) coat(f.rider, f.mat, f.cells)
+  else spill(g, cell(f.x), cell(f.y), f.mat, f.cells)
+}
+
+const plantBottle = (g, f, at, foe) => {
+  const standing = g.effects.filter(o => o.kind === 'bottle' && !o.done)
+  standing.slice(0, Math.max(0, standing.length - S.flask.bottles + 1)).forEach(o => breakBottle(g, o))
+  const c = foe ? centre(foe) : at
+  g.effects.push({
+    age: 0, kind: 'bottle', x: at.x, y: at.y, mat: f.mat, cells: f.cells, drip: f.drip, colour: f.colour,
+    rider: foe ?? null, offset: { x: at.x - c.x, y: at.y - c.y }, falling: false, vy: 0, life: S.flask.bottleLife,
+  })
+}
+
+const NEAR = [[0, 0], [0, 1], [0, -1], [1, 0], [-1, 0]]
+
+const heated = (w, x, y) => NEAR.some(([dx, dy]) => burningAt(w, x + dx, y + dy) || lavaAt(w, x + dx, y + dy)) || crushingAt(w, x, y)
+
+const stepBottle = (g, f, dt) => {
+  if (f.rider) {
+    if (f.rider.hp <= 0) {
+      f.rider = null
+      f.falling = true
+    } else Object.assign(f, { x: centre(f.rider).x + f.offset.x, y: centre(f.rider).y + f.offset.y })
+  } else if (f.falling) {
+    f.vy = Math.min(220, f.vy + TUNING.fireball.gravity * dt)
+    if (props(matAt(g.world, cell(f.x), cell(f.y + f.vy * dt + 3))).solid) f.falling = false
+    else f.y += f.vy * dt
+  }
+  const box = { x: f.x - 3, y: f.y - 3, w: 6, h: 6 }
+  const shot = g.shots.find(s => overlap(s, box))
+  if (shot) shot.life = 0
+  const struck = shot || g.fireballs.some(b => overlap(b, box)) || g.flung.some(b => overlap(b, box))
+  if (struck || heated(g.world, cell(f.x), cell(f.y))) breakBottle(g, f)
+}
+
+const breakBottlesNear = (g, x, y, reach) => g.effects
+  .filter(o => o.kind === 'bottle' && !o.done && Math.hypot(o.x - x, o.y - y) < reach)
+  .forEach(o => breakBottle(g, o))
+
+const fuseBox = ([x, y], margin = 0) => ({ x: x * BLOCK - margin, y: y * BLOCK - margin, w: BLOCK + margin * 2, h: BLOCK + margin * 2 })
+
+const snuffs = (g, [x, y]) => {
+  const p = props(matAt(g.world, x, y))
+  return !p.flammability && !p.hot && (p.liquid || p.solid)
+}
+
+const bake = (g, [x, y]) => {
+  const m = matAt(g.world, x, y)
+  if (m !== M.EMPTY && !props(m).gas) return
+  const box = fuseBox([x, y])
+  if (overlap(g.player, box) || g.enemies.some(e => overlap(e, box))) return
+  setCell(g.world, x, y, M.BRICK)
+  chipsAt(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, M.BRICK, 2)
+}
+
+const letGoTowed = f => {
+  f.towing.forEach(e => { e.stun = Math.max(e.stun, 0.4) })
+  f.towing = []
+}
+
+const fuseBang = (g, f, x, y) => {
+  const c = { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK }
+  hostile(g).filter(e => Math.hypot(centre(e).x - c.x, centre(e).y - c.y) < S.wick.radius).forEach(e => hurt(g, e, S.wick.damage, 'world', 'CRUSHED'))
+  blast(g, c.x, c.y, S.wick.bang)
+  letGoTowed(f)
+  f.banged = true
+}
+
+const burnFuseCell = (g, f, i) => {
+  const [x, y] = f.cells[i]
+  NEAR.forEach(([dx, dy]) => ignite(g.world, x + dx, y + dy))
+  const at = { x: (x + 0.5) * BLOCK, y: (y + 1) * BLOCK - 2 }
+  fuseSpark(g, at.x, at.y)
+  breakBottlesNear(g, at.x, at.y, BLOCK * 1.5)
+  hostile(g).filter(e => !f.struck.includes(e) && overlap(e, fuseBox([x, y]))).forEach(e => {
+    f.struck.push(e)
+    hurt(g, e, S.wick.sparkDamage, 'player', 'FIRE')
+  })
+  if (i === f.end) fuseBang(g, f, x, y)
+}
+
+const catchFire = (g, f) => {
+  const w = g.world
+  for (let i = 0; i < f.cells.length; i++) {
+    const [x, y] = f.cells[i]
+    const box = fuseBox([x, y])
+    const shot = g.shots.find(s => overlap(s, box))
+    if (shot) shot.life = 0
+    if (shot || heated(w, x, y) || chargedAt(w, x, y + 1) || g.fireballs.some(b => overlap(b, box))) {
+      lightFuse(f, i)
+      return
+    }
+  }
+}
+
+const towAlong = (g, f, s, dt) => {
+  if (Math.sign(f.end - s.i) !== s.step) return
+  const cellAt = f.cells[s.i]
+  const reach = fuseBox(cellAt, 2)
+  hostile(g).filter(e => !e.heavy && !e.prop && !f.towing.includes(e) && overlap(e, reach)).slice(0, S.wick.towMost - f.towing.length).forEach(e => f.towing.push(e))
+  f.towing = f.towing.filter(e => e.hp > 0)
+  const to = { x: (cellAt[0] + 0.5) * BLOCK, y: (cellAt[1] + 1) * BLOCK }
+  const most = S.wick.burnRate * BLOCK * 2 * dt
+  f.towing.forEach(e => {
+    const clamp = v => Math.max(-most, Math.min(most, v))
+    moveAxis(g.world, e, 'y', clamp(to.y - (e.y + e.h)))
+    moveAxis(g.world, e, 'x', clamp(to.x - centre(e).x))
+    Object.assign(e, { vx: 0, vy: 0, stun: Math.max(e.stun, 0.25), shoved: Math.max(e.shoved ?? 0, 0.1) })
+  })
+}
+
+const growTrail = (g, f) => {
+  const [x, y] = footCell(g.player)
+  let [lx, ly] = f.cells.at(-1)
+  while ((lx !== x || ly !== y) && f.cells.length < S.wick.trailMost) {
+    lx += Math.sign(x - lx)
+    ly += Math.sign(y - ly)
+    f.cells.push([lx, ly])
+  }
+}
+
+const advanceSpark = (g, f, s) => {
+  const next = s.i + s.step
+  if (!f.cells[next] || f.burnt[next]) {
+    s.out = true
+    return
+  }
+  if (f.kiln) bake(g, f.cells[s.i])
+  s.i = next
+  f.burnt[next] = true
+  if (snuffs(g, f.cells[next])) {
+    s.out = true
+    const [x, y] = f.cells[next]
+    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, '#9fb0a8', 4)
+    return
+  }
+  burnFuseCell(g, f, next)
+}
+
+const stepWick = (g, f, dt) => {
+  const W = S.wick
+  if (f.laying) {
+    if (f.trail) growTrail(g, f)
+    else f.laid = Math.min(f.cells.length, f.laid + W.layRate * dt)
+    return
+  }
+  if (!f.lit) catchFire(g, f)
+  if (!f.lit) return
+  f.fresh.splice(0).forEach(i => burnFuseCell(g, f, i))
+  for (const s of f.sparks) {
+    s.clock += dt * W.burnRate
+    while (s.clock >= 1 && !s.out) {
+      s.clock -= 1
+      advanceSpark(g, f, s)
+    }
+    if (f.tow && !s.out) towAlong(g, f, s, dt)
+  }
+  f.sparks = f.sparks.filter(s => !s.out)
+  if (f.sparks.length > 0) return
+  if (f.kiln) f.cells.filter((c, i) => f.burnt[i] && i !== f.end).forEach(c => bake(g, c))
+  letGoTowed(f)
+  end(f)
 }
 
 const stepFuse = (g, f) => {
@@ -1038,11 +1226,11 @@ const STEP = {
   globe: stepGlobe, nail: stepNail, thrown: stepThrown, fuse: stepFuse, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
   twister: stepTwister, lure: stepLure, pane: stepPane, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
   bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
-  seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope,
+  seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle,
 }
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
-  geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall,
+  geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle,
 }
 
 const stepAblaze = (g, e, dt) => {
@@ -1068,9 +1256,23 @@ const stepAlly = (g, e) => {
   if (e.plague) hostile(g).filter(o => !o.heavy && overlap(o, e)).forEach(o => charmOne(g, o, g.player))
 }
 
+const stepCoat = (g, e, dt) => {
+  const c = e.coat
+  c.clock -= dt
+  if (c.clock > 0) return
+  c.clock = S.flask.dripEvery
+  const [x, y] = [cell(centre(e).x), cell(e.y + e.h - 1)]
+  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1]].find(([dx, dy]) => matAt(g.world, x + dx, y + dy) === M.EMPTY)
+  if (spot) setCell(g.world, x + spot[0], y + spot[1], c.mat)
+  drop(g, centre(e).x + (Math.random() - 0.5) * e.w, e.y + e.h - 2, (Math.random() - 0.5) * 30, 10, MATERIAL_COLOURS[c.mat]?.[0] ?? '#6fd0e0')
+  c.cells -= 1
+  if (c.cells <= 0) e.coat = null
+}
+
 const stepCreatures = (g, dt) => {
   if (g.evolving) g.evolving.life -= dt
   for (const e of g.enemies) {
+    if (e.coat) stepCoat(g, e, dt)
     if (e.ablaze > 0) stepAblaze(g, e, dt)
     if (e.ally > 0) stepAlly(g, e)
     if (e.goat > 0) e.goat -= dt
