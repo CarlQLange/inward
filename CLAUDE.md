@@ -112,6 +112,7 @@ effects must spread across blocks visibly and be readable without text.
   holds what this means.
 - After playing the release pass he called the look and feel great and asked for more skills and more emergence,
   with slightly slower play to balance having more things happen at once. He left how to the game director.
+  He then asked for an elegance pass that takes things out, again left to the director's judgement.
 - On-screen text says literally what happens, in plain flat words: name the concrete thing and state the cost
   directly. No riddles, mood lines or objects with agency. Use the same word for the same thing everywhere.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
