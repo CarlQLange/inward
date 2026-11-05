@@ -8,6 +8,7 @@ import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
 import { FORKS, cooldownOf, formOf } from './skills.js'
 import { tintedIcon } from './skillart.js'
+import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
 import { LAYOUT, isTall, isTouchLayout } from './layout.js'
 import { pauseButton, stickRest, touchButtons, touchView } from './touch.js'
 
@@ -19,6 +20,7 @@ const YELLOW = '#ffe84a'
 const RED = `rgb(${SCARF_RED.join(',')})`
 const RED_DIM = '#4a1420'
 const INK = '#04100c'
+const HIT = '#ff5a4a'
 
 const SLOT = 32
 const SLOT_X = 34
@@ -105,6 +107,8 @@ const drawLeft = (ctx, g) => {
   const below = ORIGIN.y + TUNING.player.skillSlots * SLOT_GAP + 4
   drawHearts(ctx, g, below)
   drawCounts(ctx, g, below + 10)
+  drawHitNote(ctx, g, 50, below + 34)
+  drawChainCount(ctx, g, 18, below + 50)
 }
 
 const numberRight = (ctx, value, right, y, colour, scale = 1) => {
@@ -157,6 +161,21 @@ const drawRight = (ctx, g) => {
   drawSeals(ctx, g, x, y)
   y += 13
   drawRelicRow(ctx, g, x, y)
+}
+
+const drawChainCount = (ctx, g, x, y) => {
+  if (g.chain < 2) return
+  const scale = g.chainPunch > 0.4 ? 3 : 2
+  const fresh = g.chainPunch > 0.55
+  drawText(ctx, `X${g.chain}`, x, y, fresh ? WHITE : YELLOW, scale)
+  const width = textWidth(`X${g.chain}`) * 2
+  ctx.fillStyle = YELLOW
+  ctx.fillRect(x, y + 5 * scale + 2, Math.min(width, Math.round((width * g.chainTime) / TUNING.run.chainWindow)), 1)
+}
+
+const drawHitNote = (ctx, g, x, y) => {
+  if (!g.hitNote) return
+  drawPictogram(ctx, CAUSE_ICONS[g.hitNote.cause] ?? CAUSE_ICONS.DEFAULT, x, y, HIT, 2)
 }
 
 const disc = (ctx, cx, cy, r) => {
@@ -288,6 +307,8 @@ const drawTallHud = (ctx, g) => {
   for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 52 + i * 11, below, 9, 9)
   if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 52, below + 12, 10, 10)
   drawText(ctx, g.level, inset.left + 68, below + 14, GREEN)
+  drawChainCount(ctx, g, inset.left + 90, below + 2)
+  drawHitNote(ctx, g, VIEW.w - inset.right - 16, below + 12)
 }
 
 const drawWideHud = (ctx, g) => {
@@ -312,6 +333,8 @@ const drawWideHud = (ctx, g) => {
   for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 18 + i * 11, top + 44, 9, 9)
   if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 54, top + 44, 10, 10)
   drawRelicRow(ctx, g, inset.left + 6, top + 58)
+  drawChainCount(ctx, g, inset.left + 6, top + 82)
+  drawHitNote(ctx, g, inset.left + 74, top + 88)
   const pitch = 4
   const span = 15 * pitch + 3
   const right = VIEW.w - inset.right - 4 - span

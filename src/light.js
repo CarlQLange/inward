@@ -87,6 +87,8 @@ const worldLights = (g, time) => {
   }
 }
 
+const FOE_GLOW = [1, 0.5, 0.45]
+
 const omenOf = g => String(g.omen?.id ?? g.omen ?? '').toLowerCase()
 
 export const ambientOf = g => {
@@ -101,14 +103,15 @@ const actorLights = (g, dark) => {
     const h = heroOf(p)
     const tip = h.tip
     const dir = { x: Math.cos(h.angle), y: Math.sin(h.angle) }
-    splat(p.x + 3, p.y + p.h / 2, dark ? 46 : 34, LAMP, dark ? 0.8 : 0.4)
-    cone(tip.x, tip.y, dir, dark ? 120 : 76, 0.82, LAMP, dark ? 1.3 : 0.65)
+    splat(p.x + 3, p.y + p.h / 2, dark ? 46 : 26, LAMP, dark ? 0.8 : 0.22)
+    cone(tip.x, tip.y, dir, dark ? 120 : 60, 0.82, LAMP, dark ? 1.3 : 0.25)
     if (h.flash > 0) splat(tip.x, tip.y, 30, LAMP, 1.1)
   }
   for (const s of g.shots) splat(s.x, s.y, 12, SHOT, 0.5)
   for (const f of g.fireballs) splat(f.x + 2, f.y + 2, 18, f.pellet ? SHOT : f.acid ? ACID : HOT_SHOT, 0.65)
   for (const b of g.bolts) for (const point of b.points) splat(point.x, point.y, 14, CHARGE, 0.4)
   for (const e of g.enemies) {
+    if (dark && !e.friendly && !e.prop) splat(e.x + e.w / 2, e.y + e.h / 2, 18 + e.w / 2, FOE_GLOW, 0.5)
     if (e.light) splat(e.x + e.w / 2, e.y + e.h / 2, e.light.radius ?? 24, e.light.colour ?? FIRE, e.light.power ?? 0.6)
     else if (e.kind === 'emberbat' || e.elite === 'burning') splat(e.x + e.w / 2, e.y + e.h / 2, 22, FIRE, 0.5)
     else if (e.elite === 'charged') splat(e.x + e.w / 2, e.y + e.h / 2, 18, CHARGE, 0.35)

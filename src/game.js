@@ -208,6 +208,23 @@ const ghostPickup = (g, key, spot) => {
   return [{ kind: 'skull', coins: g.ghost.coins, x: spot.x, y: spot.y, w: 7, h: 7, vx: 0, vy: 0 }]
 }
 
+const crowding = e => (e.friendly || e.prop || e.warden || e.partOf ? 0 : e.kind === 'gnat' ? 0.2 : 1)
+
+const thinFoes = (g, ring, foes) => {
+  const limit = R.foeLimit[ring] * (g.omen === 'swarm' ? 1.6 : 1)
+  const kept = []
+  const protectedKinds = new Set((g.secrets ?? []).map(key => key.split(':')[1]))
+  let load = foes.filter(e => protectedKinds.has(e.kind)).reduce((n, e) => n + crowding(e), 0)
+  for (const e of shuffled(foes)) {
+    if (protectedKinds.has(e.kind) || crowding(e) === 0) kept.push(e)
+    else if (load + crowding(e) <= limit) {
+      load += crowding(e)
+      kept.push(e)
+    }
+  }
+  return kept
+}
+
 const buildRoom = (g, x, y) => {
   const key = keyOf(x, y)
   const ring = ringOf(x, y)
@@ -242,7 +259,7 @@ const buildRoom = (g, x, y) => {
     doors: definition.doors,
     world,
     arena: definition.arena,
-    enemies: definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean).map(makeElite(ring)).map(dressEnemy(g, ring)),
+    enemies: thinFoes(g, ring, definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean)).map(makeElite(ring)).map(dressEnemy(g, ring)),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare(g)),
     pickups: ghostPickup(g, key, definition.spare ?? { x: g.starter.spawn.x + 16, y: (g.starter.spawn.row - 1) * BLOCK }),
@@ -812,7 +829,10 @@ const onKill = (g, e) => {
   const earned = hasRelic(p, 'gem') ? (environmental ? killXp(g, true) * 2 : 0) : killXp(g, environmental)
   gainXp(g, earned)
   xpMotes(g, c, earned)
-  addPopup(g, c.x, c.y - 6, g.chain > 1 ? `${points} X${g.chain}` : String(points), environmental ? 'charge' : 'white')
+  if (environmental) {
+    g.popups.push({ x: c.x - 8, y: c.y - 6, icon: e.lastCause, colour: 'charge', life: 1.1 })
+    addPopup(g, c.x + 4, c.y - 8, points, 'charge')
+  } else if (g.chain >= R.popupChain) addPopup(g, c.x, c.y - 8, points, 'white')
   dropLoot(g, e, environmental ? 2 : 1)
 }
 
@@ -1746,6 +1766,10 @@ const stepEffects = (g, dt) => {
   g.pulse = Math.max(0, g.pulse - dt * 2.5)
   g.hurtFlash = Math.max(0, g.hurtFlash - dt * 3.5)
   g.shownDepth += (g.depth - g.shownDepth) * Math.min(1, dt * 1.6)
+  if (g.hitNote) {
+    g.hitNote.life -= dt
+    if (g.hitNote.life <= 0) g.hitNote = null
+  }
   if (g.toast) {
     g.toast.life -= dt
     if (g.toast.life <= 0) g.toast = null

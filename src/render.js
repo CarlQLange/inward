@@ -51,7 +51,7 @@ const drawShot = (ctx, s) => {
 const fireballColour = (f, time) => {
   if (f.acid) return ['#8ae04a', '#d8ff80']
   if (f.bomb) return [COLOURS.pale, Math.floor(time * 14) % 2 ? COLOURS.hurt : '#ffffff']
-  if (f.pellet) return [COLOURS.magnet, '#ffffff']
+  if (f.pellet) return f.friendly ? [COLOURS.magnet, '#ffffff'] : [COLOURS.hurt, Math.floor(time * 14) % 2 ? '#ffffff' : COLOURS.hurt]
   return Math.floor(time * 14) % 2 ? [COLOURS.fire, '#ffffff'] : [COLOURS.charge, COLOURS.fire]
 }
 
@@ -83,7 +83,7 @@ const drawIcon = (ctx, name, x, y, size) => {
 
 const drawPopups = (ctx, g) => {
   for (const p of g.popups) {
-    if (p.icon) drawPictogram(ctx, CAUSE_ICONS[p.icon] ?? CAUSE_ICONS.DEFAULT, p.x, p.y, COLOURS[p.colour])
+    if (p.icon) drawPictogram(ctx, CAUSE_ICONS[p.icon] ?? CAUSE_ICONS.DEFAULT, p.x, p.y, COLOURS[p.colour], p.scale ?? 1)
     else drawText(ctx, p.text, p.x - textWidth(String(p.text)) / 2, p.y, COLOURS[p.colour])
   }
 }
@@ -128,25 +128,6 @@ const drawReticle = (ctx, pointer) => {
 }
 
 const DOOR_VECTORS = { right: [-1, 0], left: [1, 0], up: [0, 1], down: [0, -1] }
-
-const drawChain = (ctx, g) => {
-  if (g.chain < 2) return
-  const scale = Math.min(5, 2 + Math.floor(g.chain / 4)) + (g.chainPunch > 0.4 ? 1 : 0)
-  const text = `${g.chain}`
-  const width = (textWidth(text) + 4) * scale
-  const x = ROOM_PX - width - 8
-  const y = 10
-  const fresh = g.chainPunch > 0.55
-  ctx.globalAlpha = fresh ? 1 : 0.82
-  drawText(ctx, 'X', x + 1, y + 1, '#04100c', scale)
-  drawText(ctx, text, x + 4 * scale + 1, y + 1, '#04100c', scale)
-  drawText(ctx, 'X', x, y, fresh ? '#ffffff' : COLOURS.charge, scale)
-  drawText(ctx, text, x + 4 * scale, y, fresh ? '#ffffff' : COLOURS.charge, scale)
-  ctx.globalAlpha = 1
-  const left = g.chainTime / TUNING.run.chainWindow
-  ctx.fillStyle = COLOURS.charge
-  ctx.fillRect(x, y + 5 * scale + 2, Math.min(width, Math.round(width * left)), 1)
-}
 
 const drawSubmerged = (ctx, g, p) => {
   for (let y = Math.floor((p.y - 2) / BLOCK); y <= Math.floor((p.y + p.h) / BLOCK); y++) {
@@ -212,10 +193,9 @@ const drawRoom = (ctx, g, pointer) => {
     ctx.translate(Math.round(-ux * (1 - slide.t) * ROOM_PX), Math.round(-uy * (1 - slide.t) * ROOM_PX))
   }
   drawScene(ctx, g, { ...room, theme: g.phase === 'title' ? 0 : room.theme, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
-  drawChain(ctx, g)
-  drawHeroLayer(ctx, g)
   drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
+  drawHeroLayer(ctx, g)
   drawPopups(ctx, g)
   drawBossBar(ctx, g)
   if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)

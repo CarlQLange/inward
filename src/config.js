@@ -122,6 +122,8 @@ export const TUNING = {
     collapseEvery: 4,
     arenaLimit: 45,
     boxedInLimit: 3,
+    foeLimit: [4, 4, 5, 5, 6, 6, 7, 8],
+    popupChain: 3,
     ledgeSeat: 34,
     altarPrice: 2,
     shockShot: 12,

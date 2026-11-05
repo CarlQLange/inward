@@ -15,15 +15,15 @@ export const CAUSE_ICONS = ICONS
 
 const INK = '#081012'
 
-export const drawPictogram = (ctx, rows, x, y, colour) => {
-  const left = Math.round(x) - 3
-  const top = Math.round(y) - 3
+export const drawPictogram = (ctx, rows, x, y, colour, scale = 1) => {
+  const left = Math.round(x) - 3 * scale
+  const top = Math.round(y) - 3 * scale
   ctx.fillStyle = INK
   rows.forEach((row, j) => [...row].forEach((c, i) => {
-    if (c === '#') ctx.fillRect(left + i - 1, top + j - 1, 3, 3)
+    if (c === '#') ctx.fillRect(left + (i - 1) * scale, top + (j - 1) * scale, 3 * scale, 3 * scale)
   }))
   ctx.fillStyle = colour
   rows.forEach((row, j) => [...row].forEach((c, i) => {
-    if (c === '#') ctx.fillRect(left + i, top + j, 1, 1)
+    if (c === '#') ctx.fillRect(left + i * scale, top + j * scale, scale, scale)
   }))
 }

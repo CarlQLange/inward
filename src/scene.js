@@ -74,12 +74,20 @@ const blank = (w, h) => {
   return canvas
 }
 
+const mixHex = (a, b, t) => {
+  const channel = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+  const [x, y] = [channel(a), channel(b)]
+  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`
+}
+
+const BACKDROP_QUIET = 0.45
+
 const makeBackdrop = ({ bg, speck, pattern }) => {
   const canvas = blank(ROOM_PX, ROOM_PX)
   const ctx = canvas.getContext('2d')
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
-  ctx.fillStyle = speck
+  ctx.fillStyle = mixHex(bg, speck, BACKDROP_QUIET)
   for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) PATTERNS[pattern](ctx, x, y)
   return canvas
 }
@@ -104,6 +112,29 @@ const tintTile = (theme, tile) => {
 }
 
 const TINTED_TILES = new Set(['bedrock', 'brick'])
+
+const MUTING = { rock: [0.5, 0.68], bedrock: [0.5, 0.6] }
+const LIGHT_MUTING = [0.15, 0.88]
+const LOUD = new Set(['volatile', 'gate'])
+const mutedTiles = new Map()
+
+const muted = (tile, name) => {
+  if (LOUD.has(name)) return tile
+  if (mutedTiles.has(tile)) return mutedTiles.get(tile)
+  const [grey, dim] = MUTING[name] ?? LIGHT_MUTING
+  const canvas = blank(tile.width, tile.height)
+  const c = canvas.getContext('2d', { willReadFrequently: true })
+  c.drawImage(tile, 0, 0)
+  const image = c.getImageData(0, 0, tile.width, tile.height)
+  const { data } = image
+  for (let i = 0; i < data.length; i += 4) {
+    const luma = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11
+    for (let k = 0; k < 3; k++) data[i + k] = (data[i + k] + (luma - data[i + k]) * grey) * dim
+  }
+  c.putImageData(image, 0, 0)
+  mutedTiles.set(tile, canvas)
+  return canvas
+}
 
 const tileFor = (name, x, y, theme) => {
   const h = hash(x, y)
@@ -138,13 +169,17 @@ const scorchMark = SCORCH_RADII.map(radius => {
   return canvas
 })
 
+const SCORCH_ALPHA = 0.3
+
 const paintScorch = (ctx, world) => {
+  ctx.globalAlpha = SCORCH_ALPHA
   ctx.globalCompositeOperation = 'source-atop'
   for (const { x, y, size } of world.scorches ?? []) {
     const mark = scorchMark[size] ?? scorchMark[0]
     ctx.drawImage(mark, x - Math.floor(mark.width / 2), y - Math.floor(mark.height / 2))
   }
   ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
 }
 
 const paintSolids = (ctx, world, depth, skin, theme) => {
@@ -157,7 +192,7 @@ const paintSolids = (ctx, world, depth, skin, theme) => {
       const name = TILE[m]
       if (!name) continue
       const tile = tileFor(name, x, y, theme)
-      ctx.drawImage(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, x * BLOCK, y * BLOCK)
+      ctx.drawImage(muted(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, name), x * BLOCK, y * BLOCK)
       if (isBuried(world, x, y)) {
         ctx.fillStyle = 'rgba(5, 12, 10, 0.72)'
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
@@ -182,7 +217,7 @@ const drawSolids = (ctx, world, depth, skin, theme) => {
 }
 
 const LIQUID = {
-  [M.WATER]: { body: 'rgba(14, 70, 88, 0.8)', deep: 'rgba(8, 40, 60, 0.45)', top: '#7fdce6', crest: '#d8f8ff' },
+  [M.WATER]: { body: 'rgba(14, 70, 88, 0.55)', deep: 'rgba(8, 40, 60, 0.25)', top: '#7fdce6', crest: '#d8f8ff' },
   [M.OIL]: { body: 'rgba(40, 22, 48, 0.94)', deep: 'rgba(14, 6, 20, 0.5)', top: '#a06ab0', crest: '#e6b8f0' },
   [M.LAVA]: { body: '#d9481c', deep: '#a82a10', top: '#ffd24a', crest: '#fff6c0' },
   [M.ACID]: { body: 'rgba(84, 186, 36, 0.88)', deep: 'rgba(40, 120, 20, 0.5)', top: '#c8ff5a', crest: '#f0ffc0' },

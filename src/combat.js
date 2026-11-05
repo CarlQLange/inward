@@ -25,6 +25,7 @@ const hurtPlayer = (g, p, cause) => {
   }
   p.iframes = TUNING.player.iframes
   p.lastCause = cause
+  g.hitNote = { cause, life: 1.6 }
   g.hurtFlash = 1
   rumble(p.hp <= 0 ? 1 : 0.7, p.hp <= 0 ? 400 : 180)
   g.hitstop = Math.max(g.hitstop, TUNING.feel.hurtStop)
@@ -71,6 +72,7 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   e.iframes = TUNING.enemyIframes
   e.flash = TUNING.feel.enemyFlash
   e.lastSource = source
+  e.lastCause = cause
   if (source === 'player') g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
   hitFx(g, e)
 }
