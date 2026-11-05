@@ -522,14 +522,21 @@ const drawCard = (ctx, card, x, y, w, h, on, time) => {
   }
 }
 
+const cardNeeds = (card, w) => {
+  const chars = Math.floor((w - 6) / 4)
+  const lines = text => (text ? wrapText(text, chars).length : 0)
+  const footer = card.prompt ? PROMPT_HEIGHT + 4 : Math.max(lines(card.sub), lines(card.cost)) * 6 + 5
+  return (card.cost ? 44 : 30) + lines(card.name) * 7 + 2 + lines(card.text) * 6 + footer
+}
+
 const drawCards = (ctx, g, menu, cards) => {
   shade(ctx, 0.62 * clamp01((menu.age ?? 1) * 6))
   const gap = 6
   const w = Math.min(68, Math.floor((ROOM_PX - 12 - gap * (cards.length - 1)) / cards.length))
   const total = cards.length * w + (cards.length - 1) * gap
   const left = midX() - total / 2
-  const top = ORIGIN.y + (menu.tall ? 52 : 72)
-  const height = menu.tall ? 110 : 72
+  const height = Math.max(menu.tall ? 110 : 72, ...cards.map(card => cardNeeds(card, w)))
+  const top = ORIGIN.y + Math.min(menu.tall ? 52 : 72, ROOM_PX - 22 - height)
   if (menu.title) centred(ctx, menu.title, ORIGIN.y + 42, YELLOW, menu.title.length > 18 ? 1 : 2)
   cards.forEach((card, i) => {
     const arrive = overshoot(((menu.age ?? 1) - i * 0.06) * 4)
