@@ -55,7 +55,7 @@ export const TUNING = {
     mudSlump: 0.25,
     mudDrag: 0.45,
     shatterDrop: 2,
-    sour: 0.25,
+    sour: 0.15,
     throwMost: 6,
     throwChance: 0.7,
   },
