@@ -5,7 +5,7 @@ import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { eraIndex } from './particles.js'
 import { PULLS } from './float.js'
-import { endOf, tiesOf } from './link.js'
+import { endOf, knotOf, tiesOf } from './link.js'
 
 const S = TUNING.skills
 
@@ -115,9 +115,15 @@ const drawTies = (ctx, g, f) => {
     const heat = f.live.get(b)
     const taut = f.rope && Math.hypot(pb.x - pa.x, pb.y - pa.y) >= (f.lengths?.get(b) ?? Infinity) * 0.97
     if (heat) dotted(ctx, pa, pb, Math.floor(g.time * 24) % 2 ? (heat.school === 'CHARGE' ? CHARGE : FIRE) : WHITE, 1)
-    else dotted(ctx, pa, pb, colour, taut ? 1 : era >= 2 ? 2 : 3, era >= 2 ? g.time * 16 : 0)
+    else {
+      dotted(ctx, pa, pb, colour, f.rope && !taut ? 2 : 1)
+      if (era >= 2) dotted(ctx, pa, pb, WHITE, 7, g.time * 14)
+    }
   }
-  for (const e of f.members) dot(ctx, e.x + e.w / 2 - 1, e.y - KNOT - 1, KNOT, KNOT, colour)
+  for (const e of f.members) {
+    const knot = knotOf(e)
+    dot(ctx, knot.x - 1, knot.y - 1, KNOT, KNOT, colour)
+  }
   if (f.hub && f.hub !== 'hero') {
     const [x, y] = [f.hub.x * BLOCK, f.hub.y * BLOCK]
     ctx.strokeStyle = colour
@@ -125,8 +131,8 @@ const drawTies = (ctx, g, f) => {
     ctx.strokeRect(x - 0.5, y - 0.5, BLOCK + 1, BLOCK + 1)
   }
   if (f.hub === 'hero') {
-    const p = g.player
-    dot(ctx, p.x + p.w / 2 - 1, (p.upside ? p.y + p.h + 1 : p.y - KNOT - 1), KNOT, KNOT, colour)
+    const knot = knotOf(g.player)
+    dot(ctx, knot.x - 1, knot.y - 1, KNOT, KNOT, colour)
   }
   for (const pulse of f.pulses) {
     const [pa, pb] = [endOf(g, f, pulse.from), endOf(g, f, pulse.to)]

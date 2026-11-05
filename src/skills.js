@@ -1570,6 +1570,21 @@ export const returnedShot = (g, p, b) => {
   if (owns(p, 'mirror.seek')) addEffect(g, { kind: 'seeker', shot: b, life: S.mirror.seekLife })
 }
 
+const solidShare = (g, at, r) => {
+  let solid = 0
+  let all = 0
+  forEachCell((x, y, point) => {
+    if (distance(point, at) >= r) return
+    all += 1
+    if (props(matAt(g.world, x, y)).solid) solid += 1
+  })
+  return solid / Math.max(1, all)
+}
+
+const settleBubble = (g, at, r) => [1, 2, 3, 4]
+  .map(k => ({ x: at.x, y: at.y - k * BLOCK }))
+  .reduce((best, spot) => (solidShare(g, spot, r) < best.share - 0.04 ? { ...spot, share: solidShare(g, spot, r) } : best), { ...at, share: solidShare(g, at, r) })
+
 const floatBubble = (g, p) => {
   const set = g.effects.find(f => f.kind === 'float' && f.snare && !f.done)
   if (set) {
@@ -1578,7 +1593,9 @@ const floatBubble = (g, p) => {
   }
   const carry = owns(p, 'float.carry')
   const snare = owns(p, 'float.snare')
-  const at = carry ? centre(p) : ray(g, muzzle(p), p.aim, S.float.reach).last
+  const hit = ray(g, muzzle(p), p.aim, S.float.reach)
+  const back = hit.solid ? S.float.radius * S.float.backOff : 0
+  const at = carry ? centre(p) : settleBubble(g, { x: hit.last.x - p.aim.x * back, y: hit.last.y - p.aim.y * back }, S.float.radius)
   addEffect(g, {
     kind: 'float', x: at.x, y: at.y, r: carry ? S.float.carryRadius : S.float.radius,
     life: snare ? S.float.snareLife : carry ? 1 : S.float.life,

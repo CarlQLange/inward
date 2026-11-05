@@ -32,13 +32,15 @@ export const chainFrom = (g, first) => {
 
 export const gatherAround = (g, point, reach) => nearestTo(g.enemies.filter(linkable), point, reach).slice(0, S.most)
 
-const hubPoint = (g, f) => (f.hub === 'hero' ? centre(g.player) : f.hub ? { x: (f.hub.x + 0.5) * BLOCK, y: (f.hub.y + 0.5) * BLOCK } : null)
+export const knotOf = e => ({ x: e.x + e.w / 2, y: e.upside ? e.y + e.h + 2 : e.y - 2 })
+
+const hubPoint = (g, f) => (f.hub === 'hero' ? knotOf(g.player) : f.hub ? { x: (f.hub.x + 0.5) * BLOCK, y: (f.hub.y + 0.5) * BLOCK } : null)
 
 export const tiesOf = f => f.members
   .map((e, i) => (f.hub ? [f.hub, e] : i ? [f.members[i - 1], e] : null))
   .filter(Boolean)
 
-export const endOf = (g, f, end) => (end === f.hub ? hubPoint(g, f) : centre(end))
+export const endOf = (g, f, end) => (end === f.hub ? hubPoint(g, f) : knotOf(end))
 
 export const linkOf = (g, e) => g.effects.find(f => f.kind === 'link' && !f.done && (f.members.includes(e) || (f.hub === 'hero' && e === g.player)))
 
@@ -231,9 +233,9 @@ const pullRopes = (g, f) => {
     const [ux, uy] = [(pb.x - pa.x) / d, (pb.y - pa.y) / d]
     const [ma, mb] = [movable(g, f, a), movable(g, f, b)]
     if (!ma && !mb) continue
-    const share = ma && mb ? 0.5 : 1
-    if (mb) haul(g, b, -ux * excess * share, -uy * excess * share)
-    if (ma) haul(g, a, ux * excess * share, uy * excess * share)
+    const [sa, sb] = ma && mb && a.grounded !== b.grounded ? (a.grounded ? [1, 0] : [0, 1]) : ma && mb ? [0.5, 0.5] : [ma ? 1 : 0, mb ? 1 : 0]
+    if (sb) haul(g, b, -ux * excess * sb, -uy * excess * sb)
+    if (sa) haul(g, a, ux * excess * sa, uy * excess * sa)
     if (mb && uy < -0.5 && excess > 2) b.vy = Math.min(b.vy ?? 0, -40)
   }
 }

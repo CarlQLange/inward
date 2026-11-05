@@ -94,7 +94,7 @@ export const TUNING = {
     mine: { every: 2.4, stock: 3, reach: 40, life: 40, trigger: 16, damage: 3, radius: 28, limpetFuse: 1.6, farReach: 130 },
     roar: { every: 4, reach: 62, shoutStep: 0.03, shoutRange: 190, shoutShove: 300, swellTime: 1.4, swellMin: 0.6, swellMax: 2.1, swellBreaks: 1.6, forms: { 'roar.shout': 3 } },
     mirror: { every: 4.5, life: 1.3, parryLife: 0.3, paneLife: 5, paneReach: 26, paneHalf: 15, shotReturn: 200, seekLife: 2, seekTurn: 9 },
-    float: { every: 5.5, reach: 96, radius: 44, life: 3.6, rise: 80, heroRise: 95, drift: 0.9, slam: 150, slamStep: 45, slamMost: 4, dropTime: 2.5, sideways: 0.85, snareLife: 24, carryTime: 3.2, carryRadius: 34, flipEvery: 1.1, forms: { 'float.snare': 7 } },
+    float: { every: 5.5, reach: 96, radius: 44, backOff: 0.45, life: 3.6, rise: 80, heroRise: 95, drift: 0.9, slam: 150, slamStep: 45, slamMost: 4, dropTime: 2.5, sideways: 0.85, snareLife: 24, carryTime: 3.2, carryRadius: 34, flipEvery: 1.1, forms: { 'float.snare': 7 } },
     link: { every: 6.5, reach: 130, width: 28, hop: 80, most: 4, life: 8, burn: 2.2, energy: 22, ropeLeast: 20, ropeMost: 96, ropeSlack: 1.15, ropeHaul: 6, liveTime: 0.4, yokeEvery: 0.45, stakeEvery: 0.4, forms: { 'link.stake': 7.5 } },
   },
   feed: {

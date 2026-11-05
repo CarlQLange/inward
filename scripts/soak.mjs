@@ -9,6 +9,7 @@
 //   flags: --seed N --workers N --minutes N (sim limit per run) --omen id --ring N (quickstart)
 //          --deeper always takes the deeper option, --stop always banks, otherwise the bot picks at random
 //          --express warps to the next Warden, --loops N stops going deeper after N loops, --keystone id forces one
+//          --skills float:tilt+link starts every run holding those skills and forms
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir, cpus } from 'node:os'
@@ -416,6 +417,11 @@ const worker = async ({ opts, from, to }) => {
     const g = createGame(null, 'playing', quick)
     if (opts.god) g.player.hp = TUNING.player.hp
     if (opts.keystone) takeKeystone(g, opts.keystone)
+    if (opts.skills) {
+      const loadout = String(opts.skills).split('+').map(token => token.split(':'))
+      g.player.skills = loadout.map(([kind]) => ({ kind, ready: 0 }))
+      loadout.forEach(([kind, ...forms]) => forms.forEach(form => g.player.upgrades.add(`${kind}.${form}`)))
+    }
     if (opts.warden && opts.warden !== 'core') {
       const spot = g.wardens[1]
       g.wardens[1].id = opts.warden
