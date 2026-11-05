@@ -34,11 +34,11 @@ const SNOW = [
   ['aaaaaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaacaaa', 'aaaaaaaa', 'aaabaaca', 'caaaaaaa', 'aacaaaba'],
 ]
 const MUD = [
-  ['aaaaaaaa', 'aacaaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaaacaa', 'aaaaaaaa', 'abaaaaba', 'aaacaaaa'],
-  ['aaaaaaaa', 'aaaaaaca', 'abaaaaaa', 'aaaacaaa', 'aaaaaaaa', 'acaaaaba', 'aaaaaaaa', 'aaabaaca'],
+  ['aaaaaaaa', 'acccaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaaccca', 'aaaaaaaa', 'abaaaaba', 'aaccaaaa'],
+  ['aaaaaaaa', 'aaaaccca', 'abaaaaaa', 'aaccaaaa', 'aaaaaaaa', 'aaaaacca', 'abaaaaaa', 'aaabaaca'],
 ]
 const SNOW_COLOURS = { a: '#e4ecee', b: '#c2d0d8', c: '#ffffff' }
-const MUD_COLOURS = { a: '#4c3622', b: '#33251a', c: '#6e5234' }
+const MUD_COLOURS = { a: '#5c4c3a', b: '#433628', c: '#8e7c60' }
 
 const TILE_INDEX = {
   rock: [0, 1], brick: [12], moss: [2], peat: [3], wood: [4], metal: [5], scrap: [6],

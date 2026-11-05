@@ -168,11 +168,19 @@ const paintGlass = (ctx, world, x, y) => {
   for (let k = 0; k < 3; k++) ctx.fillRect(px + 2 + k, py + 5 - k, 1, 1)
 }
 
-const paintMudTop = (ctx, world, x, y) => {
-  if (matAt(world, x, y - 1) === M.MUD) return
-  ctx.fillStyle = '#7a5c3a'
+const TOPS = {
+  [M.MUD]: { colour: '#b8a684', rows: 1 },
+  [M.SNOW]: { colour: '#ffffff', rows: 2 },
+}
+
+const paintTop = (ctx, world, x, y, m) => {
+  const above = matAt(world, x, y - 1)
+  if (above === m || props(above).solid) return
+  const { colour, rows } = TOPS[m]
   const h = hash(x, y)
-  for (let k = 0; k < BLOCK; k++) if ((h >> k) & 1) ctx.fillRect(x * BLOCK + k, y * BLOCK, 1, 1)
+  ctx.fillStyle = colour
+  ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, 1)
+  for (let k = 0; k < BLOCK; k++) if (rows > 1 && (h >> k) & 1) ctx.fillRect(x * BLOCK + k, y * BLOCK + 1, 1, 1)
 }
 
 const paintFixture = (ctx, x, y, [r, g, b]) => {
@@ -201,7 +209,7 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
       if (!name) continue
       const tile = tileFor(name, x, y, theme, look)
       const toned = TINTED_TILES.has(name) ? tintTile(theme, tile) : tile
-      if (isBuried(world, x, y)) {
+      if (isBuried(world, x, y) && !props(m).falls) {
         ctx.drawImage(shapedTile(toned, name, 0), x * BLOCK, y * BLOCK)
         ctx.fillStyle = `rgba(5, 12, 10, ${look.buried})`
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
@@ -211,7 +219,7 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
           ctx.fillStyle = `rgba(255, 255, 255, ${look.raised})`
           ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
         }
-        if (m === M.MUD) paintMudTop(ctx, world, x, y)
+        if (TOPS[m]) paintTop(ctx, world, x, y, m)
         else paintEdges(ctx, world, x, y)
       }
     }
@@ -237,7 +245,7 @@ export const terrainLayer = (world, theme, look, seed) => {
   return terrain
 }
 
-const LIQUID_TINT = { [M.WATER]: 'rgba(14, 70, 88, 0.3)', [M.OIL]: 'rgba(40, 22, 48, 0.42)', [M.ACID]: 'rgba(84, 186, 36, 0.3)', [M.MUD]: 'rgba(58, 38, 20, 0.62)' }
+const LIQUID_TINT = { [M.WATER]: 'rgba(14, 70, 88, 0.3)', [M.OIL]: 'rgba(40, 22, 48, 0.42)', [M.ACID]: 'rgba(84, 186, 36, 0.3)', [M.MUD]: 'rgba(84, 56, 28, 0.86)' }
 
 export const drawSubmergedTint = (ctx, world) => {
   ctx.globalCompositeOperation = 'source-atop'

@@ -36,7 +36,7 @@ export const TASTES = {
   acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
   falling: { name: 'FALLING BLOCKS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
   glass: { name: 'GLASS', colours: ['#d6f6f0', '#ffffff'], flight: 'shard', cell: made(M.GLASS) },
-  mud: { name: 'MUD', colours: ['#6e5234', '#9a7a52'], flight: 'drip', cell: made(M.MUD) },
+  mud: { name: 'MUD', colours: ['#8e7c60', '#b8a684'], flight: 'drip', cell: made(M.MUD) },
   snow: { name: 'SNOW', colours: ['#eef4f4', '#c2d0d8'], flight: 'puff', cell: made(M.SNOW) },
 }
 

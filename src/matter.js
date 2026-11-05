@@ -16,7 +16,7 @@ export const MATERIAL_COLOURS = {
   [M.WATER]: ['#6fd0e0', '#bff2ff'], [M.OIL]: ['#a06ab0', '#5a3a66'], [M.LAVA]: ['#ff9a2e', '#ffe84a'], [M.ACID]: ['#c8ff5a', '#7fd030'],
   [M.ASH]: ['#8c8c84', '#5a5a54'], [M.VINE]: ['#6f9f40', '#a8c84a'], [M.FLOE]: ['#bff2ff', '#ffffff'], [M.RIME]: ['#d8f8ff', '#ffffff'],
   [M.STILL]: ['#8a9c3e', '#5e6e30'],
-  [M.GLASS]: ['#d6f6f0', '#ffffff'], [M.MUD]: ['#6e5234', '#4c3622'], [M.SNOW]: ['#eef4f4', '#c2d0d8'],
+  [M.GLASS]: ['#d6f6f0', '#ffffff'], [M.MUD]: ['#8e7c60', '#5c4c3a'], [M.SNOW]: ['#eef4f4', '#c2d0d8'],
 }
 
 const coloursOf = mat => MATERIAL_COLOURS[mat] ?? ['#c9d4c0', '#8a9484']
@@ -954,6 +954,11 @@ export const followProjectiles = (g, dt) => {
   for (const s of g.shots) {
     if (s.friendly && rnd() < dt * 18 * era.glow) spawn(g, 'spark', s.x + rand(-1, 2), s.y + rand(-1, 2), s.vx * 0.04 + rand(-10, 10), s.vy * 0.04 + rand(-10, 10), rand(0.08, 0.16), '#fff3b4', '#ffffff').hits = 1
   }
+}
+
+export const sloshAt = (g, x, y, vx) => {
+  const colours = coloursOf(M.MUD)
+  PIECE.clod(g, x + rand(-2, 2), y, -vx * 0.3 + rand(-14, 14), rand(-40, -16), pick(colours), colours[1], rnd() < 0.3 ? 2 : 1)
 }
 
 export const swimBubble = (g, x, y) => spawn(g, 'bubble', x, y, 0, rand(-26, -14), rand(0.8, 1.6), '#bff2ff', '#bff2ff', rnd() < 0.5 ? 2 : 1)
