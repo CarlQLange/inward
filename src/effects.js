@@ -279,7 +279,7 @@ const towAlong = (g, f, s, dt) => {
   if (Math.sign(f.end - s.i) !== s.step) return
   const cellAt = f.cells[s.i]
   const reach = fuseBox(cellAt, 2)
-  hostile(g).filter(e => !e.heavy && !e.prop && !f.towing.includes(e) && overlap(e, reach)).slice(0, S.wick.towMost - f.towing.length).forEach(e => f.towing.push(e))
+  hostile(g).filter(e => !e.heavy && !e.prop && !e.warden && !e.partOf && !f.towing.includes(e) && overlap(e, reach)).slice(0, S.wick.towMost - f.towing.length).forEach(e => f.towing.push(e))
   f.towing = f.towing.filter(e => e.hp > 0)
   const to = { x: (cellAt[0] + 0.5) * BLOCK, y: (cellAt[1] + 1) * BLOCK }
   const most = S.wick.burnRate * BLOCK * 2 * dt
