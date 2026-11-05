@@ -7,7 +7,7 @@ import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.j
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
-import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath, seatEnemy, settleFooting } from './enemies.js'
+import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { dust } from './feel.js'
 import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
@@ -876,6 +876,22 @@ const aimFrom = (p, input) => {
   return { x: x / length, y: y / length }
 }
 
+const autoTarget = (g, p) => {
+  const from = muzzle(p)
+  let best = null
+  let bestDistance = TUNING.feel.autoReach
+  for (const e of g.enemies) {
+    if (e.friendly || e.prop || e.ally || e.intangible || e.plated || e.stowed || e.asleep || e.hp <= 0) continue
+    const c = centre(e)
+    const d = Math.hypot(c.x - from.x, c.y - from.y)
+    if (d < bestDistance && lineClear(g.world, from, c)) {
+      best = { x: (c.x - from.x) / d, y: (c.y - from.y) / d }
+      bestDistance = d
+    }
+  }
+  return best
+}
+
 const assisted = (g, p, aim) => {
   if (!p.assist) return aim
   const from = muzzle(p)
@@ -1487,7 +1503,13 @@ const stepPlayer = (g, input, dt) => {
 
   p.shotReady -= dt
   if (!input.shoot) p.holdFire = false
-  if (!stunned && input.shoot && !p.holdFire && p.shotReady <= 0) shoot(g, p)
+  const target = input.autofire && !input.shoot && !stunned ? autoTarget(g, p) : null
+  if (target) {
+    p.aim = target
+    p.assist = 0
+    if (Math.abs(target.x) > 0.05) p.facing = target.x < 0 ? -1 : 1
+  }
+  if (!stunned && (input.shoot || target) && !p.holdFire && p.shotReady <= 0) shoot(g, p)
   useSkills(g, p, input, stunned, dt)
   if (!stunned) throwBomb(g, p, input)
   p.iframes -= dt

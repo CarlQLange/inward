@@ -5,7 +5,7 @@ import { drawBossBar, drawReveal } from './overlay.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMenus, drawToast } from './screens.js'
-import { drawHud } from './hud.js'
+import { drawHud, drawTouchControls } from './hud.js'
 import { save } from './store.js'
 import { RELIC_BY_ID } from './relics.js'
 import { keyOf } from './map.js'
@@ -241,4 +241,5 @@ export const draw = (ctx, g, pointer) => {
     if (g.menus.length === 0) drawToast(ctx, g)
   }
   drawMenus(ctx, g)
+  drawTouchControls(ctx, g)
 }

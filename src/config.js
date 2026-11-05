@@ -228,6 +228,7 @@ export const TUNING = {
     dustEvery: 0.16,
     roomClearHeal: 1,
     grandClear: 4,
+    autoReach: 120,
     assistAngle: 0.42,
     assistStick: 0.2,
     snapRun: 0.38,

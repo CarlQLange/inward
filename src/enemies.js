@@ -291,7 +291,7 @@ const worm = (g, e, dt) => {
   }
 }
 
-const lineClear = (world, a, b) => {
+export const lineClear = (world, a, b) => {
   const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4)
   for (let i = 1; i < steps; i++) {
     const t = i / steps

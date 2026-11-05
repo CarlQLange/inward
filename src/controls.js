@@ -58,6 +58,7 @@ const PROMPTS = {
     skill: keycap('Q'), skill2: keycap('E'), skill3: keycap('R'),
     confirm: mouse('left'),
   },
+  touch: {},
   pad: {
     move: pad('stick'),
     aim: pad('rstick'),
@@ -79,6 +80,8 @@ const current = { device: 'keys', hand: 'keys', pad: 'xbox' }
 
 export const device = () => current.device
 export const padStyle = () => current.pad
+
+export const touchFinger = () => { current.device = 'touch' }
 
 export const touchPad = style => {
   current.device = 'pad'

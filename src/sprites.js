@@ -115,10 +115,13 @@ export const creatureSize = kind => {
 
 export const regionTiles = region => SPRITES.regions[typeof region === 'number' ? REGION_NAMES[region] : region] ?? []
 
+const assetUrl = file => globalThis.INLINE_ASSETS?.[file] ?? `assets/${file}`
+const castData = () => globalThis.INLINE_ASSETS?.castData ?? fetch('assets/cast.json').then(response => response.json())
+
 const loadCast = async () => {
   const [atlas, { aliases, creatures }] = await Promise.all([
-    loadImage('assets/cast.png'),
-    fetch('assets/cast.json').then(response => response.json()),
+    loadImage(assetUrl('cast.png')),
+    castData(),
   ])
   castAliases = aliases
   const cut = box => {
@@ -133,7 +136,7 @@ const loadCast = async () => {
 
 export const loadSprites = async () => {
   const sheets = ['tiles', 'tiles2', 'signs', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4']
-  const loaded = Object.fromEntries(await Promise.all(sheets.map(async name => [name, await loadImage(`assets/${name}.png`)])))
+  const loaded = Object.fromEntries(await Promise.all(sheets.map(async name => [name, await loadImage(assetUrl(`${name}.png`))])))
   const { tiles, creatures, creatures2 } = loaded
   for (const [name, indices] of Object.entries(TILE_INDEX)) {
     SPRITES.tiles[name] = indices.map(i => cutTile(tiles, i, 8))

@@ -1,6 +1,7 @@
 import { ORIGIN, TUNING, VIEW } from './config.js'
 import { KEYS, device, touchKey, touchMouse } from './controls.js'
 import { readPad } from './pad.js'
+import { readTouch } from './touch.js'
 
 const I = TUNING.input
 
@@ -26,8 +27,8 @@ const release = () => {
   flicked.clear()
 }
 
-const toRoom = (screen, e) => {
-  const box = screen.getBoundingClientRect()
+const toRoom = e => {
+  const box = document.getElementById('screen').getBoundingClientRect()
   return {
     x: ((e.clientX - box.left) / box.width) * VIEW.w - ORIGIN.x,
     y: ((e.clientY - box.top) / box.height) * VIEW.h - ORIGIN.y,
@@ -43,7 +44,7 @@ const noteTravel = e => {
   if (travel >= I.mouseTravel) touchMouse()
 }
 
-export const listen = screen => {
+export const listen = () => {
   window.addEventListener('keydown', e => {
     if (!consumes(e)) return
     e.preventDefault()
@@ -57,11 +58,11 @@ export const listen = screen => {
   window.addEventListener('blur', release)
   document.addEventListener('visibilitychange', release)
   window.addEventListener('mousemove', e => {
-    pointer = toRoom(screen, e)
+    pointer = toRoom(e)
     noteTravel(e)
   })
   window.addEventListener('mousedown', e => {
-    pointer = toRoom(screen, e)
+    pointer = toRoom(e)
     touchMouse()
     press(e.button === 0 && !e.ctrlKey ? 'MouseLeft' : 'MouseRight')
   })
@@ -84,6 +85,7 @@ export const readInput = () => {
   return {
     ...pad,
     ...fromHeld(),
+    ...(from === 'touch' ? readTouch() : {}),
     ...(from === 'pad' && aim ? { aim } : {}),
     ...(from === 'mouse' && pointer ? { pointer } : {}),
   }

@@ -8,6 +8,8 @@ import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
 import { FORKS, cooldownOf, formOf } from './skills.js'
 import { tintedIcon } from './skillart.js'
+import { LAYOUT, isTall, isTouchLayout } from './layout.js'
+import { pauseButton, stickRest, touchButtons, touchView } from './touch.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -16,6 +18,7 @@ const WHITE = '#f4f8f2'
 const YELLOW = '#ffe84a'
 const RED = `rgb(${SCARF_RED.join(',')})`
 const RED_DIM = '#4a1420'
+const INK = '#04100c'
 
 const SLOT = 32
 const SLOT_X = 34
@@ -156,7 +159,172 @@ const drawRight = (ctx, g) => {
   drawRelicRow(ctx, g, x, y)
 }
 
+const disc = (ctx, cx, cy, r) => {
+  for (let dy = -r; dy <= r; dy++) {
+    const half = Math.round(Math.sqrt(r * r - dy * dy))
+    ctx.fillRect(Math.round(cx) - half, Math.round(cy) + dy, half * 2 + 1, 1)
+  }
+}
+
+const ring = (ctx, cx, cy, r, line, fill = INK) => {
+  ctx.fillStyle = line
+  disc(ctx, cx, cy, r)
+  ctx.fillStyle = fill
+  disc(ctx, cx, cy, r - 1)
+}
+
+const MARKS = {
+  jump: ['..#..', '.###.', '#####', '..#..', '..#..', '..#..'],
+  shoot: ['..#..', '.....', '#.#.#', '.....', '..#..'],
+  pause: ['##.##', '##.##', '##.##', '##.##', '##.##'],
+  close: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
+}
+
+const mark = (ctx, rows, cx, cy, colour, scale = 2) => {
+  ctx.fillStyle = colour
+  const left = Math.round(cx - (rows[0].length * scale) / 2)
+  const top = Math.round(cy - (rows.length * scale) / 2)
+  rows.forEach((row, y) => [...row].forEach((on, x) => {
+    if (on === '#') ctx.fillRect(left + x * scale, top + y * scale, scale, scale)
+  }))
+}
+
+const SKILL_SLOTS = { skill: 0, skill2: 1, skill3: 2 }
+
+const drawSkillButton = (ctx, g, b, held) => {
+  const skill = g.player.skills[SKILL_SLOTS[b.action]]
+  if (!skill) {
+    ring(ctx, b.x, b.y, b.r, DIM)
+    return
+  }
+  const whole = cooldownOf(g.player, skill.kind)
+  const waiting = Math.max(0, Math.min(1, skill.ready / whole))
+  const { tint } = formOf(g.player, skill.kind)
+  const wasWaiting = readiness.get(skill) ?? 0
+  readiness.set(skill, waiting)
+  skill.flash = wasWaiting > 0 && waiting === 0 ? 0.18 : Math.max(0, (skill.flash ?? 0) - 1 / 60)
+  ring(ctx, b.x, b.y, b.r, skill.flash > 0 ? WHITE : waiting > 0 ? MID : tint ?? GREEN, held ? '#1a3a24' : INK)
+  ctx.globalAlpha = waiting > 0 ? 0.4 : 1
+  ctx.drawImage(tintedIcon(skill.kind, tint), Math.round(b.x) - 8, Math.round(b.y) - 8)
+  ctx.globalAlpha = 1
+  if (waiting > 0) {
+    ctx.fillStyle = GREEN
+    ctx.fillRect(Math.round(b.x) - 8, Math.round(b.y) + b.r - 3, Math.round(16 * (1 - waiting)), 2)
+  }
+}
+
+const drawActionButton = (ctx, g, b, held) => {
+  ring(ctx, b.x, b.y, b.r, held ? YELLOW : GREEN, held ? '#1a3a24' : INK)
+  if (MARKS[b.action]) mark(ctx, MARKS[b.action], b.x, b.y, held ? YELLOW : GREEN, b.r > 20 ? 3 : 2)
+  else {
+    const icon = SPRITES.icons[b.action === 'look' ? 'eye' : 'bomb']
+    ctx.drawImage(icon, Math.round(b.x) - 8, Math.round(b.y) - 8)
+  }
+  if (b.action === 'bomb') drawText(ctx, g.player.bombs, Math.round(b.x) + b.r - 3, Math.round(b.y) + b.r - 6, WHITE)
+  if (b.action === 'shoot' && touchView.aim) {
+    ctx.fillStyle = YELLOW
+    ctx.fillRect(Math.round(b.x + touchView.aim.x * (b.r + 3)) - 1, Math.round(b.y + touchView.aim.y * (b.r + 3)) - 1, 3, 3)
+  }
+}
+
+const drawStick = ctx => {
+  const rest = stickRest()
+  const { stick } = touchView
+  if (!stick) {
+    ring(ctx, rest.x, rest.y, 18, DIM)
+    ctx.fillStyle = DIM
+    disc(ctx, rest.x, rest.y, 6)
+    return
+  }
+  ring(ctx, stick.from.x, stick.from.y, 18, MID)
+  const dx = stick.at.x - stick.from.x
+  const dy = stick.at.y - stick.from.y
+  const pull = Math.min(1, 18 / Math.max(1, Math.hypot(dx, dy)))
+  ctx.fillStyle = GREEN
+  disc(ctx, stick.from.x + dx * pull, stick.from.y + dy * pull, 8)
+}
+
+export const drawTouchControls = (ctx, g) => {
+  if (!isTouchLayout()) return
+  ctx.imageSmoothingEnabled = false
+  const menu = g.menus.at(-1)
+  if (g.phase === 'playing' && !menu) {
+    drawStick(ctx)
+    for (const b of touchButtons()) {
+      const held = touchView.held.has(b.action)
+      if (b.action in SKILL_SLOTS) drawSkillButton(ctx, g, b, held)
+      else drawActionButton(ctx, g, b, held)
+    }
+  }
+  if (menu && !menu.back && !menu.cancel) return
+  if (!menu && g.phase !== 'playing') return
+  const b = pauseButton()
+  ring(ctx, b.x, b.y, b.r, menu ? YELLOW : MID)
+  mark(ctx, menu ? MARKS.close : MARKS.pause, b.x, b.y, menu ? YELLOW : GREEN, 1)
+}
+
+const drawTallHud = (ctx, g) => {
+  const { inset } = LAYOUT
+  const top = inset.top + 3
+  const left = inset.left + 22
+  const { hp } = g.player
+  for (let i = 0; i < TUNING.player.hp; i++) {
+    ctx.fillStyle = i < hp ? (hp <= 2 && Math.floor(g.time * 6) % 2 === 0 ? WHITE : RED) : RED_DIM
+    ctx.fillRect(left + i * 6, top + 1, 5, i < hp ? 4 : 2)
+  }
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(SPRITES.icons.coin, left + 52, top, 7, 7)
+  drawText(ctx, g.gold, left + 61, top + 1, YELLOW)
+  numberRight(ctx, rollScore(g), VIEW.w - inset.right - 4, top + 1, WHITE)
+  const xpTop = ORIGIN.y - 4
+  const width = VIEW.w - inset.left - inset.right - 8
+  ctx.fillStyle = DIM
+  ctx.fillRect(inset.left + 4, xpTop, width, 2)
+  ctx.fillStyle = GREEN
+  ctx.fillRect(inset.left + 4, xpTop, Math.round((width * g.xp) / g.nextLevel), 2)
+  const below = ORIGIN.y + 224 + 4
+  const pitch = 3
+  drawMapGrid(ctx, g, inset.left + 4, below, pitch)
+  for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 52 + i * 11, below, 9, 9)
+  if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 52, below + 12, 10, 10)
+  drawText(ctx, g.level, inset.left + 68, below + 14, GREEN)
+}
+
+const drawWideHud = (ctx, g) => {
+  const { inset } = LAYOUT
+  const left = inset.left + 22
+  const top = inset.top + 4
+  const { hp } = g.player
+  for (let i = 0; i < TUNING.player.hp; i++) {
+    ctx.fillStyle = i < hp ? (hp <= 2 && Math.floor(g.time * 6) % 2 === 0 ? WHITE : RED) : RED_DIM
+    ctx.fillRect(left + i * 7, top + 1, 6, i < hp ? 4 : 2)
+  }
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(SPRITES.icons.coin, inset.left + 6, top + 14, 8, 8)
+  drawText(ctx, g.gold, inset.left + 16, top + 16, YELLOW)
+  drawText(ctx, rollScore(g), inset.left + 6, top + 26, WHITE, 2)
+  const col = Math.max(40, ORIGIN.x - inset.left - 14)
+  ctx.fillStyle = DIM
+  ctx.fillRect(inset.left + 6, top + 40, col, 3)
+  ctx.fillStyle = GREEN
+  ctx.fillRect(inset.left + 6, top + 40, Math.round((col * g.xp) / g.nextLevel), 3)
+  drawText(ctx, g.level, inset.left + 6, top + 46, GREEN)
+  for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 18 + i * 11, top + 44, 9, 9)
+  if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 54, top + 44, 10, 10)
+  drawRelicRow(ctx, g, inset.left + 6, top + 58)
+  const pitch = 4
+  const span = 15 * pitch + 3
+  const right = VIEW.w - inset.right - 4 - span
+  box(ctx, right, inset.top + 3, span, span, GREEN)
+  drawMapGrid(ctx, g, right + 2, inset.top + 5, pitch)
+}
+
 export const drawHud = (ctx, g) => {
+  if (isTouchLayout()) {
+    if (isTall()) drawTallHud(ctx, g)
+    else drawWideHud(ctx, g)
+    return
+  }
   drawLeft(ctx, g)
   drawRight(ctx, g)
 }

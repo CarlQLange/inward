@@ -1,13 +1,13 @@
 import { TICK, TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
 import { almanac } from './discover.js'
+import { almanacColumns, isTouchLayout } from './layout.js'
 import { SKILL_NAMES, formOf } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
 const P = TUNING.player
-const ALMANAC_COLUMNS = 19
 
 export const openMenu = (g, menu) => g.menus.push({ selected: 0, armed: false, layout: 'list', back: true, age: 0, opened: g.time, ...menu })
 
@@ -49,8 +49,10 @@ const openOptions = g => openMenu(g, {
   items: [
     { label: () => `SHADERS: ${save.settings.shaders.toUpperCase()}`, run: cycleShaders },
     { label: () => `SHAKE: ${save.settings.shake ? 'ON' : 'OFF'}`, run: toggleSetting('shake') },
-    { label: () => `RUMBLE: ${save.settings.rumble ? 'ON' : 'OFF'}`, run: toggleSetting('rumble') },
-    { label: 'CONTROLS', run: g2 => openControls(g2) },
+    ...(isTouchLayout() ? [] : [{ label: () => `RUMBLE: ${save.settings.rumble ? 'ON' : 'OFF'}`, run: toggleSetting('rumble') }]),
+    ...(isTouchLayout()
+      ? [{ label: () => `AUTO FIRE: ${save.settings.autofire ? 'ON' : 'OFF'}`, run: toggleSetting('autofire') }]
+      : [{ label: 'CONTROLS', run: g2 => openControls(g2) }]),
     { label: 'RECORDS', run: g2 => openRecords(g2) },
     {
       label: 'FORGET ALL',
@@ -227,14 +229,19 @@ const stepRepeats = (g, input, armed) => {
 }
 
 const hitUnder = (menu, { x, y }) =>
-  (menu.hits ?? []).find(h => x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h)?.index
+  (menu.hits ?? []).find(h => x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h)
 
 const stepPointer = (g, menu, input, pressed) => {
   if (!input.pointer) return false
-  const over = hitUnder(menu, input.pointer)
-  if (over === undefined) return false
-  if (input.pointer !== g.menuHeld.pointer) menu.selected = over
-  return pressed('click') && menu.selected === over
+  const hit = hitUnder(menu, input.pointer)
+  if (!hit) return false
+  if (hit.pick) {
+    if (pressed('click')) hit.pick(menu)
+    return false
+  }
+  if (menu.page === 'pause' && pressed('click')) menu.focus = 'list'
+  if (input.pointer !== g.menuHeld.pointer) menu.selected = hit.index
+  return pressed('click') && menu.selected === hit.index
 }
 
 const leave = (g, menu) => {
@@ -264,13 +271,14 @@ export const stepMenus = (g, input) => {
     }
     if (menu.page === 'almanac') {
       const total = almanac().groups.reduce((n, group) => n + group.total, 0)
-      const by = (moved.right ? 1 : 0) - (moved.left ? 1 : 0) + ((moved.down ? 1 : 0) - (moved.up ? 1 : 0)) * ALMANAC_COLUMNS
+      const by = (moved.right ? 1 : 0) - (moved.left ? 1 : 0) + ((moved.down ? 1 : 0) - (moved.up ? 1 : 0)) * almanacColumns()
       menu.cursor = Math.max(0, Math.min(total - 1, menu.cursor + by))
     }
     const clicked = stepPointer(g, menu, input, pressed)
     const confirm = pressed('jump') || pressed('confirm') || clicked
     const toggled = menu.page === 'pause' && (pressed('skills') || pressed('map'))
-    if (confirm && !swallowed) menu.items[menu.selected].run(g)
+    const offList = menu.page === 'almanac' || (menu.page === 'pause' && menu.focus !== 'list')
+    if (confirm && !offList) menu.items[menu.selected].run(g)
     else if (pressed('back') || pressed('pause') || toggled) leave(g, menu)
   }
   g.menuHeld = { ...input }

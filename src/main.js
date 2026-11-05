@@ -4,15 +4,18 @@ import { draw } from './render.js'
 import { loadSprites } from './sprites.js'
 import { save } from './store.js'
 import { createPresenter } from './present.js'
-import { device } from './controls.js'
+import { device, touchFinger } from './controls.js'
 import { listen, readInput } from './input.js'
 import { rumble } from './pad.js'
+import { listenTouch } from './touch.js'
+import { fitTouch, isTouchLayout, wantsTouch } from './layout.js'
 
 await loadSprites()
 
+if (wantsTouch()) touchFinger()
+
 let held = {}
 const state = createGame(null, 'title')
-const screen = document.getElementById('screen')
 
 const depthFromDigit = code => {
   const match = code.match(/^Digit([1-9])$/)
@@ -32,17 +35,33 @@ if (new URLSearchParams(location.search).has('debug')) {
   })
 }
 
-listen(screen)
+listen()
+listenTouch(() => state.phase === 'playing' && state.menus.length === 0)
 
 const source = document.createElement('canvas')
-source.width = VIEW.w
-source.height = VIEW.h
 const ctx = source.getContext('2d')
-const present = createPresenter(screen)
+let present = null
+
+const shape = () => `${window.innerWidth}x${window.innerHeight}`
+let shaped = ''
+
+const layOut = () => {
+  if (isTouchLayout() || wantsTouch()) fitTouch()
+  source.width = VIEW.w
+  source.height = VIEW.h
+  const canvas = document.createElement('canvas')
+  canvas.id = 'screen'
+  document.getElementById('screen').replaceWith(canvas)
+  present?.release?.()
+  present = createPresenter(canvas)
+  shaped = shape()
+}
+
+layOut()
 
 const render = () => {
   draw(ctx, state, held.pointer)
-  screen.style.cursor = device() === 'mouse' && state.menus.length > 0 ? 'default' : 'none'
+  document.getElementById('screen').style.cursor = device() === 'mouse' && state.menus.length > 0 ? 'default' : 'none'
   const { shaders } = save.settings
   const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
@@ -52,6 +71,7 @@ const render = () => {
 let last = performance.now()
 let owed = 0
 const frame = now => {
+  if (isTouchLayout() && shape() !== shaped) layOut()
   owed += Math.min(0.1, (now - last) / 1000)
   last = now
   held = readInput()

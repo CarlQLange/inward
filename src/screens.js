@@ -7,6 +7,7 @@ import { SPRITES, creatureFrames } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { almanac } from './discover.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
+import { LAYOUT, almanacColumns, isTall } from './layout.js'
 import { drawWardenMarks, revealArt } from './overlay.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
@@ -24,7 +25,7 @@ const YELLOW = '#ffe84a'
 const RED = '#ff5a4a'
 const INK = '#04100c'
 const ROOM_PX = ROOM * 8
-const CENTRE = ORIGIN.x + ROOM_PX / 2
+const midX = () => ORIGIN.x + ROOM_PX / 2
 
 const clamp01 = v => Math.max(0, Math.min(1, v))
 const easeOut = t => 1 - (1 - clamp01(t)) ** 3
@@ -46,7 +47,7 @@ const shade = (ctx, alpha) => {
   ctx.fillRect(0, 0, VIEW.w, VIEW.h)
 }
 
-const centred = (ctx, text, y, colour, scale = 1, middle = CENTRE) =>
+const centred = (ctx, text, y, colour, scale = 1, middle = midX()) =>
   drawText(ctx, text, middle - (textWidth(String(text)) * scale) / 2, y, colour, scale)
 
 const labelOf = item => (typeof item.label === 'function' ? item.label() : item.label)
@@ -58,8 +59,8 @@ const drawList = (ctx, menu, top, active = true, pitch = 11) => {
     const y = top + i * pitch
     menu.hits?.push({ index: i, x: ROOM_PX / 2 - textWidth(label) / 2 - 10, y: y - ORIGIN.y - 3, w: textWidth(label) + 20, h: pitch })
     const nudge = on ? Math.round(easeOut((menu.age ?? 1) * 8) * 2) : 0
-    centred(ctx, label, y, on ? YELLOW : PALE, 1, CENTRE + nudge)
-    if (on) drawText(ctx, '+', CENTRE - textWidth(label) / 2 - 8, y, YELLOW)
+    centred(ctx, label, y, on ? YELLOW : PALE, 1, midX() + nudge)
+    if (on) drawText(ctx, '+', midX() - textWidth(label) / 2 - 8, y, YELLOW)
   })
 }
 
@@ -79,30 +80,50 @@ const drawTitle = (ctx, g, menu) => {
     const top = ORIGIN.y + 110 + lift
     drawList(ctx, menu, top)
   }
-  if (save.best > 0) centred(ctx, save.best, VIEW.h - 11, FAINT)
+  if (save.best > 0) centred(ctx, save.best, ORIGIN.y + ROOM_PX - 8, FAINT)
+}
+
+const pauseFrame = () => {
+  const touchWide = LAYOUT.mode === 'wide'
+  return isTall()
+    ? {
+      pitch: 7, mapTop: ORIGIN.y, listTop: ORIGIN.y + 110,
+      skillX: ORIGIN.x + 2, skillY: ORIGIN.y + 166, detailY: ORIGIN.y + 246,
+      relicX: midX() + 6, relicY: ORIGIN.y + 166,
+    }
+    : {
+      pitch: 9, mapTop: ORIGIN.y + 4, listTop: ORIGIN.y + 146,
+      skillX: LAYOUT.inset.left + 8, skillY: ORIGIN.y + (touchWide ? 18 : 8), detailY: ORIGIN.y + (touchWide ? 100 : 90),
+      relicX: ORIGIN.x + ROOM_PX + 8, relicY: ORIGIN.y + 8,
+    }
 }
 
 const skillColumn = (ctx, g, menu) => {
+  const frame = pauseFrame()
   const p = g.player
   const on = menu.focus === 'skills'
   for (let slot = 0; slot < TUNING.player.skillSlots; slot++) {
     const skill = p.skills[slot]
-    const y = ORIGIN.y + 8 + slot * 26
+    const y = frame.skillY + slot * 26
     const chosen = on && menu.slot === slot && skill
-    panel(ctx, 8, y, 20, 20, chosen ? YELLOW : skill ? GREEN : FAINT)
+    panel(ctx, frame.skillX, y, 20, 20, chosen ? YELLOW : skill ? GREEN : FAINT)
     if (!skill) continue
+    menu.hits?.push({
+      x: frame.skillX - ORIGIN.x, y: y - ORIGIN.y, w: 90, h: 24,
+      pick: m => Object.assign(m, { focus: 'skills', slot }),
+    })
     const { name, tint, stage } = formOf(p, skill.kind)
-    ctx.drawImage(tintedIcon(skill.kind, tint), 10, y + 2)
-    drawText(ctx, name, 32, y + 3, chosen ? YELLOW : WHITE)
+    ctx.drawImage(tintedIcon(skill.kind, tint), frame.skillX + 2, y + 2)
+    drawText(ctx, name, frame.skillX + 24, y + 3, chosen ? YELLOW : WHITE)
     FORKS[skill.kind].forEach((_, n) => {
       ctx.fillStyle = n < stage ? tint : FAINT
-      ctx.fillRect(32 + n * 6, y + 12, 4, 4)
+      ctx.fillRect(frame.skillX + 24 + n * 6, y + 12, 4, 4)
     })
   }
   const chosen = on && p.skills[menu.slot]
   if (!chosen) return
-  const left = 8
-  let y = ORIGIN.y + 90
+  const left = frame.skillX
+  let y = frame.detailY
   wrapText(SKILL_DETAILS[chosen.kind], 22).forEach(line => {
     drawText(ctx, line, left, y, PALE)
     y += 7
@@ -122,15 +143,19 @@ const skillColumn = (ctx, g, menu) => {
 
 const RELIC_PITCH = 18
 const RELIC_COLUMNS = 5
-const RELIC_LEFT = ORIGIN.x + ROOM_PX + 8
 
 const relicColumn = (ctx, g, menu) => {
+  const frame = pauseFrame()
   const owned = [...g.player.relics].map(id => RELIC_BY_ID[id])
   const on = menu.focus === 'relics'
   owned.forEach((relic, i) => {
-    const x = RELIC_LEFT + (i % RELIC_COLUMNS) * RELIC_PITCH
-    const y = ORIGIN.y + 8 + Math.floor(i / RELIC_COLUMNS) * RELIC_PITCH
+    const x = frame.relicX + (i % RELIC_COLUMNS) * RELIC_PITCH
+    const y = frame.relicY + Math.floor(i / RELIC_COLUMNS) * RELIC_PITCH
     ctx.drawImage(SPRITES.icons[relic.icon], x, y)
+    menu.hits?.push({
+      x: x - ORIGIN.x, y: y - ORIGIN.y, w: RELIC_PITCH, h: RELIC_PITCH,
+      pick: m => Object.assign(m, { focus: 'relics', relic: i }),
+    })
     if (on && i === menu.relic) {
       ctx.strokeStyle = YELLOW
       ctx.strokeRect(x - 1.5, y - 1.5, 19, 19)
@@ -138,29 +163,29 @@ const relicColumn = (ctx, g, menu) => {
   })
   const chosen = on && owned[menu.relic]
   if (!chosen) return
-  let y = ORIGIN.y + 8 + (Math.ceil(owned.length / RELIC_COLUMNS) * RELIC_PITCH) + 6
+  let y = isTall() ? frame.detailY : frame.relicY + (Math.ceil(owned.length / RELIC_COLUMNS) * RELIC_PITCH) + 6
   wrapText(chosen.name, 22).forEach(line => {
-    drawText(ctx, line, RELIC_LEFT, y, WHITE)
+    drawText(ctx, line, frame.relicX, y, WHITE)
     y += 7
   })
   wrapText(chosen.text, 22).forEach(line => {
-    drawText(ctx, line, RELIC_LEFT, y, PALE)
+    drawText(ctx, line, frame.relicX, y, PALE)
     y += 6
   })
 }
 
 const drawPause = (ctx, g, menu) => {
   shade(ctx, 0.88)
-  const pitch = 9
-  drawMapGrid(ctx, g, CENTRE - (15 * pitch) / 2, ORIGIN.y + 4, pitch)
-  drawList(ctx, menu, ORIGIN.y + 146, menu.focus === 'list', 10)
+  const { pitch, mapTop, listTop } = pauseFrame()
+  drawMapGrid(ctx, g, midX() - (15 * pitch) / 2, mapTop, pitch)
+  drawList(ctx, menu, listTop, menu.focus === 'list', 10)
   skillColumn(ctx, g, menu)
   relicColumn(ctx, g, menu)
 }
 
 const drawConfirm = (ctx, menu) => {
   shade(ctx, 0.7)
-  panel(ctx, CENTRE - 56, ORIGIN.y + 84, 112, 16 + menu.items.length * 11, YELLOW)
+  panel(ctx, midX() - 56, ORIGIN.y + 84, 112, 16 + menu.items.length * 11, YELLOW)
   drawList(ctx, menu, ORIGIN.y + 92)
 }
 
@@ -215,10 +240,8 @@ const shadowOf = art => {
   return shadows.get(art)
 }
 
-const ALMANAC_COLUMNS = 19
 const ALMANAC_PITCH = 21
 const ALMANAC_CELL = 18
-const ALMANAC_LEFT = Math.floor((VIEW.w - ALMANAC_COLUMNS * ALMANAC_PITCH) / 2)
 const ALMANAC_TOP = 30
 
 const blurbOf = ({ kind, id }) => ({
@@ -250,9 +273,11 @@ const drawAlmanac = (ctx, g, menu) => {
   centred(ctx, `${book.found}/${book.total}`, 12, GREEN, 2, VIEW.w / 2)
   ctx.imageSmoothingEnabled = false
   book.groups.flatMap(group => group.items).forEach((item, i) => {
-    const x = ALMANAC_LEFT + (i % ALMANAC_COLUMNS) * ALMANAC_PITCH
-    const y = ALMANAC_TOP + Math.floor(i / ALMANAC_COLUMNS) * ALMANAC_PITCH
+    const columns = almanacColumns()
+    const x = Math.floor((VIEW.w - columns * ALMANAC_PITCH) / 2) + (i % columns) * ALMANAC_PITCH
+    const y = ALMANAC_TOP + Math.floor(i / columns) * ALMANAC_PITCH
     drawAlmanacCell(ctx, item, x, y, i === menu.cursor)
+    menu.hits?.push({ x: x - ORIGIN.x, y: y - ORIGIN.y, w: ALMANAC_PITCH, h: ALMANAC_PITCH, pick: m => { m.cursor = i } })
   })
   const chosen = book.groups.flatMap(group => group.items)[menu.cursor]
   if (!chosen) return
@@ -286,10 +311,10 @@ const drawSummary = (ctx, g, menu) => {
   rows.forEach(([value, name], i) => {
     const y = ORIGIN.y + 76 + rise + i * 10
     if (age < 0.6 + i * 0.15) return
-    drawText(ctx, value, CENTRE + 6, y, i === 2 ? YELLOW : WHITE)
-    drawText(ctx, name, CENTRE - 2 - textWidth(name), y, DIM)
+    drawText(ctx, value, midX() + 6, y, i === 2 ? YELLOW : WHITE)
+    drawText(ctx, name, midX() - 2 - textWidth(name), y, DIM)
   })
-  if (!won && g.player.lastCause && age > 1.2) drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, CENTRE, ORIGIN.y + 128 + rise, RED)
+  if (!won && g.player.lastCause && age > 1.2) drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, midX(), ORIGIN.y + 128 + rise, RED)
   if (age > 1.3) {
     const found = g.foundThisRun ?? []
     found.forEach((key, i) => {
@@ -297,7 +322,7 @@ const drawSummary = (ctx, g, menu) => {
       const art = revealArt({ kind, id })
       if (!art) return
       const scale = Math.min(1, 24 / Math.max(art.width, art.height))
-      const x = CENTRE - (found.length * 28) / 2 + i * 28 + 2
+      const x = midX() - (found.length * 28) / 2 + i * 28 + 2
       ctx.drawImage(art, Math.round(x), ORIGIN.y + 140 + rise, Math.round(art.width * scale), Math.round(art.height * scale))
     })
   }
@@ -323,7 +348,7 @@ const drawCards = (ctx, g, menu, cards) => {
   const gap = 6
   const w = Math.min(68, Math.floor((ROOM_PX - 12 - gap * (cards.length - 1)) / cards.length))
   const total = cards.length * w + (cards.length - 1) * gap
-  const left = CENTRE - total / 2
+  const left = midX() - total / 2
   const top = ORIGIN.y + 72
   if (menu.title) centred(ctx, menu.title, ORIGIN.y + 42, YELLOW, menu.title.length > 18 ? 1 : 2)
   cards.forEach((card, i) => {
@@ -378,10 +403,14 @@ const lockStands = (room, dir) => {
 const drawQuickstart = (ctx, g, menu) => {
   sheet(ctx, menu)
   const size = 120
-  const cx = CENTRE
+  const cx = midX()
   const cy = ORIGIN.y + 96
   const chosen = menu.selected
   const count = CORE_RING + 1
+  for (let ring = count - 1; ring >= 0; ring--) {
+    const half = (size / 2) * (1 - ring / count)
+    menu.hits?.push({ index: ring, x: cx - half - ORIGIN.x, y: cy - half - ORIGIN.y, w: half * 2, h: half * 2 })
+  }
   for (let ring = 0; ring < count; ring++) {
     const half = (size / 2) * (1 - ring / count)
     const on = ring === chosen
@@ -422,7 +451,7 @@ const drawToastPrompts = (ctx, prompts, y) => {
     const drawn = drawPrompt(ctx, action, x, y)
     if (word) drawText(ctx, word, x + drawn + 2, y + 2, PALE)
     return x + widths[i] + 6
-  }, CENTRE - total / 2)
+  }, midX() - total / 2)
 }
 
 export const drawToast = (ctx, g) => {
@@ -439,11 +468,11 @@ export const drawToast = (ctx, g) => {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
     ctx.fillRect(ORIGIN.x, ORIGIN.y + 28, ROOM_PX, tall)
     ctx.fillStyle = YELLOW
-    ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 30, rule, 1)
-    ctx.fillRect(CENTRE - rule / 2, ORIGIN.y + 28 + tall - 3, rule, 1)
-    drawText(ctx, shown, CENTRE - width / 2, ORIGIN.y + 34, WHITE, 2)
+    ctx.fillRect(midX() - rule / 2, ORIGIN.y + 30, rule, 1)
+    ctx.fillRect(midX() - rule / 2, ORIGIN.y + 28 + tall - 3, rule, 1)
+    drawText(ctx, shown, midX() - width / 2, ORIGIN.y + 34, WHITE, 2)
     if (sub) centred(ctx, sub, ORIGIN.y + 47, PALE)
   }
-  if (prompts) drawPromptRow(ctx, prompts, CENTRE, ORIGIN.y + (title ? 62 : 34), 6)
+  if (prompts) drawPromptRow(ctx, prompts, midX(), ORIGIN.y + (title ? 62 : 34), 6)
   ctx.globalAlpha = 1
 }

@@ -1,4 +1,5 @@
 import { BLOCK, ORIGIN, ROOM, VIEW } from './config.js'
+import { LAYOUT, isTouchLayout } from './layout.js'
 import { SCARF_DEEP, SCARF_RED } from './hero.js'
 import { LIGHT_SIZE, ambientOf, buildLight } from './light.js'
 import { save } from './store.js'
@@ -187,7 +188,19 @@ const createProgram = (gl, fragment) => {
   return program
 }
 
+const fitTouchCanvas = canvas => {
+  const { pixel, dpr } = LAYOUT
+  canvas.style.width = `${(VIEW.w * pixel) / dpr}px`
+  canvas.style.height = `${(VIEW.h * pixel) / dpr}px`
+  canvas.width = VIEW.w * pixel
+  canvas.height = VIEW.h * pixel
+}
+
 const fitCanvas = canvas => {
+  if (isTouchLayout()) {
+    fitTouchCanvas(canvas)
+    return
+  }
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const fit = Math.min(window.innerWidth / VIEW.w, window.innerHeight / VIEW.h)
   const scale = Math.max(1 / dpr, Math.floor(fit * dpr) / dpr)
@@ -260,6 +273,10 @@ export const createPresenter = canvas => {
   const resize = () => fitCanvas(canvas)
   window.addEventListener('resize', resize)
   resize()
+  const release = () => {
+    window.removeEventListener('resize', resize)
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+  }
 
   const uploadLight = state => {
     gl.activeTexture(gl.TEXTURE1)
@@ -285,7 +302,7 @@ export const createPresenter = canvas => {
     return [1 - 0.46 * state.depth * state.depth, amount]
   }
 
-  return (source, state) => {
+  const present = (source, state) => {
     const power = POWER[save.settings.shaders] ?? 1
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
     const [ambient, amount] = lightLevels(state)
@@ -311,4 +328,6 @@ export const createPresenter = canvas => {
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.useProgram(program)
   }
+  present.release = release
+  return present
 }
