@@ -78,7 +78,7 @@ export const TUNING = {
     alchemy: { every: 1.2, reach: 48, width: 18, renderHp: 4, spreadStep: 0.05, spreadMost: 70 },
     well: { every: 3, reach: 80, life: 2.5, radius: 60, force: 900, rogueSpeed: 32, rogueLife: 5, novaLife: 1.6, novaKick: 700 },
     swap: { every: 1.5, reach: 110, width: 16, goatTime: 6, shockDamage: 2 },
-    stop: { every: 8, time: 2.5, stillTime: 4, holdTime: 3.5 },
+    stop: { every: 8, time: 2.5, stillTime: 4, holdTime: 3.5, heavyHold: 1.2 },
     charm: { every: 5, reach: 120, width: 26, time: 8, voltEvery: 1.1, voltReach: 60 },
     decoy: { every: 4, reach: 40, life: 5, range: 130, runSpeed: 58, cloneLife: 7 },
     drone: { every: 7, fireEvery: 0.45, life: 11, range: 130, sapperSpeed: 90, moleSpeed: 44, moleLife: 8, sapperLife: 8 },

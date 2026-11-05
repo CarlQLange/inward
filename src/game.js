@@ -20,6 +20,7 @@ const R = TUNING.run
 const CARD_SIZES = { core: [16, 16] }
 const SKILL_KEYS = ['skill', 'skill2', 'skill3', 'skill4']
 const ALL_SKILLS = Object.keys(SKILLS)
+const ALL_SKILLS_EVER = new Set([...ALL_SKILLS, 'echo', 'pact'])
 
 const shuffled = list => list.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 
@@ -174,7 +175,6 @@ const settleFlung = (g, f) => {
 }
 
 const leaveRoom = g => {
-  releaseMatter(g)
   g.flung.forEach(f => settleFlung(g, f))
   Object.assign(g.rooms[keyOf(g.x, g.y)], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
@@ -211,6 +211,7 @@ const enterRoom = (g, x, y) => {
     depth: g.depthOverride ?? depthFor(g, room.ring),
     shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [],
     timeStop: 0,
+    wasHolding: false,
   })
   if (firstVisit && room.theme !== g.lastTheme && !(room.ring > g.deepestRing)) showToast(g, THEMES[room.theme].name, EVENT_TEXT[room.event] ?? '')
   else if (firstVisit && room.event && EVENT_TEXT[room.event]) showToast(g, '', EVENT_TEXT[room.event])
@@ -225,6 +226,7 @@ const enterRoom = (g, x, y) => {
 const walkThrough = (g, dir) => {
   const here = g.rooms[keyOf(g.x, g.y)]
   const [nx, ny] = here.links[dir].to
+  releaseMatter(g)
   leaveRoom(g)
   enterRoom(g, nx, ny)
   g.hinted = false
@@ -337,6 +339,9 @@ const createRun = (depthOverride, quickRing = null) => {
     effects: [],
     spawns: [],
     timeStop: 0,
+    matterHeld: false,
+    evolving: null,
+    past: [],
     lastTheme: 0,
     time: 0,
     phase: 'playing',
@@ -460,7 +465,6 @@ const OPTION_RESULTS = {
   },
   upgrade: (g, option) => {
     evolve(g, option.skill, option.node)
-    showToast(g, option.node.name)
   },
   relic: g => gainRelic(g, nextRelic(g)),
   mend: g => {
@@ -485,10 +489,12 @@ const forkChoices = p => {
 const fallbacks = g => [...(g.relicPool.length ? [{ type: 'relic', relic: g.relicPool[0] }] : []), { type: 'mend' }]
 
 const offersFor = (g, kinds) => {
-  const forks = kinds.includes('upgrade') ? forkChoices(g.player) : []
+  const p = g.player
+  const forks = kinds.includes('upgrade') ? forkChoices(p) : []
   const fresh = kinds.includes('new') && unownedSkills(g).length > 0 ? [{ type: 'new' }] : []
-  const rest = kinds.length > 1 ? fallbacks(g) : []
-  return [...forks.slice(0, 2), ...fresh, ...forks.slice(2), ...rest].slice(0, 3)
+  const third = slotsFull(p) ? [...forks.slice(2), ...fresh] : [...fresh, ...forks.slice(2)]
+  const rest = kinds.length > 1 && p.skills.length > 0 ? fallbacks(g) : []
+  return [...forks.slice(0, 2), ...third, ...rest].slice(0, 3)
 }
 
 const openOffer = (g, kinds = ['new', 'upgrade'], title = 'LEVEL UP') => {
@@ -1356,8 +1362,13 @@ export const continueRun = g => {
   }
   const fresh = createRun(g.depthOverride)
   saved.taught = new Set()
-  const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => [key, unpackRoom(room, saved.map)]))
-  const player = { ...saved.player, upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
+  const known = ({ kind }) => SKILLS[kind] || !ALL_SKILLS_EVER.has(kind)
+  const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => {
+    const unpacked = unpackRoom(room, saved.map)
+    return [key, { ...unpacked, cards: unpacked.cards.filter(known) }]
+  }))
+  saved.cardPool = saved.cardPool.filter(kind => SKILLS[kind])
+  const player = { ...saved.player, skills: saved.player.skills.filter(known), upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
   Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter })
   enterRoom(g, saved.x, saved.y)
   g.shownDepth = g.depth

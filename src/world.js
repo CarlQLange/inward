@@ -28,7 +28,7 @@ export const restoreWorld = (encoded, overloaded, drains) => {
   return world
 }
 
-export const encodeWorld = w => String.fromCharCode(...w.mat.map(m => m + 48))
+export const encodeWorld = w => String.fromCharCode(...w.mat.map((m, i) => (m === M.STILL ? w.life[i] : m) + 48))
 
 export const createWorld = (rows, overloaded = false) => {
   const size = ROOM * ROOM

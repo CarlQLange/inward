@@ -980,7 +980,7 @@ const mason = (g, p) => {
   }
   if (owns(p, 'mason.cage')) {
     const covered = inCone(muzzle(p), p.aim, S.mason.cageReach, S.mason.cageWidth)
-    const foe = nearestTo(hostile(g).filter(e => covered(centre(e))), centre(p))
+    const foe = nearestTo(hostile(g).filter(e => !e.heavy && covered(centre(e))), centre(p))
     if (foe) {
       cageFoe(g, p, foe)
       return
@@ -1205,7 +1205,7 @@ const trade = (g, p, a, b) => {
 }
 
 const swap = (g, p) => {
-  const foes = hostile(g)
+  const foes = hostile(g).filter(e => !e.heavy)
   if (owns(p, 'swap.shuffle') && foes.length > 1) {
     const order = foes.map(e => [Math.random(), e]).sort((a, b) => a[0] - b[0]).map(([, e]) => e)
     order.slice(1).forEach((e, i) => trade(g, p, order[i], e))
@@ -1218,7 +1218,7 @@ const swap = (g, p) => {
   trade(g, p, target, p)
   p.iframes = Math.max(p.iframes, 0.3)
   if (owns(p, 'swap.goat')) {
-    addEffect(g, { kind: 'lure', follow: target, x: target.x, y: target.y, life: S.swap.goatTime })
+    addEffect(g, { kind: 'lure', loud: true, follow: target, x: target.x, y: target.y, life: S.swap.goatTime })
     target.goat = S.swap.goatTime
   }
   g.pulse = Math.max(g.pulse, 0.6)
@@ -1253,8 +1253,9 @@ const stop = (g, p) => {
     addEffect(g, { kind: 'still', life: S.stop.stillTime })
   } else if (owns(p, 'stop.hold')) {
     g.enemies.filter(e => !e.friendly).forEach(e => {
-      e.stun = Math.max(e.stun, S.stop.holdTime)
-      e.frozen = Math.max(e.frozen, S.stop.holdTime)
+      const held = e.heavy ? S.stop.heavyHold : S.stop.holdTime
+      e.stun = Math.max(e.stun, held)
+      e.frozen = Math.max(e.frozen, held)
     })
     addEffect(g, { kind: 'hold', life: S.stop.holdTime })
   } else {
@@ -1286,7 +1287,7 @@ export const charmOne = (g, e, p) => {
   e.detonates = owns(p, 'charm.sacrifice')
   e.plague = owns(p, 'charm.plague')
   e.volt = owns(p, 'charm.volt') ? S.charm.voltEvery : 0
-  if (owns(p, 'charm.lure')) addEffect(g, { kind: 'lure', follow: e, x: e.x, y: e.y, life: S.charm.time })
+  if (owns(p, 'charm.lure')) addEffect(g, { kind: 'lure', loud: true, follow: e, x: e.x, y: e.y, life: S.charm.time })
   const c = centre(e)
   ring(g, c.x, c.y, hue(p, 'charm', 'gas'), 12, 40)
 }
