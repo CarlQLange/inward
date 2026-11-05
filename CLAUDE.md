@@ -107,6 +107,8 @@ effects must spread across blocks visibly and be readable without text.
   (the surprise, not 3D as such) and Animal Well's visual confidence. Less visual interest outside, more going in, and a combo should be able to break the game a little
   without one pair of skills solving it. He's the customer now and doesn't want to be asked. `docs/direction.md`
   holds what this means.
+- On-screen text says literally what happens, in plain flat words: name the concrete thing and state the cost
+  directly. No riddles, mood lines or objects with agency. Use the same word for the same thing everywhere.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
