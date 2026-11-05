@@ -4,6 +4,8 @@ import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
 import { SKILL_DETAILS, SKILL_NAMES, TREES } from './skills.js'
 import { SPRITES } from './sprites.js'
 import { knownNotes, save } from './store.js'
+import { almanac } from './discover.js'
+import { drawWardenMarks } from './overlay.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
@@ -173,6 +175,8 @@ const MATERIAL_ORDER = [
 ]
 const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS TO ROCK'], ['bubble', 'SPLITS INTO GAS'], ['grow', 'GROWS NEAR WATER'], ['rain', 'RAINS BACK DOWN'], ['dissolve', 'DISSOLVES IN ACID']]
 
+const knownReactions = () => [...knownNotes].filter(note => !/^(seen|met|killed):/.test(note))
+
 const noteLines = () => {
   const materials = MATERIAL_ORDER.filter(m => knownNotes.has(`seen:${m}`)).map(m => ({
     tile: m,
@@ -228,7 +232,7 @@ const drawSummary = (ctx, g, menu) => {
     ['BEST', save.best, g.newBest ? YELLOW : DIM],
     ['RING', `${g.deepestRing + 1} OF ${CORE_RING + 1}`, PALE],
     ['ROOMS', g.roomsSeen, PALE],
-    ['LEVEL', g.level, PALE],
+    ['FOUND', `${g.foundThisRun.length}   ${almanac(knownReactions()).found}/${almanac().total}`, g.foundThisRun.length ? YELLOW : PALE],
     ['KILLS', g.kills, PALE],
     ['BY THE WORLD', g.environmentKills, YELLOW],
     ['BEST CHAIN', g.chainPeak, PALE],
@@ -276,7 +280,7 @@ const drawCards = (ctx, menu, cards) => {
   centred(ctx, 'LEFT AND RIGHT, THEN Z', top + 98, DIM)
 }
 
-const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW }
+const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW, seal: '#ffffff' }
 const STEPS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }
 const MAP_RINGS = ['#0d2412', '#10291a', '#13301f', '#163624', '#1a3d29', '#1e452e', '#234e34', '#2b5a3a']
 
@@ -295,7 +299,7 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
       if (!room) continue
       for (const [dir, link] of Object.entries(room.links)) {
         const [dx, dy] = STEPS[dir]
-        const lock = link.lock && room.doors[dir] && lockStands(room, dir)
+        const lock = link.lock && room.doors[dir] && (link.lock === 'seal' ? g.seals < 3 : lockStands(room, dir))
         ctx.fillStyle = lock ? LOCK_COLOURS[link.lock] : GREEN
         const px = left + x * pitch + (cellSize - 1) / 2 + dx * (pitch / 2 + (cellSize - 1) / 4)
         const py = top + y * pitch + (cellSize - 1) / 2 + dy * (pitch / 2 + (cellSize - 1) / 4)
@@ -319,6 +323,7 @@ const drawMap = (ctx, g, menu) => {
   const pitch = 10
   const size = 15 * pitch
   drawMapGrid(ctx, g, CENTRE - size / 2, ORIGIN.y + 34, pitch)
+  drawWardenMarks(ctx, g, CENTRE - size / 2, ORIGIN.y + 34, pitch)
   centred(ctx, `RING ${g.ring + 1} OF ${CORE_RING + 1}   ROOMS SEEN ${g.roomsSeen}`, ORIGIN.y + 188, PALE)
   drawList(ctx, menu, ORIGIN.y + 200)
 }

@@ -2,6 +2,7 @@ import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
 import { ENEMY_DEFS } from './enemies.js'
+import { drawBossBar, drawReveal, drawRunMarks } from './overlay.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMapGrid, drawMenus, drawToast } from './screens.js'
@@ -510,6 +511,8 @@ export const draw = (ctx, g, pointer) => {
   drawOverlays(ctx, g.world, g.time)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
+  drawBossBar(ctx, g)
+  drawReveal(ctx, g)
   if (usesMouse() && pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
   if (g.looking) drawLook(ctx, g)
   if (g.hurtFlash > 0) {
@@ -525,6 +528,7 @@ export const draw = (ctx, g, pointer) => {
   if (g.phase !== 'title') {
     drawLeftHud(ctx, g)
     drawRightHud(ctx, g)
+    drawRunMarks(ctx, g)
     if (g.menus.length === 0) drawToast(ctx, g)
     if (g.looking) drawLookLegend(ctx)
   }
