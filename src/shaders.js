@@ -644,9 +644,10 @@ uniform sampler2D front;
 uniform vec4 actorRect;
 uniform float actors;
 uniform float opacity;
+uniform float worldOn;
 
 void main() {
-  vec3 world = texture2D(roomNow, vec2(uv.x, 1.0 - uv.y)).rgb;
+  vec3 world = texture2D(roomNow, vec2(uv.x, 1.0 - uv.y)).rgb * worldOn;
   vec4 f = texture2D(front, actorRect.xy + uv * actorRect.zw) * actors;
-  gl_FragColor = vec4((f.rgb + world * (1.0 - f.a)) * opacity, opacity);
+  gl_FragColor = vec4((f.rgb + world * (1.0 - f.a)) * opacity, mix(f.a, 1.0, worldOn) * opacity);
 }`

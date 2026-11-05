@@ -1,3 +1,4 @@
+import { pausedOverPit } from './moment.js'
 import { M, MATERIAL_NAMES } from './materials.js'
 import { ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
@@ -218,7 +219,7 @@ const relicColumn = (ctx, g, menu) => {
 }
 
 const drawPause = (ctx, g, menu) => {
-  shade(ctx, 0.88)
+  shade(ctx, pausedOverPit(g) ? 0.3 : 0.88)
   const { pitch, mapTop, listTop } = pauseFrame()
   drawMapGrid(ctx, g, midX() - (15 * pitch) / 2, mapTop, pitch)
   drawList(ctx, menu, listTop, menu.focus === 'list', 10)

@@ -12,6 +12,7 @@ const SIZE = ROOM * BLOCK
 const NOISE_SIZE = 64
 const PIT_COLOUR = [0.34, 0.62, 0.58]
 const MAP_CENTRE = 7
+const FULL_FRONT = new Float32Array([2, 0, 0, 0, 0, -2, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1])
 const LOOP_TINTS = [[1, 0.2, 0.45], [0.2, 1, 0.8], [1, 0.8, 0.2], [0.45, 0.3, 1]]
 
 const compile = (gl, type, source) => {
@@ -121,7 +122,7 @@ export const createPresenter = canvas => {
   const opticsProgram = programOf(gl, OPTICS, ['worldLayer', 'cells', 'fields', 'lightMap', 'noise', 'front'], OPTICS_UNIFORMS, ['frontOrigin', 'frontScale', 'ripples', 'fogColour', 'beamColour'])
   const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'lightMap', 'noise'], FRAME_UNIFORMS, frameExtras)
   const displayProgram = programOf(gl, DISPLAY, ['scene'], ['lcd', 'scanline'], ['view', 'room'])
-  const quadProgram = programOf(gl, QUAD, ['roomNow', 'front'], ['actors', 'opacity'], ['transform', 'actorRect'], QUAD_VERTEX)
+  const quadProgram = programOf(gl, QUAD, ['roomNow', 'front'], ['actors', 'opacity', 'worldOn'], ['transform', 'actorRect'], QUAD_VERTEX)
 
   const triangle = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, triangle)
@@ -359,6 +360,21 @@ export const createPresenter = canvas => {
     return { ambient: era.ambient, amount: era.light, front: 0.55 + era.ambient * 0.25, forced: 0 }
   }
 
+  const drawQuad = (roomNow, transform, rect, values) => {
+    gl.useProgram(quadProgram.program)
+    bind(quadProgram, { roomNow: roomNow.tex, front: textures.front })
+    const { at } = quadProgram
+    gl.uniformMatrix4fv(at.transform, false, transform)
+    gl.uniform4f(at.actorRect, ...rect)
+    setFloats(quadProgram, values)
+    useBuffer(square)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    gl.disable(gl.BLEND)
+    useBuffer(triangle)
+  }
+
   const stageApi = (roomNow, frame, draw) => ({
     gl,
     target: frame,
@@ -366,20 +382,9 @@ export const createPresenter = canvas => {
     actors: () => textures.front,
     drawFrame: draw,
     drawRoom: (transform, { actors = true, opacity = 1 } = {}) => {
-      gl.useProgram(quadProgram.program)
-      bind(quadProgram, { roomNow: roomNow.tex, front: textures.front })
-      const { at } = quadProgram
-      gl.uniformMatrix4fv(at.transform, false, transform)
-      gl.uniform4f(at.actorRect, ORIGIN.x / VIEW.w, ORIGIN.y / VIEW.h, SIZE / VIEW.w, SIZE / VIEW.h)
-      gl.uniform1f(at.actors, actors ? 1 : 0)
-      gl.uniform1f(at.opacity, opacity)
-      useBuffer(square)
-      gl.enable(gl.BLEND)
-      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-      gl.disable(gl.BLEND)
-      useBuffer(triangle)
+      drawQuad(roomNow, transform, [ORIGIN.x / VIEW.w, ORIGIN.y / VIEW.h, SIZE / VIEW.w, SIZE / VIEW.h], { actors: actors ? 1 : 0, opacity, worldOn: 1 })
     },
+    drawFront: () => drawQuad(roomNow, FULL_FRONT, [0, 0, 1, 1], { actors: 1, opacity: 1, worldOn: 0 }),
   })
 
   const present = (layers, state, shake = { x: 0, y: 0 }) => {

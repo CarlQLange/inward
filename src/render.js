@@ -1,6 +1,7 @@
 import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
+import { pausedOverPit } from './moment.js'
 import { drawBossBar, drawReveal } from './overlay.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
@@ -154,7 +155,7 @@ export const draw = (ctx, g, pointer) => {
   ctx.beginPath()
   ctx.rect(0, 0, ROOM_PX, ROOM_PX)
   ctx.clip()
-  drawRoom(ctx, g, pointer)
+  if (!pausedOverPit(g)) drawRoom(ctx, g, pointer)
   ctx.restore()
   if (g.phase !== 'title') {
     if (g.menus.at(-1)?.page !== 'pause') drawHud(ctx, g)

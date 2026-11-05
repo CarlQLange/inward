@@ -38,6 +38,7 @@ uniform sampler2D atlas;
 uniform float time;
 uniform float openRing;
 uniform float sweep;
+uniform vec2 here;
 varying vec2 vUv;
 varying float vKind;
 varying float vRing;
@@ -64,6 +65,8 @@ void main() {
     colour = texture2D(atlas, vUv).rgb * (0.42 + coreLight * 1.5);
     colour = mix(colour, hue * (0.3 + opened * 0.8), edge);
     colour += hue * wave * 0.45;
+    vec2 fromHere = abs(vWorld.xy - here);
+    if (max(fromHere.x, fromHere.y) < 0.5) colour = mix(colour, vec3(1.0), (0.2 + 0.25 * sin(time * 7.0)) + edge * 0.6);
   } else if (vKind < 1.5) {
     float bands = 0.5 + 0.5 * sin(vHeight * 40.0 + time * 1.5 - vRing);
     colour = hue * (0.05 + 0.1 * bands + coreLight * 0.24 * vHeight);
@@ -245,7 +248,7 @@ export const createPit = gl => {
   const shaftBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, shaftBuffer)
   gl.bufferData(gl.ARRAY_BUFFER, mesh.shaft, gl.STATIC_DRAW)
-  const U = Object.fromEntries(['camera', 'time', 'openRing', 'sweep', 'atlas'].map(name => [name, gl.getUniformLocation(program, name)]))
+  const U = Object.fromEntries(['camera', 'time', 'openRing', 'sweep', 'atlas', 'here'].map(name => [name, gl.getUniformLocation(program, name)]))
 
   const atlasCanvas = document.createElement('canvas')
   atlasCanvas.width = atlasCanvas.height = MAP_SIZE * THUMB
@@ -272,7 +275,7 @@ export const createPit = gl => {
     }, 0)
   }
 
-  const draw = (view, { time, seals = 0, sweep = -5 }) => {
+  const draw = (view, { time, seals = 0, sweep = -5, tile = null }) => {
     gl.useProgram(program)
     ATTRIBUTES.forEach((_, i) => gl.enableVertexAttribArray(i))
     gl.activeTexture(gl.TEXTURE0)
@@ -285,6 +288,7 @@ export const createPit = gl => {
     gl.uniform1f(U.time, time)
     gl.uniform1f(U.openRing, seals > 0 ? SEAL_RINGS[Math.min(seals, SEAL_RINGS.length) - 1] : -1)
     gl.uniform1f(U.sweep, sweep)
+    gl.uniform2f(U.here, tile ? worldX(tile[0]) : 99, tile ? worldY(tile[1]) : 99)
     bindMesh(solidBuffer)
     gl.drawArrays(gl.TRIANGLES, 0, mesh.solid.length / FLOATS)
     gl.enable(gl.BLEND)

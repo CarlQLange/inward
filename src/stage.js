@@ -1,6 +1,6 @@
 import { VIEW } from './config.js'
-import { stagedMoment } from './moment.js'
-import { createPit, pitView, tileTransform } from './pit.js'
+import { pausedOverPit, stagedMoment } from './moment.js'
+import { createPit, overview, pitView, tileTransform } from './pit.js'
 import { setStage } from './present.js'
 
 const pits = new WeakMap()
@@ -21,7 +21,26 @@ const withDepth = (gl, depth, draw) => {
   gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, null)
 }
 
+const drawPause = (api, state) => {
+  const { gl } = api
+  const held = pitFor(gl)
+  const menu = state.menus.at(-1)
+  if (held.moment !== menu) {
+    held.pit.refresh(state)
+    held.moment = menu
+  }
+  held.clock = (held.clock ?? 0) + 1 / 60
+  gl.bindFramebuffer(gl.FRAMEBUFFER, api.target.fbo)
+  gl.viewport(0, 0, api.target.w, api.target.h)
+  withDepth(gl, held.depth, () => held.pit.draw(overview(held.clock), { time: held.clock, seals: state.seals, tile: [state.x, state.y] }))
+  api.drawFront()
+}
+
 setStage((api, state) => {
+  if (pausedOverPit(state)) {
+    drawPause(api, state)
+    return
+  }
   const moment = stagedMoment(state)
   if (!moment) {
     api.drawFrame()
@@ -40,6 +59,6 @@ setStage((api, state) => {
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, api.target.fbo)
   gl.viewport(0, 0, api.target.w, api.target.h)
-  withDepth(gl, held.depth, () => held.pit.draw(shot.view, { time: moment.t, seals: state.seals, sweep: shot.sweep }))
+  withDepth(gl, held.depth, () => held.pit.draw(shot.view, { time: moment.t, seals: state.seals, sweep: shot.sweep, tile: moment.tile }))
   if (shot.liveAmount > 0) api.drawRoom(tileTransform(shot.view, moment.tile), { opacity: shot.liveAmount })
 })
