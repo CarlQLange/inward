@@ -42,7 +42,35 @@ export const drawBossBar = (ctx, g) => {
   ctx.fillRect(11, 3, width + 2, 5)
   ctx.fillStyle = boss.shield > 0 ? '#ffffff' : boss.stun > 0 ? '#f5e663' : '#ff3a3a'
   ctx.fillRect(12, 4, Math.round(width * share), 3)
+  drawWardenTells(ctx, g, boss)
   drawWards(ctx, g, boss)
+}
+
+const LOOP_HUES = ['#ff2a6a', '#2affc8', '#ffc82a', '#6a4aff']
+
+export const drawLoopHue = (ctx, g) => {
+  if (!g.loop || g.phase === 'title') return
+  ctx.globalCompositeOperation = 'hue'
+  ctx.globalAlpha = TUNING.run.deep.hueAlpha
+  ctx.fillStyle = LOOP_HUES[(g.loop - 1) % LOOP_HUES.length]
+  ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
+  ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
+}
+
+const drawWardenTells = (ctx, g, e) => {
+  ctx.fillStyle = '#ffe84a'
+  if (e.railY != null) {
+    for (let x = 16 + Math.floor(g.time * 40) % 4; x < 208; x += 4) ctx.fillRect(x, Math.round(e.railY), 2, 1)
+  }
+  if (e.stormAt) {
+    const { x, y } = e.stormAt
+    for (let dy = 24; dy < y; dy += 5) ctx.fillRect(Math.round(x), dy, 1, 2)
+  }
+  if (e.heaveAt != null) {
+    ctx.fillStyle = '#c9d4c0'
+    ctx.fillRect(e.heaveAt * BLOCK, (e.floorRow ?? 24) * BLOCK - 2, BLOCK * 2, 1)
+  }
 }
 
 const auraPoint = (e, t) => {

@@ -273,6 +273,7 @@ const worker = async ({ opts, from, to }) => {
         const blocked = !lineClear(g.world, me, c)
         if (p.hitWall) bot.sidestep = -(bot.sidestep ?? 1)
         if (blocked || (p.hitWall && dist < 50)) input[(bot.sidestep ?? 1) > 0 ? 'right' : 'left'] = true
+        else if (p.keystones.has('fists')) input[near] = dist > 8
         else if (dist < 50) input[away] = true
         else if (dist > 110) input[near] = true
         else if (Math.random() < 0.02) input[Math.random() < 0.5 ? 'left' : 'right'] = true
@@ -517,6 +518,7 @@ const worker = async ({ opts, from, to }) => {
       gold: g.gold,
       seals: g.seals,
       loop: g.loop,
+      where: `${g.rooms[keyOf(g.x, g.y)].layout} L${g.loop} seals ${g.seals}${g.boss ? ` ${g.boss.kind} ${Math.round((100 * g.boss.hp) / g.boss.maxHp)}%` : ''}`,
       keystones: [...g.player.keystones],
       tally: g.tally,
       omens: g.omens,
@@ -572,6 +574,7 @@ const report = (results, opts, realSeconds) => {
   line(`\n=== ${results.length} runs in ${realSeconds.toFixed(0)}s real ===`)
   line(`outcomes: ${top(tally(results.map(r => (r.timedOut ? 'timeout' : r.phase))))}`)
   line(`errors: ${results.filter(r => r.error).length}, NaNs: ${results.filter(r => r.nan).length}`)
+  line(`timed out at: ${top(tally(results.filter(r => r.timedOut).map(r => r.where)), 8)}`)
   for (const [message, count] of Object.entries(tally(results.filter(r => r.error).map(r => r.error))).slice(0, 8)) line(`  x${count} ${message}`)
   for (const r of results.filter(r => r.nan).slice(0, 5)) line(`  nan: ${r.nan}`)
   line(`softlocks (no reachable exit): ${results.reduce((n, r) => n + r.softlocks, 0)} in ${results.filter(r => r.softlocks).length} runs. ${top(tally(results.flatMap(r => r.softlockRooms)), 8)}`)

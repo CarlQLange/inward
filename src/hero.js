@@ -131,6 +131,18 @@ const paintGun = (shoulder, angle, recoil) => {
   return tip
 }
 
+const paintFist = (shoulder, angle, recoil) => {
+  const reach = 2 + recoil * 2
+  const dx = Math.cos(angle)
+  const dy = Math.sin(angle)
+  const tip = { x: shoulder.x + dx * (reach + 2), y: shoulder.y + dy * (reach + 2) }
+  line(shoulder.x, shoulder.y, tip.x, tip.y, SUIT)
+  plot(tip.x, tip.y, LAMP)
+  plot(tip.x + 1, tip.y, LAMP)
+  plot(tip.x, tip.y + 1, LAMP)
+  return tip
+}
+
 const paintBody = (pose, f) => {
   const { body, head, feet, height, hand } = pose
   if (hand) line(body.x - f, body.y + 1, body.x + hand.x, body.y + hand.y, SUIT_SHADE)
@@ -594,7 +606,7 @@ export const drawHero = (ctx, g, p) => {
   const visor = pose.visor ?? (h.blink > 0 ? 'blink' : 'on')
   paintHelmet(pose.head.x, pose.head.y, f, { ...look, visor })
   const shoulder = { x: pose.body.x + f, y: pose.body.y + 1 }
-  const tip = paintGun(shoulder, h.angle, h.recoil > 0.45 ? 2 : h.recoil > 0 ? 1 : 0)
+  const tip = (p.keystones?.has('fists') ? paintFist : paintGun)(shoulder, h.angle, h.recoil > 0.45 ? 2 : h.recoil > 0 ? 1 : 0)
   outline()
   const palette = h.hurt > 0.26 ? FLASH_WHITE : h.hurt > 0.2 ? FLASH_RED : PALETTE
   blit(ctx, wx, wy, palette)

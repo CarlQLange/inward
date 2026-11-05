@@ -477,6 +477,8 @@ const placeAtDoor = g => {
   p.iframes = TUNING.feel.entryShield * 2
 }
 
+const WARDEN_KINDS = ['bellows', 'colossus', 'crucible', 'eel', 'brood', 'conductor']
+
 const chooseWardens = (known, secrets) => {
   const fresh = secrets.filter(key => key.startsWith('warden:')).map(key => key.split(':')[1])
   const owned = [...known].filter(key => key.startsWith('warden:')).map(key => key.split(':')[1]).filter(id => !fresh.includes(id))
@@ -1440,13 +1442,22 @@ const landingRoom = map => {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
+const deepSecrets = (g, omen) => {
+  const strange = shuffled(WARDEN_KINDS.filter(id => !isKnown(g, 'warden', id)))[0]
+  return [
+    ...g.secrets,
+    ...(omen && !isKnown(g, 'omen', omen) ? [`omen:${omen}`] : []),
+    ...(strange ? [`warden:${strange}`] : []),
+  ]
+}
+
 const descend = g => {
   const p = g.player
   const from = g.rooms[keyOf(g.x, g.y)]
   const omen = rollDeepOmen(g)
   const mutation = rollMutation(g)
   const omens = omen ? [...g.omens, omen] : g.omens
-  const secrets = omen && !isKnown(g, 'omen', omen) ? [...g.secrets, `omen:${omen}`] : g.secrets
+  const secrets = deepSecrets(g, omen)
   const known = knownFrom(secrets)
   const bands = deepBands(g.bands)
   const seed = Math.floor(Math.random() * 1e9)
@@ -1460,7 +1471,7 @@ const descend = g => {
     flocking: omenFoes(omens).flock === true,
     mutations: mutation ? [...g.mutations, mutation] : g.mutations,
     bandFoes: chooseBandFoes(bands, known, secrets),
-    wardenOrder: chooseWardens(known, []),
+    wardenOrder: chooseWardens(known, secrets),
     wardens: {}, wardenAt: {}, seals: 0, rooms: {},
     ghost: null, charted: false, ending: null, boss: null,
     deepestRing: DEEP.startRing, lastTheme: -1, keystoneDue: true,

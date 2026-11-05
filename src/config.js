@@ -214,6 +214,7 @@ export const TUNING = {
       startRing: 3,
       wardenRings: [3, 4, 5],
       wake: [0.5, 0.7, 0.85],
+      hueAlpha: 0.32,
       heal: 2,
       foeHp: 0.4,
       wardenHp: 0.35,

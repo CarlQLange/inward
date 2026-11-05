@@ -1,7 +1,7 @@
 import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
-import { drawBossBar, drawReveal } from './overlay.js'
+import { drawBossBar, drawLoopHue, drawReveal } from './overlay.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMenus, drawToast } from './screens.js'
@@ -193,6 +193,7 @@ const drawRoom = (ctx, g, pointer) => {
     ctx.translate(Math.round(-ux * (1 - slide.t) * ROOM_PX), Math.round(-uy * (1 - slide.t) * ROOM_PX))
   }
   drawScene(ctx, g, { ...room, theme: g.phase === 'title' ? 0 : room.theme, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
+  drawLoopHue(ctx, g)
   drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
   drawHeroLayer(ctx, g)

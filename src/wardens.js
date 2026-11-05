@@ -434,6 +434,8 @@ const surfaceAt = (g, x) => {
   return ROOM - 3
 }
 
+const SURGE_TOP = 14
+
 const eelMoves = {
   leap: {
     tell: 0.7, act: 2.5, rest: 1.1,
@@ -488,7 +490,7 @@ const eelMoves = {
     during: g => {
       const x = 6 + Math.floor(Math.random() * 16)
       const y = surfaceAt(g, x) - 1
-      if (y > 10 && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.WATER)
+      if (y >= SURGE_TOP && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.WATER)
     },
   },
   spines: {
