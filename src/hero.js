@@ -211,7 +211,7 @@ const stanceOf = (g, p, h) => {
   const middle = p.x + p.w / 2
   if (h.hurt > 0.16) return 'hurt'
   if (p.dashing > 0) return 'dash'
-  if (liquidAtPx(world, middle, p.y + p.h / 2)) return 'swim'
+  if (liquidAtPx(world, middle, p.y + p.h / 2) || (p.digging > 0 && solidAt(world, middle, p.y + p.h / 2))) return 'swim'
   if (p.crouching) return 'crouch'
   if (p.clinging > 0 && !p.grounded) return 'cling'
   if (!p.grounded && vineAt(world, Math.floor(middle / 8), Math.floor((p.y + p.h / 2) / 8))) return 'climb'
@@ -609,7 +609,7 @@ export const drawHero = (ctx, g, p) => {
   const tip = (p.keystones?.has('fists') ? paintFist : paintGun)(shoulder, h.angle, h.recoil > 0.45 ? 2 : h.recoil > 0 ? 1 : 0)
   outline()
   const palette = h.hurt > 0.26 ? FLASH_WHITE : h.hurt > 0.2 ? FLASH_RED : PALETTE
-  blit(ctx, wx, wy, palette)
+  blit(ctx, wx, wy, palette, p.digging > 0 ? y => solidAt(g.world, p.x + p.w / 2, wy + y - OY) : undefined)
   const anchor = anchorOf(p, h, pose)
   drawKnot(ctx, Math.round(anchor.x + f), Math.round(anchor.y))
   h.tip = { x: wx + tip.x, y: wy + tip.y }

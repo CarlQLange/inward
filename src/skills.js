@@ -6,6 +6,7 @@ import { burst, hurt } from './combat.js'
 import { chunks } from './feel.js'
 import { shotBox } from './cast.js'
 import { feedEvent } from './feed.js'
+import { burrow, clay, digging, surface } from './earth.js'
 
 const S = TUNING.skills
 
@@ -126,6 +127,14 @@ export const FORKS = {
     [form('mirror.pane', 'PANE', 'LEAVES A MIRROR STANDING', COLD), form('mirror.maw', 'MAW', 'TAKES IN SHOTS, THEN FIRES THEM BACK', BLOOD)],
     [form('mirror.parry', 'PARRY', 'SHORTER. EACH RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
+  clay: [
+    [form('clay.daub', 'DAUB', 'STICKS TO A FOE. IT DRIPS MUD', BLOOD), form('clay.roll', 'ROLL', 'ROLLS AND PICKS UP SAND AND SNOW', STONE)],
+    [form('clay.cast', 'CAST', 'SETS INTO BRICK WHERE IT LANDS', FIRE), form('clay.bog', 'BOG', 'TURNS SAND, ASH AND SNOW NEAR IT TO MUD', ACID)],
+  ],
+  burrow: [
+    [form('burrow.tunnel', 'TUNNEL', 'LEAVES AN OPEN TUNNEL', WHITE), form('burrow.grind', 'GRIND', 'SWIMS THROUGH ROCK TOO, LEAVING SAND', STONE)],
+    [form('burrow.quicksand', 'QUICKSAND', 'FOES ABOVE YOU SINK IN', BLOOD), form('burrow.breach', 'BREACH', 'COMING OUT THROWS YOU UP', MAGNET)],
+  ],
 }
 
 export const TREES = Object.fromEntries(Object.entries(FORKS).map(([kind, forks]) => [kind, forks.flat()]))
@@ -152,6 +161,8 @@ const HANDS = {
   dash: { type: 'stock', most: S.dash.stock },
   mason: { type: 'stock', most: S.mason.stock },
   mine: { type: 'stock', most: S.mine.stock },
+  clay: { type: 'stock', most: S.clay.stock },
+  burrow: { type: 'stream', time: S.burrow.time },
   'bolt.leyden': { type: 'swell', time: S.bolt.leydenTime },
   'roar.swell': { type: 'swell', time: S.roar.swellTime },
   'ember.jet': { type: 'stream', time: S.ember.jetTime },
@@ -1651,13 +1662,16 @@ const STREAMS = {
   'dash.drive': { run: driveOn },
   'grapple.sling': { run: swing, stop: letGo },
   'frost.glide': { run: glideOn, stop: glideOff },
+  burrow: { run: (g, p) => digging(g, p), stop: (g, p) => surface(g, p) },
 }
 
-export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id]).filter(Boolean).at(-1)
+export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id]).filter(Boolean).at(-1) ?? STREAMS[kind]
 
 export const SKILLS = {
   bolt, repel, ember, frost, hammer, gust, blink, grapple, dash, rewind, mason, seed, spring, acid, melt, alchemy,
   well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror,
+  clay: (g, p) => clay(g, p),
+  burrow: (g, p) => burrow(g, p),
 }
 
 export const SKILL_NAMES = Object.fromEntries(Object.keys(SKILLS).map(k => [k, k.toUpperCase()]))
@@ -1689,6 +1703,8 @@ export const SKILL_DETAILS = {
   mine: 'EXPLODES WHEN A FOE COMES NEAR.',
   roar: 'STUNS AND SCATTERS.',
   mirror: 'THROWS SHOTS BACK.',
+  clay: 'THROWS MUD. FIRE BAKES IT INTO BRICK.',
+  burrow: 'HOLD TO SWIM THROUGH SAND, SNOW, MUD AND PEAT.',
 }
 
 export const spillNapalm = (g, x, y) => {

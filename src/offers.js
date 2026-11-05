@@ -13,6 +13,8 @@ const MAKES = {
   'spring.slush': ['ice'], 'bolt.split': ['gas'], 'hammer.tremor': ['falling'], 'hammer.fuse': ['blast', 'blastKill'], 'frost.shatter': ['blast', 'blastKill'],
   'seed.tinder': ['blast', 'blastKill'], 'melt.flash': ['blast', 'steam'], 'roar.rime': ['ice', 'stun'], 'alchemy.vapour': ['gas'], 'mine.gas': ['gas'], 'decoy.gas': ['gas'],
   'ember.napalm': ['fire'], 'melt.forge': ['lava'],
+  clay: ['mud'], 'clay.daub': ['stun'], 'clay.bog': ['mud'], 'clay.roll': ['falling'],
+  'burrow.tunnel': ['falling'], 'burrow.grind': ['rubble', 'falling'], 'burrow.quicksand': ['stun', 'falling'], 'burrow.breach': ['air'],
 }
 
 const REGION_FOOD = [
