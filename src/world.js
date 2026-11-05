@@ -47,6 +47,7 @@ export const createWorld = (rows, overloaded = false) => {
     life,
     moved: new Uint8Array(size),
     crushing: new Uint8Array(size),
+    drop: new Uint8Array(size),
     frontier: [],
     clocks: { fluid: 0, fire: 0, charge: 0 },
     flip: 0,
@@ -64,10 +65,11 @@ const place = (w, i, mat, life = 0) => {
   w.burn[i] = 0
   w.charge[i] = 0
   w.life[i] = life
+  w.drop[i] = 0
 }
 
 const swap = (w, a, b) => {
-  for (const f of [w.mat, w.burn, w.charge, w.refractory, w.life]) {
+  for (const f of [w.mat, w.burn, w.charge, w.refractory, w.life, w.drop]) {
     const held = f[a]
     f[a] = f[b]
     f[b] = held
@@ -98,8 +100,12 @@ export const loosen = (w, x, y) => {
   return true
 }
 
-const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE, M.RIME, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE])
-const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.FLOE, M.RIME, M.SCRAP]
+const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE, M.RIME, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE, M.SNOW, M.MUD])
+const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.FLOE, M.RIME, M.SCRAP, M.SNOW]
+const THROWN = new Set([M.SAND, M.SCRAP, M.FLOE, M.SNOW, M.MUD])
+const ICY = new Set([M.ICE, M.FLOE, M.RIME])
+const WET = new Set([M.WATER, M.MUD])
+const N8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
 
 const flammabilityOf = (w, mat) => {
   if (w.overloaded && mat === M.ROCK) return T.overloadBurn
@@ -128,7 +134,43 @@ export const energize = (w, x, y, energy) => {
   w.frontier.push({ x, y, energy })
 }
 
-const note = (w, tag, mat) => w.notes?.add(`${tag}:${mat}`)
+const note = (w, tag, mat) => {
+  w.notes?.add(`${tag}:${mat}`)
+  if (w.counts) w.counts[tag] = (w.counts[tag] ?? 0) + 1
+}
+
+export const tallyRule = (w, tag, mat) => note(w, tag, mat)
+
+const turn = (w, i, mat, tag) => {
+  note(w, tag, mat)
+  place(w, i, mat)
+}
+
+export const shatter = (w, x, y, fromX = x, fromY = y + 1) => {
+  if (!inside(x, y) || !props(w.mat[idx(x, y)]).brittle) return false
+  turn(w, idx(x, y), M.EMPTY, 'shatter')
+  w.events.push({ type: 'shatter', x, y, fromX, fromY })
+  return true
+}
+
+const throwCell = (w, x, y, fromX, fromY) => {
+  const i = idx(x, y)
+  const mat = w.mat[i]
+  turn(w, i, M.EMPTY, 'throw')
+  w.events.push({ type: 'throw', x, y, mat, fromX, fromY })
+}
+
+export const bake = (w, x, y) => {
+  if (!inside(x, y)) return false
+  const i = idx(x, y)
+  const m = w.mat[i]
+  if (m === M.SAND) turn(w, i, M.GLASS, 'glaze')
+  else if (m === M.MUD) turn(w, i, M.BRICK, 'bake')
+  else if (props(m).melts) turn(w, i, M.WATER, 'melt')
+  else if (flammabilityOf(w, m) && w.burn[i] <= 0) ignite(w, x, y)
+  else return false
+  return true
+}
 
 const bubble = (w, i) => {
   if (w.mat[i] !== M.WATER || Math.random() > T.bubble) return
@@ -149,26 +191,46 @@ const conduct = (w, i, energy) => {
   }
 }
 
+const soak = (w, x, y, mat) => {
+  if (mat === M.SAND) {
+    if (Math.random() > T.soak || !N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.WATER)) return false
+    turn(w, idx(x, y), M.MUD, 'soak')
+    return true
+  }
+  if (mat !== M.ASH || Math.random() > T.regrow || !props(matAt(w, x, y + 1)).solid) return false
+  if (!N8.some(([dx, dy]) => WET.has(matAt(w, x + dx, y + dy)))) return false
+  turn(w, idx(x, y), M.MOSS, 'regrow')
+  return true
+}
+
+const DROWNS = { [M.ASH]: [M.MUD, 'soak'], [M.SNOW]: [M.WATER, 'melt'] }
+
 const fall = (w, x, y) => {
   const i = idx(x, y)
+  const mat = w.mat[i]
+  const p = props(mat)
   const below = matAt(w, x, y + 1)
-  if (props(w.mat[i]).floats && matAt(w, x, y - 1) === M.WATER) {
+  if (p.floats && matAt(w, x, y - 1) === M.WATER) {
     swap(w, i, idx(x, y - 1))
     return
   }
-  const sinks = below === M.WATER && props(w.mat[i]).sinks === true
-  if (below === M.WATER && w.mat[i] === M.ASH) {
-    place(w, i, M.EMPTY)
+  if (below === M.WATER && DROWNS[mat]) {
+    turn(w, i, ...DROWNS[mat])
     return
   }
+  if (soak(w, x, y, mat)) return
+  const sinks = below === M.WATER && p.sinks === true
   if (isOpen(w, x, y + 1) || sinks) {
-    const heavy = props(w.mat[i]).solid === true
-    note(w, 'fall', w.mat[i])
-    swap(w, i, idx(x, y + 1))
-    if (heavy) w.crushing[idx(x, y + 1)] = 1
+    const j = idx(x, y + 1)
+    note(w, 'fall', mat)
+    swap(w, i, j)
+    if (w.drop[j] < 255) w.drop[j] += 1
+    if (p.solid && !p.soft) w.crushing[j] = 1
     return
   }
-  if (!props(w.mat[i]).slides) return
+  if (p.solid && !p.soft && w.drop[i] >= T.shatterDrop) shatter(w, x, y + 1, x, y)
+  w.drop[i] = 0
+  if (!p.slides && !(p.thick && Math.random() < T.mudSlump)) return
   const side = Math.random() < 0.5 ? 1 : -1
   for (const d of [side, -side]) {
     if (isOpen(w, x + d, y) && isOpen(w, x + d, y + 1)) {
@@ -215,6 +277,10 @@ const rise = (w, x, y) => {
 const ageOut = (w, i, dt) => {
   w.life[i] -= dt
   if (w.life[i] > 0) return
+  if (w.mat[i] === M.STEAM && w.cold && Math.random() < T.snowfall) {
+    turn(w, i, M.SNOW, 'snow')
+    return
+  }
   const condenses = w.mat[i] === M.STEAM && props(w.mat[i - ROOM] ?? M.EMPTY).solid === true && Math.random() < T.rain
   if (condenses) note(w, 'rain', M.STEAM)
   place(w, i, condenses ? M.WATER : M.EMPTY)
@@ -232,7 +298,10 @@ const stepLava = (w, x, y, dt) => {
       place(w, i, M.ROCK)
       return true
     }
-    if (props(other).melts) place(w, idx(nx, ny), M.WATER)
+    if (other === M.SAND && Math.random() < T.glaze) turn(w, idx(nx, ny), M.GLASS, 'glaze')
+    else if (ICY.has(other) && Math.random() < T.iceGlass) turn(w, idx(nx, ny), M.GLASS, 'glaze')
+    else if (props(other).melts) place(w, idx(nx, ny), M.WATER)
+    else if (props(other).bakes && Math.random() < T.lavaBake) turn(w, idx(nx, ny), M.BRICK, 'bake')
     if (props(other).flammability && Math.random() < T.lavaBurn * dt * 8) ignite(w, nx, ny)
   }
   const thin = props(matAt(w, x, y + 1)).solid && matAt(w, x, y - 1) === M.EMPTY
@@ -311,6 +380,12 @@ const stepPours = w => {
   })
 }
 
+const freezes = (w, x, y) => {
+  if (Math.random() > T.snowFreeze || !N4.some(([dx, dy]) => ICY.has(matAt(w, x + dx, y + dy)))) return false
+  turn(w, idx(x, y), M.SNOW, 'snow')
+  return true
+}
+
 const stepFluids = (w, dt) => {
   w.moved.fill(0)
   w.crushing.fill(0)
@@ -324,7 +399,7 @@ const stepFluids = (w, dt) => {
       const i = idx(x, y)
       if (w.moved[i]) continue
       const p = props(w.mat[i])
-      if (p.expires && !p.gas) ageOut(w, i, dt)
+      if (p.expires && !p.gas) ageOut(w, i, w.mat[i] === M.ASH && props(w.mat[i + ROOM]).solid ? dt * T.ashSettle : dt)
       if (p.falls && w.mat[i] !== M.EMPTY) fall(w, x, y)
       else if (p.hot) {
         if (!stepLava(w, x, y, dt)) flow(w, x, y)
@@ -340,6 +415,7 @@ const stepFluids = (w, dt) => {
       const x = column(k)
       const i = idx(x, y)
       if (w.moved[i] || !props(w.mat[i]).gas) continue
+      if (w.mat[i] === M.STEAM && freezes(w, x, y)) continue
       ageOut(w, i, dt)
       if (w.mat[i] !== M.EMPTY) rise(w, x, y)
     }
@@ -353,12 +429,21 @@ const emitSmoke = (w, x, y) => {
 
 export const explode = (w, x, y, reach) => {
   w.events.push({ type: 'blast', x, y, reach })
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) {
+  const ring = reach + 1
+  let thrown = 0
+  for (let dy = -ring; dy <= ring; dy++) {
+    for (let dx = -ring; dx <= ring; dx++) {
       const nx = x + dx
       const ny = y + dy
       if (!inside(nx, ny)) continue
       const n = idx(nx, ny)
+      if (shatter(w, nx, ny, x, y)) continue
+      if ((dx || dy) && thrown < T.throwMost && THROWN.has(w.mat[n]) && Math.random() < T.throwChance) {
+        throwCell(w, nx, ny, x, y)
+        thrown += 1
+        continue
+      }
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > reach) continue
       w.crushing[n] = 1
       ignite(w, nx, ny)
       if (reach > 1 && BLAST_BREAKS.includes(w.mat[n])) place(w, n, M.EMPTY)
@@ -388,24 +473,33 @@ const stepFire = (w, dt, excite) => {
       burning++
       w.burn[i] -= dt
       const p = props(w.mat[i])
+      let doused = false
       for (const [dx, dy] of N4) {
         const nx = x + dx
         const ny = y + dy
         const other = matAt(w, nx, ny)
+        const q = props(other)
         const flam = flammabilityOf(w, other)
         if (flam && Math.random() < flam * excite * dt) ignite(w, nx, ny)
         if (other === M.WATER && !p.liquid && Math.random() < T.quench * dt) {
           w.burn[i] = 0
+          doused = true
           place(w, idx(nx, ny), M.STEAM, between(T.steamLife))
         }
-        if (props(other).melts && Math.random() < T.melt * dt) {
+        if (q.smothers && Math.random() < T.smother * dt) {
+          w.burn[i] = 0
+          doused = true
+          note(w, 'smother', other)
+        }
+        if (q.bakes && Math.random() < T.bake * dt) turn(w, idx(nx, ny), M.BRICK, 'bake')
+        else if (q.melts && Math.random() < T.melt * dt) {
           note(w, 'melt', M.ICE)
           place(w, idx(nx, ny), M.WATER)
         }
       }
       if (Math.random() < (p.smoke ?? 1) * dt) emitSmoke(w, x, y)
       if (w.burn[i] <= 0 && w.mat[i] !== M.EMPTY) {
-        const quenched = N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.STEAM)
+        const quenched = doused || N4.some(([dx, dy]) => matAt(w, x + dx, y + dy) === M.STEAM)
         if (!quenched) burnOut(w, x, y)
       }
     }
@@ -422,6 +516,7 @@ const stepCharge = (w, dt) => {
   w.charged = charged
   const next = []
   for (const { x, y, energy } of w.frontier) {
+    const live = conductanceOf(w, w.mat[idx(x, y)])
     for (const [dx, dy] of N4) {
       const nx = x + dx
       const ny = y + dy
@@ -431,6 +526,8 @@ const stepCharge = (w, dt) => {
       if (cost && w.refractory[n] <= 0 && energy > cost) {
         conduct(w, n, energy)
         next.push({ x: nx, y: ny, energy: energy - cost })
+      } else if (live && w.mat[n] === M.SAND && Math.random() < T.fuse) {
+        turn(w, n, M.GLASS, 'fuse')
       } else if (flammabilityOf(w, w.mat[n]) && Math.random() < T.spark) {
         ignite(w, nx, ny)
       }

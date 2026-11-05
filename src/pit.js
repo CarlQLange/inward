@@ -200,7 +200,7 @@ const MATERIAL_SHADES = {
   [M.METAL]: '#9aa2a8', [M.GATE]: '#c8ccd0', [M.SAND]: '#c8b878', [M.ASH]: '#3a3a36', [M.WATER]: '#2a88a0', [M.SMOKE]: '#20282a',
   [M.STEAM]: '#20282a', [M.SCRAP]: '#a08c6c', [M.VOLATILE]: '#e060d0', [M.ICE]: '#a8e6f8', [M.OIL]: '#5a3a70', [M.METHANE]: '#3a2a50',
   [M.BRICK]: '#6c7a48', [M.LAVA]: '#ff7a24', [M.VINE]: '#4f9c3a', [M.ACID]: '#88d830', [M.SOURCE]: '#9aa2a8', [M.FLOE]: '#a8e6f8',
-  [M.RIME]: '#a8e6f8', [M.STILL]: '#88a0b0',
+  [M.RIME]: '#a8e6f8', [M.STILL]: '#88a0b0', [M.GLASS]: '#7ab8b0', [M.MUD]: '#4c3622', [M.SNOW]: '#dce8ea',
 }
 
 const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0]]

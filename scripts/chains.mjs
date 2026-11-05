@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Measures which world systems actually fire in each region, using a bot that wanders, shoots and casts.
+// The second line per region counts the newer rules per room minute and the loose matter each room starts with.
 //   node scripts/chains.mjs --rooms 60
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { cpus, homedir } from 'node:os'
@@ -13,6 +14,8 @@ const argOf = (name, fallback) => {
 }
 
 const SECONDS = 25
+const RULES = ['glaze', 'fuse', 'shatter', 'soak', 'bake', 'smother', 'snow', 'throw', 'regrow', 'magnet']
+const MATTER = ['sand', 'mud', 'snow', 'glass']
 
 const playRegion = async ({ theme, rooms }) => {
   const store = new Map()
@@ -25,7 +28,8 @@ const playRegion = async ({ theme, rooms }) => {
   const { ringOf } = await import('../src/map.js')
   save.found = [...LADDER]
 
-  const tally = { ticks: 0, burning: 0, charged: 0, falling: 0, acid: 0, kills: {}, rocks: 0, opened: 0, fuel: 0, conductors: 0, loose: 0, cells: 0, rooms: 0, props: {} }
+  const tally = { ticks: 0, burning: 0, charged: 0, falling: 0, acid: 0, kills: {}, rocks: 0, opened: 0, fuel: 0, conductors: 0, loose: 0, cells: 0, rooms: 0, props: {}, rules: {}, matter: {} }
+  const MATS = { sand: M.SAND, mud: M.MUD, snow: M.SNOW, glass: M.GLASS }
   const count = (w, wanted) => w.mat.reduce((n, m) => n + (wanted(m) ? 1 : 0), 0)
 
   const started = Date.now()
@@ -38,6 +42,8 @@ const playRegion = async ({ theme, rooms }) => {
     delete g.rooms[`${x},${y}`]
     jumpTo(g, x, y)
     const w0 = g.world
+    w0.counts = {}
+    for (const [name, mat] of Object.entries(MATS)) tally.matter[name] = (tally.matter[name] ?? 0) + count(w0, m => m === mat)
     tally.rooms++
     tally.fuel += count(w0, m => props(m).flammability > 0)
     tally.conductors += count(w0, m => props(m).conductance > 0)
@@ -78,6 +84,7 @@ const playRegion = async ({ theme, rooms }) => {
         tally.kills[cause] = (tally.kills[cause] ?? 0) + 1
       }
     }
+    for (const [tag, n] of Object.entries(w0.counts)) tally.rules[tag] = (tally.rules[tag] ?? 0) + n
     tally.rocks += Math.max(0, count(g.world, m => m === M.ROCK) - rockAtStart)
     tally.opened += Math.max(0, gatesAtStart - count(g.world, m => m === M.GATE))
   }
@@ -119,5 +126,11 @@ else {
     `| props ${Object.entries(t.props).map(([k, v]) => `${k} ${(v / t.rooms).toFixed(2)}`).join(' ') || 'none'}`,
     `| kills ${Object.entries(t.kills).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`,
   ].join(' '))
-  console.log(rows.join('\n'))
+  const minutes = t => Math.max(1e-9, (t.ticks / 60) / 60)
+  const rules = results.map(({ theme, tally: t }) => [
+    ''.padEnd(15),
+    RULES.map(tag => `${tag} ${((t.rules[tag] ?? 0) / minutes(t)).toFixed(1)}`).join(' '),
+    `| per room ${MATTER.map(name => `${name} ${((t.matter[name] ?? 0) / t.rooms).toFixed(1)}`).join(' ')}`,
+  ].join(' '))
+  console.log(rows.flatMap((row, i) => [row, rules[i]]).join('\n'))
 }

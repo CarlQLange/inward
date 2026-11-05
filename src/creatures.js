@@ -19,9 +19,10 @@ const BATTERY = [batteryFrame('#ffe84a'), batteryFrame('#c8b42c')]
 const TANK = paintFrames(['.....cc.....', '.dddddddddd.', 'dbbbbbbbbbbd', 'dwwwwwwwwwwd', 'dwWwwwwwwwwd', 'dwwwwwwwWwwd', 'dwwwwwwwwwwd', 'dbbbbbbbbbbd', '.dddddddddd.'], { ...IRON, b: '#6a7a80', w: '#2f8fa8', W: '#7fdce6' })
 const CARBOY = paintFrames(['...cc...', '...cc...', '..gggg..', '...gg...', '.gGGGGg.', 'gGAAAAGg', 'gAaAAAAg', 'gAAAAaAg', 'gAAAAAAg', '.gggggg.'], { c: IRON.c, g: '#3a6a30', G: '#6a9a50', A: '#84d024', a: '#d8ff7a' })
 const LADLE = paintFrames(['....cc....', '...c..c...', '..c....c..', 'dddddddddd', 'dYYYYYYYYd', '.dOOOOOOd.', '.dOOOOOOd.', '..dddddd..', '...dddd...'], { c: IRON.c, d: '#3a3230', Y: '#ffd24a', O: '#d9481c' })
+const SANDBAG = paintFrames(['...cc...', '...cc...', '..tttt..', '.bbbbbb.', 'bBbbbbbb', 'bbbbsbbb', 'bbbbbbBb', 'bbsbbbbb', '.bbbbbb.', '..bbbb..'], { c: IRON.c, t: '#7a5a34', b: '#a8844e', B: '#c8a468', s: '#e2d28c' })
 const still = frame => ({ idle: { fps: 0, loop: true, frames: [frame] } })
 const LOCAL_ART = {
-  lamp: still(LAMP), orbit: still(ORBIT), tank: still(TANK), carboy: still(CARBOY), ladle: still(LADLE),
+  lamp: still(LAMP), orbit: still(ORBIT), tank: still(TANK), carboy: still(CARBOY), ladle: still(LADLE), sandbag: still(SANDBAG),
   battery: { idle: { fps: 5, loop: true, frames: BATTERY } },
 }
 

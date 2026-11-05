@@ -3,14 +3,14 @@ import { rumble as padRumble } from './pad.js'
 import { isTouchLayout } from './layout.js'
 import { M, props } from './materials.js'
 import { matAt } from './world.js'
-import { centre } from './physics.js'
+import { centre, miredAtPx } from './physics.js'
 import { SCARF_RED, heroFired, heroOf, stepHero } from './hero.js'
 import { rand, rnd } from './dice.js'
 import { dustPuff, keepColour, spawn, stepParticles } from './particles.js'
 import { stepMarks } from './marks.js'
 import {
   MATERIAL_COLOURS, ashAt, blastDebris, breakAt, burstOf, dropOf, dustOf, emberAt, emitWorld, followBolts, followProjectiles,
-  hitOf, hurtMatter, hushCell, impactAt, killOf, muzzleOf, splashAt, swimBubble, watchWorld, wetAt,
+  hitOf, hurtMatter, hushCell, impactAt, killOf, muzzleOf, sloshAt, splashAt, swimBubble, watchWorld, wetAt,
 } from './matter.js'
 
 export { MATERIAL_COLOURS, setPixelSource } from './matter.js'
@@ -312,6 +312,7 @@ const stepHeroSide = (g, dt) => {
   const h = stepHero(g, p, dt)
   if (g.phase !== 'playing') return
   if (h.stance === 'swim' && rnd() < dt * 2.4) bubble(g, p.x + 3 + p.facing * 3, p.y + 4)
+  if (miredAtPx(g.world, p.x + p.w / 2, p.y + p.h - 1) && rnd() < dt * (2 + Math.abs(p.vx) * 0.25)) sloshAt(g, p.x + p.w / 2, p.y + p.h - 4, p.vx)
   if (h.stance === 'cling' && rnd() < dt * 22) dustPuff(g, p.x + (p.facing > 0 ? p.w : 0), p.y + p.h - 2, -p.facing * 12, -20, '#8c9884', 0.14)
   if (!grounded && p.grounded && fell > 235) {
     const c = p.x + p.w / 2

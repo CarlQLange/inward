@@ -1,4 +1,4 @@
-import { liquidAtPx, solidAt } from './physics.js'
+import { liquidAtPx, miredAtPx, solidAt } from './physics.js'
 import { vineAt } from './world.js'
 
 export const SCARF_RED = [224, 24, 45]
@@ -288,7 +288,7 @@ const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
   const scale = dt / dtWas
   nodes.forEach((n, i) => {
     if (i === 0 && pinned) return
-    const wet = liquidAtPx(world, n.x, n.y)
+    const wet = liquidAtPx(world, n.x, n.y) || miredAtPx(world, n.x, n.y)
     const [ax, ay] = force(n, i, wet)
     const keep = (wet ? 0.86 : 0.965) * scale
     const nx = n.x + (n.x - n.px) * keep + ax * dt * dt

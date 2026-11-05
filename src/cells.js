@@ -33,7 +33,7 @@ const writeCells = (world, out) => {
       const kind = LIQUID_CLASS[m] ?? 0
       let surface = 0
       if (kind) for (let up = y - 1; up >= 0 && world.mat[up * ROOM + x] === m && surface < 15; up--) surface++
-      out[i * 4] = p.solid ? 255 : 0
+      out[i * 4] = (p.solid && !p.clear) || p.thick ? 255 : 0
       out[i * 4 + 1] = kind * LIQUID_STEP
       out[i * 4 + 2] = surface * SURFACE_STEP
       out[i * 4 + 3] = world.burn[i] > 0 || world.charge[i] > 0 ? 255 : 0
