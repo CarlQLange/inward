@@ -6,8 +6,10 @@ const R = TUNING.run
 
 export const beginMoment = g => {
   const first = !save.seenPit
-  g.moment = { t: 0, delay: R.momentDelay, plan: pitPlan(first), first, tile: [g.x, g.y], landed: false }
-  if (g.seals === 1) g.depthDrive = 0
+  const gainsDepth = g.seals === 1 && !g.loop
+  g.moment = { t: 0, delay: R.momentDelay, plan: pitPlan(first), first, gainsDepth, tile: [g.x, g.y], landed: false }
+  g.sealHold = true
+  if (gainsDepth) g.depthDrive = 0
   g.player.iframes = Math.max(g.player.iframes, R.momentDelay + 1)
 }
 
@@ -23,6 +25,7 @@ const land = (g, m) => {
 const finish = g => {
   g.moment = null
   g.depthDrive = null
+  g.sealHold = false
   save.seenPit = true
   persist()
   ;(g.afterMoment ?? []).forEach(run => run())
@@ -40,7 +43,7 @@ export const stepMoment = (g, dt, wantsSkip) => {
   if (wantsSkip && !m.first && m.t > 0.4 && m.t < m.plan.length - m.plan.plan.settle) m.t = m.plan.length - m.plan.plan.settle
   const { landed } = pitView(m.t, m.plan, m.tile)
   if (landed > 0 && !m.landed) land(g, m)
-  if (landed > 0 && g.seals === 1) g.depthDrive = landed * spring(landed)
+  if (landed > 0 && m.gainsDepth) g.depthDrive = landed * spring(landed)
   if (m.t >= m.plan.length) finish(g)
   return true
 }

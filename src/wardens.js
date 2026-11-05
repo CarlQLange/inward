@@ -1,11 +1,12 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, crushingAt, energize, ignite, matAt, puff, setCell } from './world.js'
+import { burningAt, crushingAt, energize, ignite, matAt, pour, puff, setCell } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { quake, zap } from './skills.js'
 import { ENEMY_DEFS, STEPPERS, createEnemy } from './enemies.js'
 import { blank, paint } from './room.js'
+import { adaptWards, readBuild, stepWard } from './wards.js'
 
 const E = TUNING.enemies
 
@@ -84,6 +85,25 @@ const gasPuff = (g, x, y, range = [9, 13]) => puff(g.world, x, y, M.METHANE, ran
 
 const nearFire = (g, e, reach) => cellsUnder(e, reach).some(([x, y]) => burningAt(g.world, x, y) || crushingAt(g.world, x, y))
 
+const LATE_MOVES = {
+  bellows: ['gasp', 'gale'],
+  colossus: ['heave', 'hail'],
+  crucible: ['spatter', 'drown'],
+  eel: ['surge', 'spines'],
+  brood: ['web', 'rain'],
+  conductor: ['rails', 'storm'],
+}
+
+const lateFor = e => LATE_MOVES[e.kind].slice(0, e.tier ?? 0)
+
+const pullPlayer = (g, e, force, dt) => {
+  const p = g.player
+  p.vx += toward(centre(p).x, centre(e).x) * force * dt
+  p.drift = Math.max(p.drift, 0.08)
+}
+
+const floorRowOf = e => (e.floorRow ??= cell(e.y + e.h + 1))
+
 const bellowsMoves = {
   charge: {
     tell: 0.75, act: 1.5, rest: 1.4,
@@ -141,6 +161,40 @@ const bellowsMoves = {
       burst(g, centre(e).x, centre(e).y, 'gas', 24)
     },
   },
+  gasp: {
+    tell: 0.9, act: 1.5, rest: 1.4,
+    telling: (g, e) => {
+      e.vx = 0
+      e.swell = 1
+    },
+    during: (g, e, dt) => {
+      pullPlayer(g, e, 460, dt)
+      const a = Math.random() * Math.PI * 2
+      burst(g, centre(e).x + Math.cos(a) * 50, centre(e).y + Math.sin(a) * 40, 'gas', 1, 20)
+    },
+    end: (g, e) => {
+      e.swell = 0
+      const from = { x: centre(e).x + e.facing * 12, y: e.y + 4 }
+      for (const spread of [-40, 40]) lob(g, from, { x: centre(g.player).x + spread, y: centre(g.player).y }, 0.8)
+    },
+  },
+  gale: {
+    tell: 0.8, act: 1.7, rest: 1.5,
+    telling: (g, e) => {
+      e.vx = 0
+      e.facing = toward(centre(e).x, centre(g.player).x)
+    },
+    during: (g, e, dt) => {
+      const p = g.player
+      p.vx += e.facing * 560 * dt
+      p.drift = Math.max(p.drift, 0.08)
+      e.galeClock = (e.galeClock ?? 0) - dt
+      if (e.galeClock > 0) return
+      e.galeClock = 0.42
+      floorWave(g, centre(e).x + e.facing * 20, e.y + e.h, e.facing)
+      gasPuff(g, cell(centre(e).x + e.facing * 30), cell(e.y + e.h - 12), [4, 6])
+    },
+  },
 }
 
 const bellows = (g, e, dt) => {
@@ -158,8 +212,8 @@ const bellows = (g, e, dt) => {
     e.leak = 0.14
     gasPuff(g, cell(e.x + Math.random() * e.w), cell(e.y - 3), [10, 14])
   }
-  if (nearFire(g, e, 12)) hurt(g, e, 2)
-  runMoves(g, e, dt, bellowsMoves, () => bag(e, Object.keys(bellowsMoves)))
+  if (nearFire(g, e, 12)) hurt(g, e, 2, 'world', 'WEAK')
+  runMoves(g, e, dt, bellowsMoves, () => bag(e, ['charge', 'spark', 'slam', 'bloat', ...lateFor(e)]))
 }
 
 const loosenRoof = (g, count, power) => {
@@ -214,6 +268,41 @@ const colossusMoves = {
       }))
     },
   },
+  heave: {
+    tell: 0.95, act: 0.1, rest: 1.5,
+    telling: (g, e) => {
+      e.vx = 0
+      const floor = floorRowOf(e)
+      e.heaveAt ??= cell(centre(g.player).x) + (Math.random() < 0.5 ? -5 : 5)
+      burst(g, (e.heaveAt + 1) * BLOCK, floor * BLOCK, 'pale', 1, 40)
+    },
+    start: (g, e) => {
+      const floor = floorRowOf(e)
+      const at = Math.max(3, Math.min(ROOM - 5, e.heaveAt))
+      e.heaveAt = null
+      for (const x of [at, at + 1]) {
+        for (let y = floor - 1; y >= floor - 6; y--) if (matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.ROCK)
+      }
+      g.shake = Math.max(g.shake, 8)
+      burst(g, (at + 1) * BLOCK, (floor - 3) * BLOCK, 'pale', 22)
+    },
+  },
+  hail: {
+    tell: 0.9, act: 0.1, rest: 1.5,
+    telling: (g, e) => {
+      e.vx = 0
+      burst(g, centre(g.player).x + (Math.random() - 0.5) * 80, 8 * BLOCK, 'pale', 1, 30)
+    },
+    start: (g, e) => {
+      const c = cell(centre(g.player).x)
+      for (let n = 0; n < 7; n++) {
+        const x = c + Math.floor(Math.random() * 15) - 7
+        const y = [...Array(14).keys()].map(i => i + 2).find(row => matAt(g.world, x, row) === M.EMPTY)
+        if (y !== undefined) setCell(g.world, x, y, M.SCRAP)
+      }
+      g.shake = Math.max(g.shake, 6)
+    },
+  },
 }
 
 const colossus = (g, e, dt) => {
@@ -225,7 +314,7 @@ const colossus = (g, e, dt) => {
     e.vy = Math.min(TUNING.player.maxFall, e.vy + E.gravity * dt)
     move(g.world, e, dt)
   }
-  runMoves(g, e, dt, colossusMoves, () => bag(e, ['stomp', 'charge', 'hurl', 'stomp']))
+  runMoves(g, e, dt, colossusMoves, () => bag(e, ['stomp', 'charge', 'hurl', 'stomp', ...lateFor(e)]))
 }
 
 const COOL_AFTER = 5
@@ -280,6 +369,28 @@ const crucibleMoves = {
       if (Math.random() < dt * 5) g.fireballs.push({ x: centre(e).x, y: e.y + e.h, w: 4, h: 4, vx: 0, vy: 40, age: 0, friendly: false, fromWarden: true, lava: true })
     },
   },
+  spatter: {
+    tell: 0.75, act: 0.2, rest: 1.3,
+    telling: (g, e) => burst(g, centre(e).x, e.y, 'fire', 1, 50),
+    start: (g, e) => {
+      const c = centre(e)
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI * (0.08 + (i / 6) * 0.84)
+        g.fireballs.push({ x: c.x - 2, y: e.y, w: 4, h: 4, vx: Math.cos(a) * 130, vy: -Math.sin(a) * 170, age: 0, friendly: false, fromWarden: true, lava: true })
+      }
+    },
+  },
+  drown: {
+    tell: 1, act: 0.5, rest: 1.8,
+    telling: (g, e) => {
+      burst(g, 3.5 * BLOCK, 23 * BLOCK, 'fire', 1, 40)
+      burst(g, 24.5 * BLOCK, 23 * BLOCK, 'fire', 1, 40)
+    },
+    start: g => {
+      pour(g.world, 3, 22, M.LAVA, 12)
+      pour(g.world, 24, 22, M.LAVA, 12)
+    },
+  },
 }
 
 const crucible = (g, e, dt) => {
@@ -291,7 +402,7 @@ const crucible = (g, e, dt) => {
     e.facing = dx < 0 ? -1 : 1
   }
   if (cellsUnder(e, 2).some(([x, y]) => matAt(g.world, x, y) === M.WATER)) {
-    hurt(g, e, 3)
+    hurt(g, e, 3, 'world', 'WEAK')
     if (e.stun <= 0) e.stun = 2.4
     for (const [x, y] of cellsUnder(e, 2)) {
       if (matAt(g.world, x, y) === M.WATER) puffSteam(g, x, y)
@@ -299,7 +410,7 @@ const crucible = (g, e, dt) => {
     burst(g, centre(e).x, centre(e).y, 'pale', 12)
   }
   keepInside(e)
-  runMoves(g, e, dt, crucibleMoves, () => bag(e, Object.keys(crucibleMoves)))
+  runMoves(g, e, dt, crucibleMoves, () => bag(e, ['pour', 'ladle', 'stride', ...lateFor(e)]))
 }
 
 const puffSteam = (g, x, y) => setCell(g.world, x, y, M.STEAM, 2)
@@ -322,6 +433,8 @@ const surfaceAt = (g, x) => {
   for (let y = 2; y < ROOM - 1; y++) if (matAt(g.world, x, y) === M.WATER) return y
   return ROOM - 3
 }
+
+const SURGE_TOP = 14
 
 const eelMoves = {
   leap: {
@@ -371,6 +484,27 @@ const eelMoves = {
       for (const spread of [-22, 0, 22]) lob(g, from, { x: them.x + spread, y: them.y }, 0.95, { pellet: true })
     },
   },
+  surge: {
+    tell: 0.9, act: 0.9, rest: 1.5,
+    telling: (g, e) => burst(g, 6 * BLOCK + Math.random() * 16 * BLOCK, surfaceAt(g, 14) * BLOCK, 'pale', 1, 40),
+    during: g => {
+      const x = 6 + Math.floor(Math.random() * 16)
+      const y = surfaceAt(g, x) - 1
+      if (y >= SURGE_TOP && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.WATER)
+    },
+  },
+  spines: {
+    tell: 0.8, act: 1.3, rest: 1.3,
+    telling: (g, e) => burst(g, centre(e).x, centre(e).y, 'pale', 1, 50),
+    during: (g, e, dt) => {
+      e.spineClock = (e.spineClock ?? 0) - dt
+      if (e.spineClock > 0) return
+      e.spineClock = 0.2
+      const parts = g.enemies.filter(o => o.partOf === 'eel')
+      const part = parts[Math.floor(Math.random() * parts.length)] ?? e
+      lob(g, centre(part), centre(g.player), 0.9, { pellet: true })
+    },
+  },
 }
 
 const eel = (g, e, dt) => {
@@ -399,14 +533,14 @@ const eel = (g, e, dt) => {
       if (e.stranded > 0.8) {
         e.stranded = 0
         e.stun = Math.max(e.stun, 0.9)
-        hurt(g, e, 1)
+        hurt(g, e, 1, 'world', 'WEAK')
       }
     }
   }
   e.x = Math.max(6 * BLOCK, Math.min(22 * BLOCK - e.w, e.x))
   e.y = Math.max(3 * BLOCK, Math.min(25 * BLOCK - e.h, e.y))
   if (!airborne && hitsSolid(g.world, e)) Object.assign(e, { x: 13 * BLOCK, y: 22 * BLOCK, vx: 0, vy: 0 })
-  runMoves(g, e, dt, eelMoves, () => bag(e, ['leap', 'electrify', 'spit', 'leap']))
+  runMoves(g, e, dt, eelMoves, () => bag(e, ['leap', 'electrify', 'spit', 'leap', ...lateFor(e)]))
 }
 
 const eelseg = (g, e) => {
@@ -478,6 +612,27 @@ const broodMoves = {
       for (const spread of [-26, 0, 26]) lob(g, from, { x: them.x + spread, y: them.y }, 0.8, { acid: 4 })
     },
   },
+  web: {
+    tell: 1, act: 0.2, rest: 1.5,
+    telling: (g, e) => burst(g, centre(e).x + (Math.random() - 0.5) * 90, e.y + e.h, 'gas', 1, 30),
+    start: g => {
+      for (let x = 4; x < 24; x++) {
+        if (x % 5 === 0) continue
+        if (matAt(g.world, x, 16) === M.EMPTY) setCell(g.world, x, 16, M.VINE)
+      }
+    },
+  },
+  rain: {
+    tell: 0.85, act: 1.5, rest: 1.3,
+    telling: (g, e) => { e.rainFrom = centre(g.player).x < WORLD_PX / 2 ? 3 * BLOCK : 25 * BLOCK },
+    during: (g, e, dt) => {
+      e.rainClock = (e.rainClock ?? 0) - dt
+      if (e.rainClock > 0) return
+      e.rainClock = 0.14
+      e.rainFrom += (e.rainFrom < WORLD_PX / 2 ? 1 : -1) * 11
+      g.fireballs.push({ x: e.rainFrom, y: 6 * BLOCK, w: 4, h: 4, vx: 0, vy: 30, age: 0, friendly: false, fromWarden: true, acid: 3 })
+    },
+  },
 }
 
 const brood = (g, e, dt) => {
@@ -491,7 +646,7 @@ const brood = (g, e, dt) => {
       e.vx = 0
       move(g.world, e, dt)
       if (e.grounded) {
-        hurt(g, e, 6)
+        hurt(g, e, 6, 'world', 'WEAK')
         e.stun = 4.5
         g.shake = Math.max(g.shake, 10)
         burst(g, centre(e).x, e.y + e.h, 'pale', 26)
@@ -518,7 +673,7 @@ const brood = (g, e, dt) => {
     return
   }
   keepInside(e)
-  runMoves(g, e, dt, broodMoves, () => bag(e, Object.keys(broodMoves)))
+  runMoves(g, e, dt, broodMoves, () => bag(e, ['spawn', 'swing', 'spit', ...lateFor(e)]))
 }
 
 const stripColumns = () => Array.from({ length: 4 }, (_, i) => 2 + i * 6)
@@ -574,11 +729,41 @@ const conductorMoves = {
       if (dist(to, centre(g.player)) < 12) hurt(g, g.player, 1, 'world', 'CHARGE')
     },
   },
+  rails: {
+    tell: 1, act: 0.2, rest: 1.5,
+    telling: (g, e) => {
+      e.railY ??= centre(g.player).y
+      burst(g, 3 * BLOCK + Math.random() * 22 * BLOCK, e.railY, 'charge', 1, 12)
+    },
+    start: (g, e) => {
+      zap(g, { x: 2 * BLOCK, y: e.railY }, { x: 26 * BLOCK, y: e.railY })
+      if (Math.abs(centre(g.player).y - e.railY) < 12) hurt(g, g.player, 1, 'world', 'CHARGE')
+      e.railY = null
+    },
+  },
+  storm: {
+    tell: 0.7, act: 1.5, rest: 1.4,
+    during: (g, e, dt) => {
+      e.stormClock = (e.stormClock ?? 0) - dt
+      if (e.stormClock > 0) return
+      e.stormClock = 0.38
+      if (e.stormAt) {
+        zap(g, { x: e.stormAt.x, y: 3 * BLOCK }, e.stormAt)
+        ignite(g.world, cell(e.stormAt.x), cell(e.stormAt.y))
+        energize(g.world, cell(e.stormAt.x), cell(e.stormAt.y + 8), 8)
+        if (dist(e.stormAt, centre(g.player)) < 12) hurt(g, g.player, 1, 'world', 'CHARGE')
+      }
+      const c = centre(g.player)
+      e.stormAt = { x: c.x + (Math.random() - 0.5) * 30, y: c.y }
+      burst(g, e.stormAt.x, e.stormAt.y, 'charge', 6, 24)
+    },
+    end: (g, e) => { e.stormAt = null },
+  },
 }
 
 const overload = (g, e) => {
   if (!e.wet) return
-  hurt(g, e, 4)
+  hurt(g, e, 4, 'world', 'WEAK')
   e.stun = Math.max(e.stun, 1.6)
   burst(g, centre(e).x, centre(e).y, 'charge', 30)
 }
@@ -596,7 +781,7 @@ const conductor = (g, e, dt) => {
     move(g.world, e, dt)
     e.facing = centre(g.player).x < centre(e).x ? -1 : 1
   }
-  runMoves(g, e, dt, conductorMoves, () => bag(e, Object.keys(conductorMoves)))
+  runMoves(g, e, dt, conductorMoves, () => bag(e, ['pattern', 'sweep', 'arc', ...lateFor(e)]))
 }
 
 const CORE_PHASES = [1, 0.66, 0.33]
@@ -672,9 +857,38 @@ const coreMoves = {
       if (g.enemies.filter(o => o.spawned).length < 3) g.spawns.push(baby)
     },
   },
+  retort: {
+    tell: 0.9, act: 0.2, rest: 1.2,
+    telling: (g, e) => burst(g, centre(e).x, centre(e).y, RETORT_COLOURS[e.wards?.[0]?.school] ?? 'white', 1, 60),
+    start: (g, e) => (RETORTS[e.wards?.[0]?.school] ?? RETORTS.SHOT)(g, e),
+  },
 }
 
-const CORE_MOVES = [['nova', 'rain'], ['ground', 'lance', 'nova'], ['spill', 'quake', 'ground', 'nova']]
+const aimedFan = (g, e, count, speed, extra = {}) => {
+  const c = centre(e)
+  const them = centre(g.player)
+  const a = Math.atan2(them.y - c.y, them.x - c.x)
+  for (let i = 0; i < count; i++) {
+    const turn = a + (i - (count - 1) / 2) * 0.22
+    g.fireballs.push({ x: c.x, y: c.y, w: 4, h: 4, vx: Math.cos(turn) * speed, vy: Math.sin(turn) * speed, age: 0, straight: true, friendly: false, fromWarden: true, ...extra })
+  }
+}
+
+const RETORT_COLOURS = { SHOT: 'pale', BLOW: 'hurt', FIRE: 'fire', CHARGE: 'charge', CRUSHED: 'pale', ACID: 'heal' }
+
+const RETORTS = {
+  SHOT: (g, e) => aimedFan(g, e, 5, 130, { pellet: true }),
+  BLOW: (g, e) => Object.assign(e, { x: centre(g.player).x - e.w / 2, stun: 0, shield: 0.4 }),
+  FIRE: (g, e) => {
+    aimedFan(g, e, 3, 90)
+    for (const dx of [-3, -2, -1, 0, 1, 2, 3]) ignite(g.world, cell(centre(g.player).x) + dx, cell(g.player.y + g.player.h + 2))
+  },
+  CHARGE: (g, e) => coreMoves.ground.start(g, e),
+  CRUSHED: g => quake(g, 18, 10),
+  ACID: (g, e) => lob(g, centre(e), centre(g.player), 0.9, { acid: 6 }),
+}
+
+const CORE_MOVES = [['nova', 'rain'], ['ground', 'lance', 'nova', 'retort'], ['spill', 'quake', 'ground', 'nova', 'retort']]
 
 const coreInit = (g, e) => {
   if (e.bodied) return
@@ -699,6 +913,7 @@ const core = (g, e, dt) => {
   const due = CORE_PHASES.findLastIndex(limit => share <= limit)
   if (due > e.phase) {
     Object.assign(e, { phase: due, shield: 2, stage: 'rest', clock: 2.2, windup: false, aimAt: null, bag: [] })
+    adaptWards(g, e)
     g.pulse = 1
     g.shake = Math.max(g.shake, 12)
     burst(g, centre(e).x, centre(e).y, 'white', 40)
@@ -739,13 +954,13 @@ const orbit = (g, e) => {
 }
 
 Object.assign(ENEMY_DEFS, {
-  bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, sprite: [26] },
-  colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, sprite: [13] },
+  bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'], sprite: [26] },
+  colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, weakTo: ['CRUSHED'], sprite: [13] },
   crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true, sprite: [16] },
   eel: { size: [20, 16], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [15] },
   eelseg: { size: [12, 12], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
-  brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, sprite: [22] },
-  conductor: { size: [40, 62], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [16] },
+  brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'], sprite: [22] },
+  conductor: { size: [40, 62], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, weakTo: ['CHARGE'], sprite: [16] },
   core: { size: [44, 44], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
   orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true, sprite: [6] },
 })
@@ -789,7 +1004,7 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
   return { doors, seals, exits, clears }
 }
 
-const lampAt = (x, roof) => ({ kind: 'lamp', x: x * BLOCK + 1, y: roof * BLOCK })
+const hangAt = (kind, x, roof) => ({ kind, x: x * BLOCK + 1, y: roof * BLOCK })
 
 const postWithTank = (grid, x, floor, roof, width = 5) => {
   paint(grid, x, roof + 3, x + width - 1, roof + 3, 'w')
@@ -898,13 +1113,14 @@ const ARENAS = {
     paint(grid, 20, 12, 23, 12, 'B')
     paint(grid, 2, floor - 1, 3, floor - 1, 'V')
     paint(grid, 24, floor - 1, 25, floor - 1, 'V')
-    return { grid, floor, roof, boss: { x: 13, y: 7 * BLOCK }, lamps: [] }
+    return { grid, floor, roof, boss: { x: 13, y: 7 * BLOCK }, lamps: [], hung: [['battery', 6], ['tank', 11], ['carboy', 16], ['lamp', 21]] }
   },
 }
 
 export const buildArena = (id, links) => {
   const plan = ARENAS[id]()
   const { doors, seals, exits, clears } = openDoors(plan.grid, links, plan)
+  const hung = [...plan.lamps.map(x => ['lamp', x]), ...(plan.hung ?? [])].map(([kind, x]) => hangAt(kind, x, plan.roof))
   const drains = []
   plan.grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
   plan.grid[ROOM - 1].forEach((c, x) => { if (c !== '#') drains.push((ROOM - 1) * ROOM + x) })
@@ -916,10 +1132,10 @@ export const buildArena = (id, links) => {
     map: plan.grid.map(row => row.join('')),
     doors, drains,
     cards: [], wares: [],
-    enemies: [{ kind: id, x: plan.boss.x * BLOCK, row: plan.boss.row, y: plan.boss.y }, ...plan.lamps.map(x => lampAt(x, plan.roof))],
+    enemies: [{ kind: id, x: plan.boss.x * BLOCK, row: plan.boss.row, y: plan.boss.y }, ...hung],
     layout: `arena-${id}`,
     spare: { x: 14 * BLOCK, y: (plan.floor - 2) * BLOCK },
-    arena: { id, seals, exits, clears, interior, shape: plan.grid.map(row => row.join('')), lamps: plan.lamps.map(x => lampAt(x, plan.roof)), lampClock: 0, watch: 0 },
+    arena: { id, seals, exits, clears, interior, shape: plan.grid.map(row => row.join('')), lamps: hung, lampClock: 0, watch: 0 },
   }
 }
 
@@ -978,10 +1194,12 @@ export const stepArena = (g, room, dt, seal) => {
   if (!room.sealed && !room.cleared && warden && inside) {
     seal(g, room)
     warden.asleep = false
+    readBuild(g, warden)
     g.enemies.filter(o => o.partOf).forEach(o => { o.asleep = false })
   }
   g.boss = room.sealed ? warden : null
   if (!room.sealed || !warden) return
+  stepWard(warden, dt)
   warden.sinceHit = (warden.sinceHit ?? 0) + dt
   restock(g, arena, dt)
   arena.watch += dt

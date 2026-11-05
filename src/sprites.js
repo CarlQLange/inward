@@ -1,3 +1,6 @@
+import { KEYSTONES } from './keystones.js'
+import { MUTATIONS } from './deep.js'
+
 const paint = (rows, colours) => {
   const h = rows.length
   const w = rows[0].length
@@ -75,6 +78,33 @@ const flipped = source => {
   ctx.scale(-1, 1)
   ctx.drawImage(source, -source.width, 0)
   return canvas
+}
+
+const wedge = (rows, tint) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 16
+  const ctx = canvas.getContext('2d')
+  for (let y = 0; y < 16; y++) {
+    const inset = Math.round((y * 3) / 15)
+    ctx.fillStyle = y === 0 || y === 15 ? '#c9d4c0' : '#141c18'
+    ctx.fillRect(inset, y, 16 - inset * 2, 1)
+    ctx.fillStyle = '#c9d4c0'
+    ctx.fillRect(inset, y, 1, 1)
+    ctx.fillRect(15 - inset, y, 1, 1)
+  }
+  ctx.fillStyle = tint
+  rows.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c === '#') ctx.fillRect(x + 4, y + 2, 1, 1)
+  }))
+  return canvas
+}
+
+const paintKeystones = () => {
+  for (const { id, glyph, tint } of KEYSTONES) {
+    SPRITES.icons[`key_${id}`] = wedge(glyph, tint)
+    SPRITES.icons[`glyph_${id}`] = paint(glyph, { '#': tint })
+  }
+  for (const { id, glyph, tint } of MUTATIONS) SPRITES.icons[`mut_${id}`] = paint(glyph, { '#': tint })
 }
 
 export const paintFrames = (rows, colours) => {
@@ -158,5 +188,6 @@ export const loadSprites = async () => {
   REGION_NAMES.forEach((name, index) => {
     SPRITES.regions[name] = [cutTile(loaded.tiles2, index * 2, 8), cutTile(loaded.tiles2, index * 2 + 1, 8)]
   })
+  paintKeystones()
   await loadCast()
 }

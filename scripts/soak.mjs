@@ -5,7 +5,10 @@
 //   node scripts/soak.mjs --runs 40 --found rand    random progress along the ladder, exercises all content
 //   node scripts/soak.mjs --runs 20 --career        one save carried across runs
 //   node scripts/soak.mjs --warden bellows --gun    duels one warden, gun only
+//   node scripts/soak.mjs --runs 12 --god --express --deeper --loops 2   skips walking to reach the Core, goes deeper
 //   flags: --seed N --workers N --minutes N (sim limit per run) --omen id --ring N (quickstart)
+//          --deeper always takes the deeper option, --stop always banks, otherwise the bot picks at random
+//          --express warps to the next Warden, --loops N stops going deeper after N loops, --keystone id forces one
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir, cpus } from 'node:os'
@@ -32,14 +35,15 @@ const seededRandom = seed => () => {
 const worker = async ({ opts, from, to }) => {
   const store = {}
   globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v }, removeItem: k => { delete store[k] } }
-  const { createGame, step, jumpTo } = await import('../src/game.js')
+  const { createGame, step, jumpTo, takeKeystone } = await import('../src/game.js')
   const { save } = await import('../src/store.js')
   const { LADDER } = await import('../src/discover.js')
   const { props, M } = await import('../src/materials.js')
   const { matAt, setCell } = await import('../src/world.js')
   const { TUNING } = await import('../src/config.js')
-  const { keyOf, ringOf } = await import('../src/map.js')
+  const { CORE_RING, keyOf, ringOf } = await import('../src/map.js')
   const { doorGoal, exitsFrom, pathTo } = await import('../src/reach.js')
+  const { heartCap } = await import('../src/keystones.js')
 
   const TICK = 1 / 60
   const BLOCK = 8
@@ -123,6 +127,28 @@ const worker = async ({ opts, from, to }) => {
     `${room.layout} ring ${room.ring} event ${room.event} doors ${JSON.stringify(room.doors)} links ${Object.entries(room.links).map(([d, l]) => `${d}:${l.lock}`)} player ${from.x},${from.y} passed ${room.passed} cleared ${room.cleared}`,
     ...Array.from({ length: ROOM }, (_, y) => Array.from({ length: ROOM }, (_, x) => (x === from.x && y === from.y ? '@' : CHARS[matAt(g.world, x, y)])).join('')),
   ].join('\n')
+
+  const expressRings = g => (g.loop ? TUNING.run.deep.wardenRings : TUNING.run.wardenRings)
+
+  const nextStop = g => {
+    if (g.seals >= 3) return [CORE_RING, CORE_RING]
+    const ring = expressRings(g).find(r => !g.wardens[r]?.dead)
+    const placed = g.wardens[ring]
+    if (placed) return [placed.x, placed.y]
+    const cells = Object.keys(g.map.links).map(key => key.split(',').map(Number)).filter(([x, y]) => ringOf(x, y) === ring)
+    return cells[Math.floor(Math.random() * cells.length)]
+  }
+
+  const warp = (g, bot) => {
+    if (!bot.opts.express || g.door || g.reveal || g.menus.length) return
+    const room = g.rooms[keyOf(g.x, g.y)]
+    if (room.sealed || (room.arena && !room.cleared)) return
+    if (g.time - bot.enteredAt < 1.5) return
+    const [x, y] = nextStop(g)
+    if (x === g.x && y === g.y) return
+    bot.enteredAt = g.time
+    jumpTo(g, x, y)
+  }
 
   const newBot = (g, opts) => ({
     opts, ringQuota: {}, plan: null, planAt: -1, room: null, enteredAt: 0, stuckAt: 0, stuckX: 0, stuckY: 0,
@@ -231,7 +257,10 @@ const worker = async ({ opts, from, to }) => {
         input.pointer = target ? input.pointer : c
         if (!room.sealed) {
           bot.enteredAt = g.time
-          if (p.y + p.h > room.arena.interior.y1) input.jump = true
+          if (p.y + p.h > room.arena.interior.y1) {
+            input.jump = !bot.jumpHeld
+            bot.jumpHeld = input.jump
+          }
           const dx = (ROOM * BLOCK) / 2 - p.x
           if (Math.abs(dx) > 4) input[dx > 0 ? 'right' : 'left'] = true
           if (!p.grounded && p.vy < 0) input.jump = true
@@ -247,6 +276,7 @@ const worker = async ({ opts, from, to }) => {
         const blocked = !lineClear(g.world, me, c)
         if (p.hitWall) bot.sidestep = -(bot.sidestep ?? 1)
         if (blocked || (p.hitWall && dist < 50)) input[(bot.sidestep ?? 1) > 0 ? 'right' : 'left'] = true
+        else if (p.keystones.has('fists')) input[near] = dist > 8
         else if (dist < 50) input[away] = true
         else if (dist > 110) input[near] = true
         else if (Math.random() < 0.02) input[Math.random() < 0.5 ? 'left' : 'right'] = true
@@ -349,9 +379,19 @@ const worker = async ({ opts, from, to }) => {
     return null
   }
 
-  const answerMenu = g => {
+  const answerChoice = (g, menu, opts) => {
+    const stopNow = opts.stop === true || (opts.loops !== undefined && g.loop >= opts.loops)
+    const pick = stopNow ? 'stop' : opts.deeper === true ? 'deeper' : Math.random() < 0.5 ? 'stop' : 'deeper'
+    menu.items.find(item => item.id === pick).run(g)
+  }
+
+  const answerMenu = (g, opts) => {
     const menu = g.menus.at(-1)
     if (!menu) return
+    if (menu.page === 'choice') {
+      answerChoice(g, menu, opts)
+      return
+    }
     const real = menu.items.filter(i => !/NOT NOW|NOT TODAY/.test(i.card?.name ?? ''))
     const choice = real[Math.floor(Math.random() * real.length)] ?? menu.items[0]
     choice.run(g)
@@ -374,6 +414,7 @@ const worker = async ({ opts, from, to }) => {
     const quick = opts.warden ? (opts.warden === 'core' ? 7 : 1) : opts.ring ?? null
     const g = createGame(null, 'playing', quick)
     if (opts.god) g.player.hp = TUNING.player.hp
+    if (opts.keystone) takeKeystone(g, opts.keystone)
     if (opts.warden && opts.warden !== 'core') {
       const spot = g.wardens[1]
       g.wardens[1].id = opts.warden
@@ -400,7 +441,8 @@ const worker = async ({ opts, from, to }) => {
     const wardenStart = {}
     for (let t = 0; t < limit && g.phase === 'playing'; t++) {
       stats.ticks = t
-      if (g.menus.length) answerMenu(g)
+      if (g.menus.length) answerMenu(g, opts)
+      warp(g, bot)
       const input = g.reveal ? {} : decide(g, bot, stats)
       const sample = t % 8 === 0
       const before = sample ? performance.now() : 0
@@ -435,7 +477,8 @@ const worker = async ({ opts, from, to }) => {
         stats.ringHits = stats.ringHits ?? {}
         stats.ringHits[g.ring] = (stats.ringHits[g.ring] ?? 0) + 1
         const b = g.boss
-        if (b) wardenStart[b.kind] && (wardenStart[b.kind].hits += 1)
+        const fight = b && wardenStart[`${b.kind}${g.loop ? ` L${g.loop}` : ''}`]
+        if (fight) fight.hits += 1
       }
       lastHp = g.player.hp
       const place = g.boss ? `boss` : g.reveal ? 'reveal' : g.menus.length ? 'menu' : g.rooms[keyOf(g.x, g.y)].sealed ? 'sealed' : g.rooms[keyOf(g.x, g.y)].visited && g.time - bot.enteredAt > 30 ? 'overstay' : 'walk'
@@ -443,15 +486,19 @@ const worker = async ({ opts, from, to }) => {
       stats.ringTime[g.ring] = (stats.ringTime[g.ring] ?? 0) + TICK
       const boss = g.boss
       if (boss) {
-        wardenStart[boss.kind] ??= { t, hits: 0, ring: g.ring }
-        wardenLog[boss.kind] = {
-          secs: (t - wardenStart[boss.kind].t) * TICK, hits: wardenStart[boss.kind].hits, ring: wardenStart[boss.kind].ring,
+        const fight = `${boss.kind}${g.loop ? ` L${g.loop}` : ''}`
+        wardenStart[fight] ??= { t, hits: 0, ring: g.ring }
+        wardenLog[fight] = {
+          base: boss.kind, loop: g.loop,
+          secs: (t - wardenStart[fight].t) * TICK, hits: wardenStart[fight].hits, ring: wardenStart[fight].ring,
           gun: boss.gunDamage ?? 0, world: boss.worldDamage ?? 0, hpLeft: boss.hp, maxHp: boss.maxHp, killed: false,
+          wards: (boss.wards ?? []).map(w => w.school),
         }
       }
-      for (const kind of Object.keys(wardenLog)) if (!g.enemies.some(e => e.kind === kind)) wardenLog[kind].killed = true
+      for (const [fight, log] of Object.entries(wardenLog)) if (log.loop !== g.loop || !g.enemies.some(e => e.kind === log.base)) log.killed = true
       if (opts.warden && wardenLog[opts.warden]?.killed) break
-      if (opts.god) g.player.hp = TUNING.player.hp
+      if (opts.loops !== undefined && g.loop > opts.loops) break
+      if (opts.god) g.player.hp = heartCap(g.player)
     }
     if (g.phase === 'playing' && stats.ticks >= limit - 1) timedOut = true
     if (opts.trace) console.log(asciiRoom(g, g.rooms[keyOf(g.x, g.y)], { x: cell(g.player.x + 3), y: cell(g.player.y + g.player.h - 1) }), `p ${g.player.x},${g.player.y} v ${g.player.vx},${g.player.vy}`)
@@ -473,6 +520,12 @@ const worker = async ({ opts, from, to }) => {
       chainPeak: g.chainPeak,
       gold: g.gold,
       seals: g.seals,
+      loop: g.loop,
+      where: `${g.rooms[keyOf(g.x, g.y)].layout} L${g.loop} seals ${g.seals}${g.boss ? ` ${g.boss.kind} ${Math.round((100 * g.boss.hp) / g.boss.maxHp)}%` : ''}`,
+      keystones: [...g.player.keystones],
+      tally: g.tally,
+      omens: g.omens,
+      mutations: g.mutations,
       clean: g.cleanClears,
       mercy: g.mercyBombs ?? 0,
       secrets,
@@ -524,10 +577,14 @@ const report = (results, opts, realSeconds) => {
   line(`\n=== ${results.length} runs in ${realSeconds.toFixed(0)}s real ===`)
   line(`outcomes: ${top(tally(results.map(r => (r.timedOut ? 'timeout' : r.phase))))}`)
   line(`errors: ${results.filter(r => r.error).length}, NaNs: ${results.filter(r => r.nan).length}`)
+  line(`timed out at: ${top(tally(results.filter(r => r.timedOut).map(r => r.where)), 8)}`)
   for (const [message, count] of Object.entries(tally(results.filter(r => r.error).map(r => r.error))).slice(0, 8)) line(`  x${count} ${message}`)
   for (const r of results.filter(r => r.nan).slice(0, 5)) line(`  nan: ${r.nan}`)
   line(`softlocks (no reachable exit): ${results.reduce((n, r) => n + r.softlocks, 0)} in ${results.filter(r => r.softlocks).length} runs. ${top(tally(results.flatMap(r => r.softlockRooms)), 8)}`)
   if (opts.maps) results.flatMap(r => r.softMaps).slice(0, Number(opts.maps) || 4).forEach(line)
+  const without = results.filter(r => r.keystones.length === 0)
+  const softBy = list => fmt(mean(list.map(r => r.softlocks / Math.max(1, r.rooms))) * 100)
+  line(`softlocks per 100 rooms: no keystone ${softBy(without)} (${without.length} runs), any ${softBy(results.filter(r => r.keystones.length > 0))}. ${[...new Set(results.flatMap(r => r.keystones))].map(k => `${k} ${softBy(results.filter(r => r.keystones.includes(k)))}`).join(', ')}`)
   line(`generator gave up: ${top(tally(results.flatMap(r => r.failedRooms)), 8)}`)
   line(`bot teleports (stuck, not necessarily a softlock): mean ${fmt(mean(results.map(r => r.assists)))} per run`)
   line(`locked out (no bomb, no open gate, bot could not open the door): ${fmt(mean(results.map(r => r.lockedOut)))} per run`)
@@ -552,6 +609,10 @@ const report = (results, opts, realSeconds) => {
   line(`level reached: ${spread(results.map(r => r.level))}. rooms per level-up: ${spread(results.flatMap(r => r.levelRooms.map((v, i) => v - (r.levelRooms[i - 1] ?? 0))))}`)
   line(`score: ${spread(results.map(r => r.score))}. peak chain: ${spread(results.map(r => r.chainPeak))}. clean rooms per run: ${fmt(mean(results.map(r => r.clean)))}`)
   line(`seals broken: ${top(tally(results.map(r => `${r.seals}`)), 4)}`)
+  line(`loops reached: ${top(tally(results.map(r => `L${r.loop}`)), 8)}. score by loop: ${[...new Set(results.map(r => r.loop))].sort().map(n => `L${n} ${spread(results.filter(r => r.loop === n).map(r => r.score))}`).join(', ')}`)
+  line(`keystones taken: ${top(tally(results.flatMap(r => r.keystones)), 17)}`)
+  line(`kills by school: ${top(merge(results.map(r => r.tally)), 6)}`)
+  line(`mutations: ${top(tally(results.flatMap(r => r.mutations)), 6)}. stacked omens: ${top(tally(results.map(r => `${r.omens.length}`)), 6)}`)
   const planted = results.flatMap(r => r.secrets)
   const met = results.flatMap(r => Object.values(r.met))
   line(`secrets: ${planted.length} planted, ${met.length} met (${planted.length ? ((100 * met.length) / planted.length).toFixed(0) : 0}%). time to meet (s) ${spread(met.map(m => m.t))}, rooms to meet ${spread(met.map(m => m.rooms))}`)
@@ -563,7 +624,7 @@ const report = (results, opts, realSeconds) => {
     const these = fights.filter(f => f.kind === kind)
     const killed = these.filter(f => f.killed)
     const dmg = these.reduce((n, f) => n + f.gun + f.world, 0) || 1
-    line(`  warden ${kind}: ${these.length} fights, ${killed.length} killed, secs ${spread(killed.map(f => f.secs))}, hits ${spread(these.map(f => f.hits))}, damage from world ${((100 * these.reduce((n, f) => n + f.world, 0)) / dmg).toFixed(0)}%`)
+    line(`  warden ${kind}: ${these.length} fights, ${killed.length} killed, secs ${spread(killed.map(f => f.secs))}, hits ${spread(these.map(f => f.hits))}, damage from world ${((100 * these.reduce((n, f) => n + f.world, 0)) / dmg).toFixed(0)}%, wards ${top(tally(these.flatMap(f => f.wards ?? [])), 3)}`)
   }
   const ticks = results.map(r => r.tickMean)
   line(`ms per tick: mean ${mean(ticks).toFixed(3)}, worst run mean ${Math.max(...ticks).toFixed(3)}, worst single tick ${Math.max(...results.map(r => r.tickMax)).toFixed(2)} (budget 16.67)`)

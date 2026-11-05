@@ -13,6 +13,8 @@ import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
 import { RELIC_BY_ID } from './relics.js'
+import { KEYSTONE_BY_ID, slotsOf } from './keystones.js'
+import { SCHOOLS } from './wards.js'
 import { CONTROL_ROWS, promptFor, skillAction } from './controls.js'
 import { PROMPT_HEIGHT, drawPrompt, drawPromptRow, promptWidth } from './glyphs.js'
 
@@ -72,6 +74,36 @@ const sheet = (ctx, menu) => {
   return rise
 }
 
+const drawLoopMarks = (ctx, loop, x, y) => {
+  ctx.imageSmoothingEnabled = false
+  for (let i = 0; i < loop; i++) ctx.drawImage(SPRITES.icons.map_core, x + i * 8, y, 7, 7)
+  return loop * 8
+}
+
+const drawKeyGlyphs = (ctx, keys, x, y) => {
+  keys.forEach((id, i) => ctx.drawImage(SPRITES.icons[`glyph_${id}`], x + i * 10, y))
+  return keys.length * 10
+}
+
+const hallRow = (ctx, run, y, colour) => {
+  const score = String(run.score)
+  const right = midX() - 2
+  drawText(ctx, score, right - textWidth(score), y, colour)
+  const after = drawKeyGlyphs(ctx, run.keys ?? [], midX() + 4, y - 2)
+  drawLoopMarks(ctx, run.loop ?? 0, midX() + 6 + after, y - 1)
+}
+
+const drawHall = (ctx, top) => {
+  const runs = save.hall.slice(0, 3)
+  if (runs.length === 0) {
+    if (save.best > 0) centred(ctx, save.best, top + 26, GREEN)
+    return
+  }
+  ctx.fillStyle = 'rgba(4, 16, 12, 0.72)'
+  ctx.fillRect(midX() - 84, top - 3, 168, runs.length * 12 + 4)
+  runs.forEach((run, i) => hallRow(ctx, run, top + i * 12, i === 0 ? YELLOW : i === 1 ? WHITE : PALE))
+}
+
 const drawTitle = (ctx, g, menu) => {
   const lift = Math.round(Math.sin(g.time * 1.1) * 1.5)
   if (!menu.pressed) {
@@ -80,7 +112,7 @@ const drawTitle = (ctx, g, menu) => {
     const top = ORIGIN.y + 110 + lift
     drawList(ctx, menu, top)
   }
-  if (save.best > 0) centred(ctx, save.best, ORIGIN.y + ROOM_PX - 8, FAINT)
+  drawHall(ctx, ORIGIN.y + 180)
 }
 
 const pauseFrame = () => {
@@ -102,7 +134,7 @@ const skillColumn = (ctx, g, menu) => {
   const frame = pauseFrame()
   const p = g.player
   const on = menu.focus === 'skills'
-  for (let slot = 0; slot < TUNING.player.skillSlots; slot++) {
+  for (let slot = 0; slot < slotsOf(p); slot++) {
     const skill = p.skills[slot]
     const y = frame.skillY + slot * 26
     const chosen = on && menu.slot === slot && skill
@@ -144,9 +176,14 @@ const skillColumn = (ctx, g, menu) => {
 const RELIC_PITCH = 18
 const RELIC_COLUMNS = 5
 
+const keystoneEntry = id => {
+  const k = KEYSTONE_BY_ID[id]
+  return { icon: `key_${id}`, name: k.name, text: k.gift, cost: k.cost }
+}
+
 const relicColumn = (ctx, g, menu) => {
   const frame = pauseFrame()
-  const owned = [...g.player.relics].map(id => RELIC_BY_ID[id])
+  const owned = [...[...g.player.keystones].map(keystoneEntry), ...[...g.player.relics].map(id => RELIC_BY_ID[id])]
   const on = menu.focus === 'relics'
   owned.forEach((relic, i) => {
     const x = frame.relicX + (i % RELIC_COLUMNS) * RELIC_PITCH
@@ -172,6 +209,12 @@ const relicColumn = (ctx, g, menu) => {
     drawText(ctx, line, frame.relicX, y, PALE)
     y += 6
   })
+  if (!chosen.cost) return
+  y += 2
+  wrapText(chosen.cost, 22).forEach(line => {
+    drawText(ctx, line, frame.relicX, y, RED)
+    y += 6
+  })
 }
 
 const drawPause = (ctx, g, menu) => {
@@ -181,6 +224,7 @@ const drawPause = (ctx, g, menu) => {
   drawList(ctx, menu, listTop, menu.focus === 'list', 10)
   skillColumn(ctx, g, menu)
   relicColumn(ctx, g, menu)
+  if (!isTall()) drawSchools(ctx, g.tally, midX() - 66, listTop + 52, 22)
 }
 
 const drawConfirm = (ctx, menu) => {
@@ -212,6 +256,7 @@ const drawRecords = (ctx, menu) => {
     ['RUNS', save.runs],
     ['DEEPEST', save.deepest],
     ['CORES', save.coresReached],
+    ['DEEPER', save.deepestLoop],
     ['WORLD KILLS', save.worldKills],
   ]
   rows.forEach(([name, value], i) => {
@@ -247,6 +292,7 @@ const ALMANAC_TOP = 30
 const blurbOf = ({ kind, id }) => ({
   skill: () => SKILL_DETAILS[id],
   relic: () => RELIC_BY_ID[id]?.text,
+  keystone: () => KEYSTONE_BY_ID[id]?.gift,
   foe: () => ENEMY_TRAITS[id],
   inhabitant: () => ENEMY_TRAITS[id],
   warden: () => ENEMY_TRAITS[id],
@@ -288,9 +334,72 @@ const drawAlmanac = (ctx, g, menu) => {
   }
   centred(ctx, chosen.name, y, WHITE, 1, VIEW.w / 2)
   centred(ctx, blurbOf(chosen), y + 9, PALE, 1, VIEW.w / 2)
+  if (chosen.kind === 'keystone') centred(ctx, KEYSTONE_BY_ID[chosen.id].cost, y + 17, RED, 1, VIEW.w / 2)
 }
 
 const roll = (value, t) => Math.round(value * easeOut(t))
+
+const drawSchools = (ctx, tally, x, y, pitch) => {
+  const rows = Object.entries(tally ?? {}).sort((a, b) => b[1] - a[1])
+  rows.forEach(([school, count], i) => {
+    const at = x + i * pitch
+    drawPictogram(ctx, CAUSE_ICONS[school], at + 3, y + 3, count > 0 ? SCHOOLS[school] : FAINT)
+    drawText(ctx, count, at + 8, y + 1, count > 0 ? (i === 0 ? YELLOW : WHITE) : FAINT)
+  })
+}
+
+const drawBestBar = (ctx, g, score, y) => {
+  const before = g.bestBefore ?? 0
+  if (before <= 0 || g.quick) return
+  const width = 150
+  const left = Math.round(midX() - width / 2)
+  ctx.fillStyle = FAINT
+  ctx.fillRect(left, y, width, 2)
+  ctx.fillStyle = score >= before ? YELLOW : GREEN
+  ctx.fillRect(left, y, Math.round(width * Math.min(1, score / before)), 2)
+  if (score < before) drawText(ctx, before, left + width - textWidth(String(before)), y + 4, DIM)
+}
+
+const drawBuildRow = (ctx, g, y) => {
+  const p = g.player
+  const keys = [...p.keystones]
+  const total = (p.skills.length + keys.length) * 18
+  const left = Math.round(midX() - total / 2)
+  ctx.imageSmoothingEnabled = false
+  keys.forEach((id, i) => ctx.drawImage(SPRITES.icons[`key_${id}`], left + i * 18, y))
+  p.skills.forEach((skill, i) => ctx.drawImage(tintedIcon(skill.kind, formOf(p, skill.kind).tint), left + (keys.length + i) * 18, y))
+  const relics = [...p.relics].slice(0, 20)
+  const across = Math.round(midX() - (relics.length * 10) / 2)
+  relics.forEach((id, i) => ctx.drawImage(SPRITES.icons[RELIC_BY_ID[id].icon], across + i * 10, y + 19, 9, 9))
+}
+
+const drawDepthRow = (ctx, g, y) => {
+  const won = g.phase === 'cleared'
+  const cores = g.loop + (won ? 1 : 0)
+  const text = `${g.deepestRing + 1}/${CORE_RING + 1}`
+  const width = cores * 8 + (cores ? 4 : 0) + (won ? 0 : textWidth(text))
+  const left = Math.round(midX() - width / 2)
+  const used = drawLoopMarks(ctx, cores, left, y)
+  if (!won) drawText(ctx, text, left + used + (cores ? 4 : 0), y + 1, WHITE)
+}
+
+const drawCounts = (ctx, g, y) => {
+  const book = almanac()
+  const items = [
+    [`X${g.chainPeak}`, YELLOW, 'chain'],
+    [g.wardenWins, g.outwits > 0 ? YELLOW : WHITE, g.outwits > 0 ? 'seal_broken' : 'seal'],
+    [g.cleanClears, WHITE, 'heart'],
+    [g.gold, WHITE, 'coin'],
+    [`${book.found}/${book.total}`, DIM, 'discovery'],
+  ]
+  const pitch = 42
+  const left = Math.round(midX() - (items.length * pitch) / 2)
+  ctx.imageSmoothingEnabled = false
+  items.forEach(([value, colour, icon], i) => {
+    ctx.drawImage(SPRITES.icons[icon], left + i * pitch, y - 1, 8, 8)
+    drawText(ctx, value, left + i * pitch + 10, y, colour)
+  })
+}
 
 const drawSummary = (ctx, g, menu) => {
   const age = menu.age ?? 1
@@ -299,46 +408,107 @@ const drawSummary = (ctx, g, menu) => {
   ctx.fillRect(0, 0, VIEW.w, VIEW.h)
   const rise = Math.round((1 - easeOut(age * 3)) * 14)
   const score = roll(g.score, age / 1.4)
-  centred(ctx, score, ORIGIN.y + 34 + rise, won ? YELLOW : WHITE, 4)
-  if (g.newBest && age > 1.4) centred(ctx, 'BEST', ORIGIN.y + 60 + rise, YELLOW)
-  const rows = [
-    [`${g.deepestRing + 1}/${CORE_RING + 1}`, 'RING'],
-    [g.kills, 'KILLS'],
-    [g.environmentKills, 'BY THE WORLD'],
-    [`X${g.chainPeak}`, 'CHAIN'],
-    [`${almanac().found}/${almanac().total}`, 'FOUND'],
-  ]
-  rows.forEach(([value, name], i) => {
-    const y = ORIGIN.y + 76 + rise + i * 10
-    if (age < 0.6 + i * 0.15) return
-    drawText(ctx, value, midX() + 6, y, i === 2 ? YELLOW : WHITE)
-    drawText(ctx, name, midX() - 2 - textWidth(name), y, DIM)
-  })
-  if (!won && g.player.lastCause && age > 1.2) drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, midX(), ORIGIN.y + 128 + rise, RED)
+  const top = ORIGIN.y + rise
+  centred(ctx, score, top + 12, won ? YELLOW : WHITE, 4)
+  drawBestBar(ctx, g, score, top + 36)
+  if (g.newBest && age > 1.4 && Math.floor(g.time * 4) % 2 === 0) centred(ctx, 'BEST', top + 41, YELLOW)
+  if (won && g.banked && age > 1.4) drawText(ctx, `+${g.banked}`, midX() - 75, top + 40, GREEN)
+  if (!won && g.player.lastCause && age > 1.2) {
+    const width = textWidth(String(g.score)) * 4
+    drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, Math.max(ORIGIN.x + 8, midX() - width / 2 - 8), top + 21, RED)
+  }
+  if (age > 0.5) drawDepthRow(ctx, g, top + 50)
+  if (age > 0.7) drawBuildRow(ctx, g, top + 60)
+  if (age > 0.9) drawSchools(ctx, g.tally, midX() - 66, top + 92, 22)
+  if (age > 1.1) drawCounts(ctx, g, top + 105)
   if (age > 1.3) {
     const found = g.foundThisRun ?? []
     found.forEach((key, i) => {
       const [kind, id] = key.split(':')
       const art = revealArt({ kind, id })
       if (!art) return
-      const scale = Math.min(1, 24 / Math.max(art.width, art.height))
-      const x = midX() - (found.length * 28) / 2 + i * 28 + 2
-      ctx.drawImage(art, Math.round(x), ORIGIN.y + 140 + rise, Math.round(art.width * scale), Math.round(art.height * scale))
+      const scale = Math.min(1, 20 / Math.max(art.width, art.height))
+      const x = midX() - (found.length * 24) / 2 + i * 24 + 2
+      ctx.drawImage(art, Math.round(x), top + 118, Math.round(art.width * scale), Math.round(art.height * scale))
     })
   }
-  if (age > 1.4) drawList(ctx, menu, ORIGIN.y + 172 + rise)
+  if (age > 1.4) drawList(ctx, menu, top + 150)
+}
+
+const GREENS = ['#0f380f', '#306230', '#8bac0f', '#9bbc0f']
+const HOTS = ['#2a0a2e', '#7a1a4a', '#d9531c', '#ff9a2e', '#ffe84a', '#ffffff']
+
+const drawStopArt = (ctx, x, y, w, h, time) => {
+  ctx.fillStyle = GREENS[3]
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = GREENS[2]
+  ctx.fillRect(x, y + Math.round(h * 0.62), w, 2)
+  ctx.fillStyle = GREENS[1]
+  ctx.fillRect(x, y + Math.round(h * 0.62) + 2, w, Math.round(h * 0.38) - 2)
+  ctx.fillStyle = GREENS[2]
+  const sun = 7
+  ctx.fillRect(x + w - sun - 6, y + 6 + Math.round(Math.sin(time) * 1), sun, sun)
+  ctx.fillStyle = GREENS[0]
+  const foot = y + Math.round(h * 0.62)
+  ctx.fillRect(x + Math.round(w / 2) - 2, foot - 9, 4, 9)
+  ctx.fillRect(x + Math.round(w / 2) + 2, foot - 7, 3, 1)
+}
+
+const drawDeepArt = (ctx, x, y, w, h, time) => {
+  const cx = x + w / 2
+  const cy = y + h / 2
+  const rings = HOTS.length
+  for (let i = 0; i < rings; i++) {
+    const beat = (time * 0.5 + i / rings) % 1
+    const half = Math.round((h / 2) * (1 - i / rings) + beat)
+    ctx.fillStyle = HOTS[i]
+    ctx.fillRect(Math.round(cx - half * (w / h)), Math.round(cy - half), Math.round(half * 2 * (w / h)), half * 2)
+  }
+}
+
+const drawChoice = (ctx, g, menu) => {
+  const age = menu.age ?? 1
+  shade(ctx, 0.35 * clamp01(age * 3))
+  const gap = 8
+  const w = 96
+  const h = 116
+  const left = Math.round(midX() - w - gap / 2)
+  const top = ORIGIN.y + 44
+  const armed = menu.armed
+  const cards = [
+    { art: drawStopArt, value: `+${menu.bank}`, colour: GREEN },
+    { art: drawDeepArt, value: `X${menu.deeper}`, colour: YELLOW, big: true },
+  ]
+  cards.forEach(({ art, value, colour, big }, i) => {
+    const on = armed && i === menu.selected
+    const arrive = overshoot((age - i * 0.1) * 3)
+    const lift = on ? 4 + Math.round(Math.sin(g.time * 5)) : 0
+    const x = left + i * (w + gap)
+    const y = Math.round(VIEW.h + 10 + (top - lift - VIEW.h - 10) * arrive)
+    panel(ctx, x, y, w, h, on ? YELLOW : DIM)
+    art(ctx, x + 3, y + 3, w - 6, h - 28, g.time)
+    const scale = big ? 3 : textWidth(value) * 2 > w - 6 ? 1 : 2
+    drawText(ctx, value, x + (w - textWidth(value) * scale) / 2, y + h - 22 + (big ? 0 : 2), colour, scale)
+    menu.hits?.push({ index: i, x: x - ORIGIN.x, y: top - ORIGIN.y, w, h })
+  })
 }
 
 const drawCard = (ctx, card, x, y, w, h, on, time) => {
   panel(ctx, x, y, w, h, on ? YELLOW : GREEN)
   if (card.mystery) drawText(ctx, '?', x + w / 2 - 6, y + 8, Math.floor(time * 5) % 2 ? YELLOW : WHITE, 4)
+  else if (card.cost) ctx.drawImage(SPRITES.icons[card.icon], x + w / 2 - 16, y + 7, 32, 32)
   else if (card.icon) ctx.drawImage(tintedIcon(card.icon, card.tint), x + w / 2 - 8, y + 8)
   const chars = Math.floor((w - 6) / 4)
   const name = wrapText(card.name, chars)
-  name.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 30 + n * 7, on ? YELLOW : WHITE))
+  const nameAt = card.cost ? y + 44 : y + 30
+  name.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, nameAt + n * 7, on ? YELLOW : WHITE))
   wrapText(card.text, chars).forEach((line, n) => {
-    drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 32 + name.length * 7 + n * 6, PALE)
+    drawText(ctx, line, x + (w - textWidth(line)) / 2, nameAt + 2 + name.length * 7 + n * 6, PALE)
   })
+  if (card.cost) {
+    const lines = wrapText(card.cost, chars)
+    lines.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, y + h - 3 - (lines.length - n) * 6, RED))
+  }
   if (card.prompt) drawPrompt(ctx, card.prompt, x + (w - promptWidth(card.prompt)) / 2, y + h - PROMPT_HEIGHT - 3)
   else if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, DIM)
 }
@@ -349,15 +519,16 @@ const drawCards = (ctx, g, menu, cards) => {
   const w = Math.min(68, Math.floor((ROOM_PX - 12 - gap * (cards.length - 1)) / cards.length))
   const total = cards.length * w + (cards.length - 1) * gap
   const left = midX() - total / 2
-  const top = ORIGIN.y + 72
+  const top = ORIGIN.y + (menu.tall ? 52 : 72)
+  const height = menu.tall ? 110 : 72
   if (menu.title) centred(ctx, menu.title, ORIGIN.y + 42, YELLOW, menu.title.length > 18 ? 1 : 2)
   cards.forEach((card, i) => {
     const arrive = overshoot(((menu.age ?? 1) - i * 0.06) * 4)
     const on = i === menu.selected
     const lift = on ? 4 + Math.round(Math.sin(g.time * 5)) : 0
     const y = VIEW.h + 10 + (top - lift - VIEW.h - 10) * arrive
-    drawCard(ctx, card, left + i * (w + gap), Math.round(y), w, 72, on, g.time)
-    menu.hits?.push({ index: i, x: left + i * (w + gap) - ORIGIN.x, y: top - ORIGIN.y, w, h: 72 })
+    drawCard(ctx, card, left + i * (w + gap), Math.round(y), w, height, on, g.time)
+    menu.hits?.push({ index: i, x: left + i * (w + gap) - ORIGIN.x, y: top - ORIGIN.y, w, h: height })
   })
 }
 
@@ -432,6 +603,7 @@ const PAGES = {
   records: (ctx, g, menu) => drawRecords(ctx, menu),
   almanac: drawAlmanac,
   summary: drawSummary,
+  choice: drawChoice,
   offer: (ctx, g, menu) => drawCards(ctx, g, menu, menu.items.map(item => item.card ?? cardFor(item.option))),
   swap: (ctx, g, menu) => drawCards(ctx, g, menu, menu.items.map(item => item.card)),
 }

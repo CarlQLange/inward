@@ -10,6 +10,7 @@ const BUTTONS = {
   skill: [1], back: [1],
   skill2: [3],
   skill3: [5],
+  skill4: [11],
   bomb: [4],
   map: [8],
   pause: [9],

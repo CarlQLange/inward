@@ -13,6 +13,9 @@ const DEFAULTS = {
   coresReached: 0,
   deepest: 0,
   worldKills: 0,
+  deepestLoop: 0,
+  hall: [],
+  last: null,
   notes: [],
   settings: { autofire: true, shaders: 'full', shake: true, rumble: true },
 }
@@ -26,6 +29,7 @@ const read = () => {
       ...saved,
       best: Math.max(saved.best ?? 0, oldBest),
       found: Array.isArray(saved.found) ? saved.found : [],
+      hall: Array.isArray(saved.hall) ? saved.hall : [],
       settings: { ...DEFAULTS.settings, ...saved.settings },
     }
   } catch {
@@ -74,8 +78,11 @@ export const clearRun = () => {
 
 export const hasRun = () => loadRun() !== null
 
-export const recordRun = ({ score, chainPeak, roomReached, reachedCore, worldKills }) => {
+const HALL_SIZE = 5
+
+export const recordRun = ({ score, chainPeak, roomReached, reachedCore, worldKills, loop = 0, entry = {} }) => {
   const newBest = score > save.best
+  const run = { score, ...entry }
   Object.assign(save, {
     best: Math.max(save.best, score),
     bestChain: Math.max(save.bestChain, chainPeak),
@@ -83,6 +90,9 @@ export const recordRun = ({ score, chainPeak, roomReached, reachedCore, worldKil
     coresReached: save.coresReached + (reachedCore ? 1 : 0),
     deepest: Math.max(save.deepest, roomReached),
     worldKills: save.worldKills + worldKills,
+    deepestLoop: Math.max(save.deepestLoop, loop),
+    hall: [...save.hall, run].sort((a, b) => b.score - a.score).slice(0, HALL_SIZE),
+    last: run,
   })
   persist()
   return newBest

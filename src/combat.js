@@ -4,6 +4,8 @@ import { acidAt, burningAt, chargedAt, crushingAt, explode, lavaAt, matAt, vineA
 import { cell, cellsUnder, centre } from './physics.js'
 import { rumble } from './pad.js'
 import { burstSparks, hitFx, hurtFx, woundFx } from './fx.js'
+import { bounced, schoolOf, wardShare } from './wards.js'
+import { hasKeystone } from './keystones.js'
 
 export const burst = burstSparks
 
@@ -19,7 +21,7 @@ const hurtPlayer = (g, p, cause) => {
   const paid = p.relics.has('crown') && g.gold >= TUNING.run.crownHit
   if (paid) spillCoins(g, p, TUNING.run.crownHit)
   else p.hp -= 1
-  if (p.relics.has('chain')) {
+  if (p.relics.has('chain') && !hasKeystone(p, 'unbroken')) {
     g.chain = 0
     g.chainTime = 0
   }
@@ -38,28 +40,38 @@ const hurtPlayer = (g, p, cause) => {
   if (p.relics.has('plate')) explode(g.world, cell(here.x), cell(here.y), 1)
 }
 
-const hurtWarden = (g, e, amount, source) => {
+const hurtWarden = (g, e, amount, source, cause) => {
   const fromWorld = source !== 'player'
   if (e.hp <= 0 || e.asleep || e.shield > 0 || (fromWorld && e.iframes > 0)) return
-  e.hp -= (e.stun > 1 ? 2 : 1) * amount * (fromWorld ? TUNING.enemies.warden.world : 1)
+  const school = schoolOf(source, cause)
+  const share = wardShare(e, school)
+  const scale = (e.stun > 1 ? 2 : 1) * (hasKeystone(g.player, 'onecut') ? TUNING.run.keystones.onecutWarden : 1)
+  const dealt = amount * (fromWorld ? TUNING.enemies.warden.world : 1)
+  e.hp -= scale * dealt * share
   e.sinceHit = 0
+  if (e.taken) e.taken[school ?? 'WEAK'] = (e.taken[school ?? 'WEAK'] ?? 0) + dealt
   if (fromWorld) {
     e.iframes = TUNING.enemyIframes
-    e.worldDamage = (e.worldDamage ?? 0) + amount * TUNING.enemies.warden.world
+    e.worldDamage = (e.worldDamage ?? 0) + dealt
   } else e.gunDamage = (e.gunDamage ?? 0) + amount
-  e.flash = TUNING.feel.enemyFlash
   e.lastSource = source
+  e.lastCause = cause
+  if (share < 1) {
+    bounced(g, e, school)
+    return
+  }
+  e.flash = TUNING.feel.enemyFlash
   woundFx(g, e)
 }
 
 export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   if (e.partOf) {
     const body = g.enemies.find(o => o.warden)
-    if (body) hurtWarden(g, body, amount, source)
+    if (body) hurtWarden(g, body, amount, source, cause)
     return
   }
   if (e.warden) {
-    hurtWarden(g, e, amount, source)
+    hurtWarden(g, e, amount, source, cause)
     return
   }
   if (e.iframes > 0 || e.hp <= 0) return
@@ -67,7 +79,12 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
     hurtPlayer(g, e, cause)
     return
   }
-  e.hp -= e.stun > 1 ? amount * 2 : amount
+  if (e.ward && schoolOf(source, cause) === e.ward) {
+    e.iframes = TUNING.enemyIframes
+    bounced(g, e, e.ward)
+    return
+  }
+  e.hp = hasKeystone(g.player, 'onecut') && !e.prop ? 0 : e.hp - (e.stun > 1 ? amount * 2 : amount)
   e.iframes = TUNING.enemyIframes
   e.flash = TUNING.feel.enemyFlash
   e.lastSource = source

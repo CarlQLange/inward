@@ -21,6 +21,13 @@ const trail = (ctx, x, y, ux, uy, from, to, step = 1) => {
   for (let i = from; i <= to; i += step) ctx.fillRect(Math.round(x - ux * i), Math.round(y - uy * i), 1, 1)
 }
 
+const drawStained = (ctx, s, g) => {
+  const speed = Math.hypot(s.vx, s.vy) || 1
+  ctx.fillStyle = s.colour
+  trail(ctx, s.x + s.w / 2, s.y + s.h / 2, s.vx / speed, s.vy / speed, 0, 5)
+  ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) - 1, s.w + 2, s.h + 2)
+}
+
 const drawTracer = (ctx, s, g) => {
   const era = eraOf(g)
   const index = eraIndex(g)
@@ -56,7 +63,7 @@ const drawShrapnel = (ctx, s, g) => {
   ctx.fillRect(Math.round(s.x), Math.round(s.y), s.w, s.h)
 }
 
-export const drawShot = (ctx, s, g) => (s.friendly ? drawTracer(ctx, s, g) : drawShrapnel(ctx, s, g))
+export const drawShot = (ctx, s, g) => (s.colour ? drawStained(ctx, s, g) : s.friendly ? drawTracer(ctx, s, g) : drawShrapnel(ctx, s, g))
 
 const DIAMOND = [[0, -2], [-1, -1], [0, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]]
 const DIAMOND_EDGE = [[0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [-3, 0], [3, 0], [-2, 1], [2, 1], [-1, 2], [1, 2], [0, 3]]

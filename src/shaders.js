@@ -367,7 +367,7 @@ void main() {
 }`
 
 export const FRAME_ERA = ['green', 'shades', 'posterise', 'ghost', 'bloom', 'saturate', 'unmoor', 'pit', 'bend']
-export const FRAME_UNIFORMS = ['time', 'pulse', 'stop', 'aberration', 'flash', 'desaturate', 'hurt', 'forced', 'doorOn', 'halo', 'calm', 'coreGlow', ...FRAME_ERA]
+export const FRAME_UNIFORMS = ['time', 'pulse', 'stop', 'aberration', 'flash', 'desaturate', 'hurt', 'forced', 'doorOn', 'halo', 'calm', 'coreGlow', 'loopOn', ...FRAME_ERA]
 
 export const FRAME = `
 precision highp float;
@@ -388,6 +388,7 @@ uniform vec3 zoom;
 uniform vec3 pitColour;
 uniform vec4 rings[${RING_SLOTS}];
 ${floats(FRAME_UNIFORMS)}
+uniform vec3 loopTint;
 
 const vec3 GB0 = vec3(0.059, 0.200, 0.098);
 const vec3 GB1 = vec3(0.188, 0.384, 0.188);
@@ -571,7 +572,10 @@ void main() {
     world *= 1.0 - near * halo;
   }
 
-  if (w.a > 0.5) world = handheld(world);
+  if (w.a > 0.5) {
+    world = handheld(world);
+    world = mix(world, loopTint * luma(world) * 1.9, loopOn);
+  }
 
   vec3 actor = f.rgb;
   float spot = 0.0;

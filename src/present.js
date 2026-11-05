@@ -1,4 +1,4 @@
-import { BLOCK, ORIGIN, ROOM, VIEW } from './config.js'
+import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { LAYOUT, isTouchLayout } from './layout.js'
 import { LIGHT_SIZE, ambientOf, buildLight } from './light.js'
 import { save } from './store.js'
@@ -12,6 +12,7 @@ const SIZE = ROOM * BLOCK
 const NOISE_SIZE = 64
 const PIT_COLOUR = [0.34, 0.62, 0.58]
 const MAP_CENTRE = 7
+const LOOP_TINTS = [[1, 0.2, 0.45], [0.2, 1, 0.8], [1, 0.8, 0.2], [0.45, 0.3, 1]]
 
 const compile = (gl, type, source) => {
   const shader = gl.createShader(type)
@@ -115,7 +116,7 @@ export const createPresenter = canvas => {
   gl.disable(gl.DEPTH_TEST)
   gl.disable(gl.BLEND)
 
-  const frameExtras = ['view', 'origin', 'shake', 'slideNew', 'slideOld', 'mapPos', 'zoom', 'pitColour', 'rings']
+  const frameExtras = ['view', 'origin', 'shake', 'slideNew', 'slideOld', 'mapPos', 'zoom', 'pitColour', 'rings', 'loopTint']
   const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks', 'front'], WORLD_UNIFORMS, ['frontOrigin', 'frontScale', 'vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide'])
   const opticsProgram = programOf(gl, OPTICS, ['worldLayer', 'cells', 'fields', 'lightMap', 'noise', 'front'], OPTICS_UNIFORMS, ['frontOrigin', 'frontScale', 'ripples', 'fogColour', 'beamColour'])
   const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'lightMap', 'noise'], FRAME_UNIFORMS, frameExtras)
@@ -322,6 +323,7 @@ export const createPresenter = canvas => {
       halo: Math.min(0.5, era.bloom * 0.55 + era.fog * 0.2 + (era.far + era.near) * 0.08),
       calm: isTouchLayout() ? 0.65 : 1,
       coreGlow: 0.9,
+      loopOn: state.loop ? TUNING.run.deep.hueAlpha * power : 0,
     })
     const { at } = frameProgram
     const slide = slides(state)
@@ -333,6 +335,7 @@ export const createPresenter = canvas => {
     gl.uniform2f(at.mapPos, (state.x ?? MAP_CENTRE) - MAP_CENTRE, (state.y ?? MAP_CENTRE) - MAP_CENTRE)
     gl.uniform3f(at.zoom, state.zoom?.x ?? 112, state.zoom?.y ?? 112, (state.zoom?.amount ?? 0) * power)
     gl.uniform3fv(at.pitColour, PIT_COLOUR)
+    gl.uniform3fv(at.loopTint, LOOP_TINTS[((state.loop || 1) - 1) % LOOP_TINTS.length])
     uploadRings(state, power)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }

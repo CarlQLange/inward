@@ -9,21 +9,26 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOut
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
-import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
+import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, formOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { dust } from './feel.js'
 import { beginDoor, blastFx, chipsAt, coinMote, createFx, fallFx, impact, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
-import { dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
+import { dropCard, openChoice, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
 import { clearRun, knownNotes, loadRun, persist, recordRun, save, saveRun } from './store.js'
 import { isKnown, knownFrom, knownOf, meet, pickSecrets, plantsFor, rollOmen, showReveal } from './discover.js'
-import { OMENS, applyOmen, omenFoes, omenTheme } from './omens.js'
+import { OMENS, applyOmens, omenAmbient, omenFoes, omenTheme } from './omens.js'
 import { buildArena, openArena, stepArena } from './wardens.js'
 import { exitsFrom } from './reach.js'
+import { KEYSTONE_BY_ID, bombReady, bombThrown, castWait, crowdedOut, hasKeystone, heartCap, openKeystones, rechargeRate, slotsOf, stainColour, stainStrikes, stepKeystones } from './keystones.js'
+import { deepKill, mutateFoe, rollMutation, stepMutations } from './deep.js'
+import { emptyTally, noteKill, outwitted, wardedAgainst } from './wards.js'
 
 const P = TUNING.player
 const R = TUNING.run
+const K = R.keystones
+const DEEP = R.deep
 const CARD_SIZES = { core: [16, 16] }
 const ALL_SKILLS = Object.keys(SKILLS)
 const ALL_SKILLS_EVER = new Set([...ALL_SKILLS, 'echo', 'pact'])
@@ -36,14 +41,14 @@ const createPlayer = ({ x, row }) => ({
   grounded: false, sinceGround: 1, sinceJump: 1, jumpHeld: false,
   shotReady: 0, skills: [], upgrades: new Set(), relics: new Set(), aim: { x: 1, y: 0 }, drift: 0,
   wasJump: false, wasSkills: [false, false, false, false], bombs: P.startBombs, wasBomb: false,
-  airJumps: 0, dashing: 0, trail: [], clinging: 0,
+  airJumps: 0, dashing: 0, trail: [], clinging: 0, keystones: new Set(),
 })
 
 const nextRelic = g => g.relicPool.shift() ?? null
 
 const createCard = g => ({ kind, x, row, relic }) => {
-  const resolved = kind === 'skill' ? g.cardPool.shift() ?? 'bolt' : kind
-  return { kind: resolved, x, y: row * BLOCK - 13, w: 12, h: 12, relic: kind === 'chest' || kind === 'altar' ? relic ?? nextRelic(g) : undefined }
+  const resolved = kind === 'skill' ? g.cardPool.shift() ?? 'chest' : kind
+  return { kind: resolved, x, y: row * BLOCK - 13, w: 12, h: 12, relic: resolved === 'chest' || resolved === 'altar' ? relic ?? nextRelic(g) : undefined }
 }
 
 const createWare = g => ({ kind, x, row }) => ({
@@ -63,7 +68,8 @@ const lean = g => {
 
 const depthFor = (g, ring) => {
   const distance = ring / CORE_RING
-  return g.awake ? R.wakeDepth + (1 - R.wakeDepth) * distance : distance
+  const wake = g.loop ? DEEP.wake[Math.min(g.loop, DEEP.wake.length) - 1] : R.wakeDepth
+  return g.awake ? wake + (1 - wake) * distance : distance
 }
 
 const LOCK_OPENERS = {
@@ -124,7 +130,7 @@ const fitsRing = ring => kind => (MIN_RING[kind] ?? 0) <= ring
 const regionTheme = (g, ring, index) => {
   const band = BAND_OF_RING[ring]
   const roster = (g.bandFoes[band] ?? []).filter(fitsRing(ring))
-  return omenTheme(g.omen, {
+  return omenTheme(g.omens, {
     ...THEMES[index],
     roster: roster.length ? roster : ['crawler'],
     swimmers: WATER_FOES.filter(kind => isKnown(g, 'foe', kind)).filter(fitsRing(ring)),
@@ -171,8 +177,9 @@ const withPlant = (g, ring, special) => {
 
 const ELITES = ['burning', 'charged', 'armoured']
 
-const makeElite = ring => e => {
-  if (e.friendly || e.heavy || Math.random() > ring * TUNING.enemies.elite.chancePerRing) return e
+const makeElite = (g, ring) => e => {
+  const chance = hasKeystone(g.player, 'bounty') ? 1 : ring * TUNING.enemies.elite.chancePerRing + (g.loop ?? 0) * DEEP.eliteChance
+  if (e.friendly || e.heavy || Math.random() > chance) return e
   const elite = ELITES[Math.floor(Math.random() * ELITES.length)]
   return {
     ...e,
@@ -190,16 +197,17 @@ const arenaFor = (g, key, ring) => {
 }
 
 const dressEnemy = (g, ring) => e => {
+  const loop = g.loop ?? 0
   if (e.warden) {
-    const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.wardenHpPerRing))
-    return { ...e, hp, maxHp: hp, asleep: true, pace: TUNING.enemies.warden.pace[ring] ?? 1 }
+    const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.wardenHpPerRing) * (1 + loop * DEEP.wardenHp))
+    return { ...e, hp, maxHp: hp, asleep: true, pace: (TUNING.enemies.warden.pace[ring] ?? 1) * DEEP.pace ** loop, tier: loop > 0 || ring >= 5 ? 2 : ring >= 3 ? 1 : 0 }
   }
-  const omen = omenFoes(g.omen)
+  const omen = omenFoes(g.omens)
   return {
     ...e,
     magnetic: e.magnetic || (Boolean(omen.magnetic) && !e.friendly),
     cooldown: e.cooldown + R.entryGrace,
-    hp: e.friendly ? e.hp : Math.max(1, Math.ceil(e.hp * (1 + ring * R.hpPerRing) * (omen.hp ?? 1))),
+    hp: e.friendly ? e.hp : Math.max(1, Math.ceil(e.hp * (1 + ring * R.hpPerRing) * (1 + loop * DEEP.foeHp) * (omen.hp ?? 1))),
   }
 }
 
@@ -211,7 +219,7 @@ const ghostPickup = (g, key, spot) => {
 const crowding = e => (e.friendly || e.prop || e.warden || e.partOf ? 0 : e.kind === 'gnat' ? 0.2 : 1)
 
 const thinFoes = (g, ring, foes) => {
-  const limit = R.foeLimit[ring] * (g.omen === 'swarm' ? 1.6 : 1)
+  const limit = R.foeLimit[ring] * (g.omens.includes('swarm') ? 1.6 : 1)
   const kept = []
   const protectedKinds = new Set((g.secrets ?? []).map(key => key.split(':')[1]))
   let load = foes.filter(e => protectedKinds.has(e.kind)).reduce((n, e) => n + crowding(e), 0)
@@ -229,7 +237,7 @@ const buildRoom = (g, x, y) => {
   const key = keyOf(x, y)
   const ring = ringOf(x, y)
   const links = g.map.links[key] ?? {}
-  const start = key === keyOf(...g.map.start) && !g.quick
+  const start = key === keyOf(...g.map.start) && !g.quick && !g.loop
   const depth = ring / CORE_RING
   const themeIndex = regionFor(g, ring)
   const arenaId = arenaFor(g, key, ring)
@@ -247,7 +255,7 @@ const buildRoom = (g, x, y) => {
         theme: regionTheme(g, ring, themeIndex),
         themeIndex,
       })
-  const world = createWorld(definition.map, ring === CORE_RING)
+  const world = createWorld(definition.map, ring === CORE_RING || hasKeystone(g.player, 'overload'))
   world.drains = definition.drains ?? []
   return {
     x, y, ring, links,
@@ -259,7 +267,7 @@ const buildRoom = (g, x, y) => {
     doors: definition.doors,
     world,
     arena: definition.arena,
-    enemies: thinFoes(g, ring, definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean)).map(makeElite(ring)).map(dressEnemy(g, ring)),
+    enemies: thinFoes(g, ring, definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean)).map(makeElite(g, ring)).map(dressEnemy(g, ring)).map(e => mutateFoe(g, e, themeIndex)),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare(g)),
     pickups: ghostPickup(g, key, definition.spare ?? { x: g.starter.spawn.x + 16, y: (g.starter.spawn.row - 1) * BLOCK }),
@@ -287,9 +295,11 @@ const leaveRoom = g => {
   Object.assign(g.rooms[keyOf(g.x, g.y)], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
 
+const wardenRingsOf = g => (g.loop ? DEEP.wardenRings : R.wardenRings)
+
 const placeWarden = (g, x, y) => {
   const ring = ringOf(x, y)
-  const slot = R.wardenRings.indexOf(ring)
+  const slot = wardenRingsOf(g).indexOf(ring)
   if (slot < 0 || g.wardens[ring] || ring < (g.quickRing ?? 0)) return
   const rooms = loopRooms(g.map, [x, y], ring).filter(r => r.steps > 0)
   const [near, far] = R.wardenWalk
@@ -356,20 +366,15 @@ const enterRoom = (g, x, y) => {
   }
   if (room.ring > g.deepestRing) {
     g.deepestRing = room.ring
-    g.score += room.ring * R.ringBonus
+    award(g, room.ring * R.ringBonus)
   }
 }
 
-const walkThrough = (g, dir) => {
-  const here = g.rooms[keyOf(g.x, g.y)]
-  const [nx, ny] = here.links[dir].to
-  releaseMatter(g)
-  leaveRoom(g)
-  enterRoom(g, nx, ny)
+const arriveBy = (g, dir, from) => {
   g.hinted = false
-  beginDoor(g, dir, here)
+  beginDoor(g, dir, from)
   const p = g.player
-  const door = g.rooms[keyOf(nx, ny)].doors[OPPOSITE[dir]]
+  const door = g.rooms[keyOf(g.x, g.y)].doors[OPPOSITE[dir]]
   if (dir === 'right' || dir === 'left') {
     p.x = dir === 'right' ? 1 : WORLD_PX - p.w - 1
     p.y = (door.row + 2) * BLOCK - p.h
@@ -382,6 +387,15 @@ const walkThrough = (g, dir) => {
     p.sinceGround = 1
     p.jumpHeld = false
   }
+}
+
+const walkThrough = (g, dir) => {
+  const here = g.rooms[keyOf(g.x, g.y)]
+  const [nx, ny] = here.links[dir].to
+  releaseMatter(g)
+  leaveRoom(g)
+  enterRoom(g, nx, ny)
+  arriveBy(g, dir, here)
   storeRun(g)
 }
 
@@ -389,6 +403,7 @@ const RUN_FIELDS = [
   'seed', 'map', 'x', 'y', 'awake', 'roomsSeen', 'deepestRing', 'cardPool', 'score', 'chainPeak',
   'xp', 'level', 'nextLevel', 'gold', 'kills', 'environmentKills', 'pendingOffers', 'relicPool', 'lastTheme', 'quick', 'quickRing',
   'bands', 'bandFoes', 'omen', 'ambient', 'flocking', 'secrets', 'plants', 'foundThisRun', 'wardens', 'wardenAt', 'wardenOrder', 'seals', 'charted', 'ghost', 'cleanClears', 'mercyBombs',
+  'loop', 'omens', 'mutations', 'tally', 'recent', 'keystoneDue', 'bestBeaten', 'wardenWins', 'outwits',
 ]
 
 const packRoom = room => ({
@@ -399,10 +414,10 @@ const packRoom = room => ({
   drains: room.world.drains, world: encodeWorld(room.world),
 })
 
-const unpackRoom = (packed, map) => ({
+const unpackRoom = (packed, map, overloaded) => ({
   ...packed,
   links: map.links[keyOf(packed.x, packed.y)] ?? {},
-  world: restoreWorld(packed.world, packed.ring === CORE_RING, packed.drains),
+  world: restoreWorld(packed.world, packed.ring === CORE_RING || overloaded, packed.drains),
 })
 
 const storeRun = g => {
@@ -411,7 +426,7 @@ const storeRun = g => {
   g.flung = []
   saveRun({
     ...Object.fromEntries(RUN_FIELDS.map(f => [f, g[f]])),
-    player: { ...g.player, upgrades: [...g.player.upgrades], relics: [...g.player.relics], trail: [] },
+    player: { ...g.player, upgrades: [...g.player.upgrades], relics: [...g.player.relics], keystones: [...g.player.keystones], trail: [] },
     rooms: Object.fromEntries(Object.entries(g.rooms).map(([key, room]) => [key, packRoom(room)])),
   })
   persist()
@@ -424,6 +439,8 @@ const ringCells = (map, ring) =>
     .map(key => key.split(',').map(Number))
     .filter(([x, y]) => ringOf(x, y) === ring)
 
+const QUICK_SKIPS = new Set(['slough', 'monomania', 'fourth', 'overload', 'quarry'])
+
 const applyQuickstart = (g, ring) => {
   const p = g.player
   const kinds = shuffled(knownOf(g, 'skill')).slice(0, Math.min(P.skillSlots, 1 + ring))
@@ -433,7 +450,12 @@ const applyQuickstart = (g, ring) => {
     if (pick) p.upgrades.add(pick.node.id)
   }
   g.relicPool.splice(0, ring).forEach(id => p.relics.add(id))
+  for (let n = 0; n < g.seals; n++) {
+    const [pick] = shuffled(openKeystones(p, g.known).filter(k => !QUICK_SKIPS.has(k.id)))
+    if (pick) p.keystones.add(pick.id)
+  }
   applyRelic(p)
+  p.hp = heartCap(p)
   p.bombs = 1 + ring
   g.gold = ring * 4
   g.level = 1 + ring * 2
@@ -456,6 +478,8 @@ const placeAtDoor = g => {
   p.iframes = TUNING.feel.entryShield * 2
 }
 
+const WARDEN_KINDS = ['bellows', 'colossus', 'crucible', 'eel', 'brood', 'conductor']
+
 const chooseWardens = (known, secrets) => {
   const fresh = secrets.filter(key => key.startsWith('warden:')).map(key => key.split(':')[1])
   const owned = [...known].filter(key => key.startsWith('warden:')).map(key => key.split(':')[1]).filter(id => !fresh.includes(id))
@@ -472,7 +496,8 @@ const createRun = (depthOverride, quickRing = null, discovering = false) => {
   const secrets = fresh ? pickSecrets() : []
   const known = knownFrom(secrets)
   const omen = fresh ? rollOmen(secrets) : null
-  applyOmen(omen)
+  const omens = omen ? [omen] : []
+  applyOmens(omens)
   const ghost = fresh ? save.ghost : null
   if (fresh) save.ghost = null
   const bands = chooseBands(starter)
@@ -499,8 +524,21 @@ const createRun = (depthOverride, quickRing = null, discovering = false) => {
     reveal: null,
     revealQueue: [],
     omen,
-    ambient: OMENS[omen]?.ambient ?? 1,
-    flocking: omenFoes(omen).flock === true,
+    omens,
+    ambient: omenAmbient(omens),
+    flocking: omenFoes(omens).flock === true,
+    loop: 0,
+    mutations: [],
+    tally: emptyTally(),
+    recent: emptyTally(),
+    keystoneDue: false,
+    keystoneOffer: null,
+    sealHold: false,
+    bestBeaten: false,
+    wardenWins: 0,
+    outwits: 0,
+    echoes: [],
+    tempo: 1,
     bands,
     bandFoes: chooseBandFoes(bands, known, secrets),
     wardenOrder: chooseWardens(known, secrets),
@@ -653,7 +691,7 @@ const OPTION_RESULTS = {
   },
   relic: g => gainRelic(g, nextRelic(g)),
   mend: g => {
-    g.player.hp = P.hp
+    g.player.hp = heartCap(g.player)
     g.player.bombs += 1
     g.pulse = 1
   },
@@ -718,8 +756,8 @@ const gainRelic = (g, id) => {
 }
 
 const applyRelic = p => {
-  p.fireproof = hasRelic(p, 'fireboots')
-  p.insulated = hasRelic(p, 'rubber')
+  p.fireproof = hasRelic(p, 'fireboots') || hasKeystone(p, 'salamander')
+  p.insulated = hasRelic(p, 'rubber') || hasKeystone(p, 'livewire')
   p.smokeproof = hasRelic(p, 'gills')
 }
 
@@ -730,13 +768,13 @@ const gainXp = (g, amount) => {
     g.level += 1
     g.nextLevel = R.firstLevel + (g.level - 1) * R.levelGrowth
     g.pendingOffers += 1
-    g.player.hp = Math.min(P.hp, g.player.hp + R.levelHeal)
+    g.player.hp = Math.min(heartCap(g.player), g.player.hp + R.levelHeal)
   }
 }
 
 const dropLoot = (g, e, base) => {
   const c = centre(e)
-  const count = base * R.lootScale
+  const count = hasKeystone(g.player, 'quarry') ? 0 : base * R.lootScale
   for (let i = 0; i < count; i++) {
     g.pickups.push({
       kind: 'coin', x: c.x - 2, y: c.y - 2, w: 5, h: 5,
@@ -767,14 +805,116 @@ const offerRelics = g => {
   })
 }
 
+const award = (g, points) => {
+  g.score += points * (1 + g.loop)
+  if (g.bestBeaten || g.quick || save.best <= 0 || g.score <= save.best) return
+  g.bestBeaten = true
+  g.pulse = 1
+  showToast(g, 'BEST')
+}
+
+const leaveChest = g => {
+  const c = centre(g.player)
+  g.cards.push({ kind: 'chest', x: c.x - 6, y: c.y - 16, w: 12, h: 12, relic: nextRelic(g) })
+}
+
+const pickSlough = (g, p) => {
+  const count = Math.max(2, p.skills.length)
+  const kinds = shuffled(knownOf(g, 'skill').filter(kind => !p.skills.some(s => s.kind === kind))).slice(0, count)
+  if (kinds.length === 0) return
+  g.cardPool = [...g.cardPool.filter(kind => !kinds.includes(kind)), ...p.skills.map(s => s.kind)]
+  p.skills = kinds.map(kind => ({ kind, ready: 0 }))
+  kinds.forEach(kind => FORKS[kind].forEach(fork => p.upgrades.add(shuffled(fork)[0].id)))
+}
+
+const openKeepOne = (g, p) => openMenu(g, {
+  page: 'offer',
+  layout: 'cards',
+  back: false,
+  title: '',
+  items: p.skills.map((skill, slot) => ({
+    card: { icon: skill.kind, tint: formOf(p, skill.kind).tint, name: formOf(p, skill.kind).name, text: '', prompt: skillAction(slot) },
+    run: gm => {
+      gm.menus.pop()
+      p.skills.filter(s => s !== skill).forEach(s => dropCard(gm, s.kind))
+      p.skills = [skill]
+    },
+  })),
+})
+
+const KEYSTONE_TAKEN = {
+  fourth: g => {
+    const [kind] = shuffled(unownedSkills(g))
+    if (kind) learnOrSwap(g, kind, () => {}, gm => dropCard(gm, kind))
+  },
+  monomania: (g, p) => { if (p.skills.length > 1) openKeepOne(g, p) },
+  slough: pickSlough,
+  overload: g => Object.values(g.rooms).forEach(room => { room.world.overloaded = true }),
+  quarry: g => { g.gold = 0 },
+}
+
+export const takeKeystone = (g, id) => {
+  const p = g.player
+  const found = KEYSTONE_BY_ID[id]
+  p.keystones.add(id)
+  applyRelic(p)
+  p.hp = Math.min(p.hp, heartCap(p))
+  const c = centre(p)
+  ring(g, c.x, c.y, found.tint, 40, 170)
+  g.pulse = 1
+  g.shake = Math.max(g.shake, 8)
+  p.iframes = Math.max(p.iframes, 1)
+  KEYSTONE_TAKEN[id]?.(g, p)
+  showToast(g, found.name, found.gift)
+  if (!g.loop) leaveChest(g)
+}
+
+const rollKeystones = g => {
+  const fresh = g.secrets.filter(key => key.startsWith('keystone:')).map(key => key.split(':')[1])
+  const open = shuffled(openKeystones(g.player, g.known))
+  return [...open.filter(k => fresh.includes(k.id)), ...open.filter(k => !fresh.includes(k.id))].slice(0, R.keystoneOffers)
+}
+
+const offerKeystones = g => {
+  g.keystoneOffer ??= rollKeystones(g)
+  if (g.keystoneOffer.map(k => meet(g, 'keystone', k.id)).some(Boolean)) return
+  const picks = g.keystoneOffer
+  g.keystoneDue = false
+  g.keystoneOffer = null
+  if (picks.length === 0) {
+    leaveChest(g)
+    return
+  }
+  openMenu(g, {
+    page: 'offer',
+    layout: 'cards',
+    back: false,
+    title: '',
+    tall: true,
+    items: picks.map(k => ({
+      card: { icon: `key_${k.id}`, name: k.name, text: k.gift, cost: k.cost },
+      run: gm => {
+        gm.menus.pop()
+        takeKeystone(gm, k.id)
+        gm.player.wasJump = true
+        gm.player.wasBomb = true
+      },
+    })),
+  })
+}
+
 const onWardenKilled = (g, e) => {
   const room = g.rooms[keyOf(g.x, g.y)]
   const p = g.player
   openArena(g, room)
   room.sealed = false
   room.cleared = true
-  g.score += ENEMY_DEFS[e.kind].value
+  const outwit = outwitted(e)
+  award(g, ENEMY_DEFS[e.kind].value * (outwit ? R.wards.outwitPays : 1))
   g.kills += 1
+  g.wardenWins += 1
+  g.outwits += outwit ? 1 : 0
+  noteKill(g, e)
   if (e.lastSource !== 'player') g.environmentKills += 1
   g.pulse = 1
   g.shake = Math.max(g.shake, 14)
@@ -787,11 +927,11 @@ const onWardenKilled = (g, e) => {
   const ring = g.wardenAt[keyOf(g.x, g.y)]
   if (g.wardens[ring]) g.wardens[ring].dead = true
   g.seals += 1
-  p.hp = P.hp
-  g.score += R.wardenBonus * g.seals
+  p.hp = heartCap(p)
+  award(g, R.wardenBonus * g.seals)
   gainXp(g, g.nextLevel - g.xp)
   beginMoment(g)
-  g.afterMoment = [() => showReveal(g, 'seal', e.kind), () => offerRelics(g)]
+  g.afterMoment = [() => showReveal(g, 'seal', e.kind), () => (g.loop ? offerRelics(g) : (g.keystoneDue = true))]
 }
 
 const killXp = (g, environmental) =>
@@ -817,16 +957,21 @@ const onKill = (g, e) => {
   if (e.kind === 'mimic') gainRelic(g, nextRelic(g))
   const p = g.player
   const environmental = e.lastSource !== 'player'
+  noteKill(g, e)
+  keystoneKill(g, e, p)
+  deepKill(g, e, environmental)
   if (hasRelic(p, 'battery') && environmental) p.skills.forEach(s => { s.ready = 0 })
   if (hasRelic(p, 'sack')) spillMatter(g, e, 3)
   const gained = environmental ? R.worldChain : 1
   const before = g.chainTime > 0 ? g.chain : 0
   g.chain = before + gained
-  g.chainTime = hasRelic(p, 'chain') ? Infinity : R.chainWindow
-  if (hasRelic(p, 'skull') && Math.floor(g.chain / R.skullChain) > Math.floor(before / R.skullChain)) p.hp = Math.min(P.hp, p.hp + 1)
+  g.chainTime = hasKeystone(p, 'unbroken') ? K.unbrokenWindow : hasRelic(p, 'chain') ? Infinity : R.chainWindow
+  if (hasRelic(p, 'skull') && Math.floor(g.chain / R.skullChain) > Math.floor(before / R.skullChain)) p.hp = Math.min(heartCap(p), p.hp + 1)
   g.chainPeak = Math.max(g.chainPeak, g.chain)
-  const points = def.value * g.chain * (environmental ? R.worldScore : 1)
-  g.score += points
+  const bounty = e.elite && hasKeystone(p, 'bounty') ? K.bountyPays : 1
+  const base = def.value * g.chain * (environmental ? R.worldScore : 1) * bounty
+  const points = base * (1 + g.loop)
+  award(g, base)
   g.kills += 1
   if (environmental) g.environmentKills += 1
   const earned = hasRelic(p, 'gem') ? (environmental ? killXp(g, true) * 2 : 0) : killXp(g, environmental)
@@ -836,7 +981,18 @@ const onKill = (g, e) => {
     g.popups.push({ x: c.x - 8, y: c.y - 6, icon: e.lastCause, colour: 'charge', life: 1.1 })
     addPopup(g, c.x + 4, c.y - 8, points, 'charge')
   } else if (g.chain >= R.popupChain) addPopup(g, c.x, c.y - 8, points, 'white')
-  dropLoot(g, e, environmental ? 2 : 1)
+  dropLoot(g, e, (environmental ? 2 : 1) * bounty)
+}
+
+const keystoneKill = (g, e, p) => {
+  const c = centre(e)
+  if (hasKeystone(p, 'powder')) explode(g.world, cell(c.x), cell(c.y), e.w > K.blastBigAbove ? K.blastBig : K.blastSmall)
+  if (!hasKeystone(p, 'wake') || e.spawned || e.hatched || e.heavy) return
+  if (g.enemies.filter(o => o.woken).length >= K.wakeMost) return
+  const woken = createEnemy({ kind: e.kind, x: e.x, y: e.y })
+  Object.assign(woken, { woken: true, silent: true, detonates: true, ally: K.wakeLife, hp: K.wakeHp, facing: e.facing })
+  g.spawns.push(woken)
+  ring(g, c.x, c.y, 'gas', 10, 40)
 }
 
 const stepMotionFeel = (g, p, input, dt, wasGrounded, falling, swimming) => {
@@ -902,7 +1058,7 @@ const aimFrom = (p, input) => {
 const autoTarget = (g, p) => {
   const from = muzzle(p)
   let best = null
-  let bestDistance = TUNING.feel.autoReach
+  let bestDistance = hasKeystone(p, 'fists') ? K.punchReach : TUNING.feel.autoReach
   for (const e of g.enemies) {
     if (e.friendly || e.prop || e.ally || e.intangible || e.plated || e.stowed || e.asleep || e.hp <= 0) continue
     const c = centre(e)
@@ -941,9 +1097,13 @@ const ASSISTED_SKILLS = new Set(['bolt', 'swap', 'charm', 'grapple', 'melt', 'em
 
 const fireShot = (g, p, aim, life = P.shotLife) => {
   const from = muzzle(p)
+  const stain = hasKeystone(p, 'stain') ? p.stain ?? M.ROCK : undefined
   g.shots.push({
-    x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: aim.x * P.shotSpeed, vy: aim.y * P.shotSpeed, life,
+    x: from.x - 1, y: from.y - 1, w: 2, h: 2, vx: aim.x * P.shotSpeed, vy: aim.y * P.shotSpeed,
+    life: hasKeystone(p, 'fists') ? K.punchLife : life,
+    power: hasKeystone(p, 'fists') ? K.punchPower : 1,
     bounces: hasRelic(p, 'ricochet') ? 3 : 0, friendly: true,
+    ...(stain === undefined ? {} : { stain, colour: stainColour(stain) }),
   })
 }
 
@@ -960,15 +1120,34 @@ const shoot = (g, p) => {
     p.jumpHeld = false
   } else fireShot(g, p, aim)
   shotFx(g, p, aim)
-  p.shotReady = P.shotEvery * (scatter ? 3 : 1)
+  p.shotReady = hasKeystone(p, 'fists') ? K.punchEvery : P.shotEvery * (scatter ? 3 : 1)
+  if (hasKeystone(p, 'fists')) p.vx += aim.x * K.punchLunge
+}
+
+const fireSkill = (g, p, kind) => {
+  const aim = p.aim
+  if (ASSISTED_SKILLS.has(kind)) p.aim = assisted(g, p, aim)
+  SKILLS[kind](g, p)
+  p.aim = aim
 }
 
 const castSkill = (g, p, skill) => {
-  const aim = p.aim
-  if (ASSISTED_SKILLS.has(skill.kind)) p.aim = assisted(g, p, aim)
-  SKILLS[skill.kind](g, p)
-  p.aim = aim
-  skill.ready = cooldownOf(p, skill.kind)
+  if (crowdedOut(g, p)) return
+  fireSkill(g, p, skill.kind)
+  skill.ready = castWait(p, cooldownOf(p, skill.kind))
+  if (hasKeystone(p, 'echo')) g.echoes.push({ kind: skill.kind, at: g.time + K.echoDelay })
+}
+
+const stepEchoes = (g, p, stunned) => {
+  const due = g.echoes.filter(echo => echo.at <= g.time)
+  if (due.length === 0) return
+  g.echoes = g.echoes.filter(echo => echo.at > g.time)
+  if (stunned) return
+  due.forEach(({ kind }) => {
+    const c = centre(p)
+    ring(g, c.x, c.y, formOf(p, kind).tint ?? '#6fd0ff', 8, 60)
+    fireSkill(g, p, kind)
+  })
 }
 
 const nearFire = (g, p) => {
@@ -981,7 +1160,8 @@ const nearFire = (g, p) => {
 }
 
 const useSkills = (g, p, input, stunned, dt) => {
-  const rate = hasRelic(p, 'hands') && nearFire(g, p) ? R.hotHandsRate : 1
+  const rate = (hasRelic(p, 'hands') && nearFire(g, p) ? R.hotHandsRate : 1) * rechargeRate(g, p)
+  stepEchoes(g, p, stunned)
   p.skills.forEach((skill, slot) => {
     skill.ready -= dt * rate
     const pressed = input[SKILL_ACTIONS[slot]] === true
@@ -990,17 +1170,31 @@ const useSkills = (g, p, input, stunned, dt) => {
   SKILL_ACTIONS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
 }
 
+const runEntry = (g, phase) => ({
+  won: phase === 'cleared',
+  loop: g.loop,
+  ring: g.deepestRing,
+  chain: g.chainPeak,
+  kills: g.kills,
+  world: g.environmentKills,
+  keys: [...g.player.keystones],
+  skills: g.player.skills.map(s => [s.kind, formOf(g.player, s.kind).tint]),
+})
+
 const finishRun = (g, phase) => {
   clearRun()
   g.phase = phase
   g.phaseTime = 0
-  if (phase === 'dead' && !g.quick && g.gold > 0) save.ghost = { key: keyOf(g.x, g.y), coins: Math.ceil(g.gold * R.ghostShare) }
+  if (phase === 'dead' && !g.quick && g.gold > 0 && !g.loop) save.ghost = { key: keyOf(g.x, g.y), coins: Math.ceil(g.gold * R.ghostShare) }
+  g.bestBefore = save.best
   g.newBest = !g.quick && recordRun({
     score: g.score,
     chainPeak: g.chainPeak,
     roomReached: g.ring + 1,
-    reachedCore: phase === 'cleared',
+    reachedCore: phase === 'cleared' || g.loop > 0,
     worldKills: g.environmentKills,
+    loop: g.loop,
+    entry: runEntry(g, phase),
   })
   g.best = save.best
 }
@@ -1123,7 +1317,7 @@ const buyWares = (g, p) => {
   if (!ware) return
   g.gold -= ware.price
   g.wares = g.wares.filter(w => w !== ware)
-  if (ware.kind === 'heart') p.hp = Math.min(P.hp, p.hp + 2)
+  if (ware.kind === 'heart') p.hp = Math.min(heartCap(p), p.hp + 2)
   else if (ware.kind === 'bomb') p.bombs += 1
   else if (ware.kind === 'relic') gainRelic(g, ware.relic)
   else g.pendingOffers += 1
@@ -1175,7 +1369,7 @@ const usePickups = (g, p, dt) => {
       g.gold += c.coins
       g.ghost = null
       burst(g, c.x, c.y, 'charge', 16)
-    } else p.hp = Math.min(P.hp, p.hp + 1)
+    } else p.hp = Math.min(heartCap(p), p.hp + 1)
   }
   g.pickups = g.pickups.filter(c => !c.taken)
 }
@@ -1207,8 +1401,97 @@ const stepEnding = (g, dt) => {
     burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'fire', 12)
   }
   if (g.ending.life > 0) return
-  g.score += R.coreBonus + g.player.hp * 100
+  g.ending.asking = true
+  openChoice(g, { bank: bankOf(g), deeper: g.loop + 2, stop: stopHere, go: descend })
+}
+
+const bankOf = g => (R.coreBonus + g.player.hp * R.heartBonus) * (1 + g.loop) + Math.floor(g.score * R.bankShare)
+
+const stopHere = g => {
+  g.menus.length = 0
+  g.banked = bankOf(g)
+  g.score += g.banked
+  g.ending = null
   finishRun(g, 'cleared')
+}
+
+const holdChoice = (g, dt) => {
+  g.player.iframes = 1
+  crumble(g, 1)
+  stepWorld(g.world, dt, g.depth)
+  handleWorldEvents(g)
+  const deeper = g.menus.at(-1)?.selected === 1
+  g.depth = deeper ? 1 : 0
+  if (deeper) {
+    g.shake = Math.max(g.shake, 2)
+    g.pulse = Math.max(g.pulse, 0.25)
+  }
+}
+
+const rollDeepOmen = g => {
+  const owned = Object.keys(OMENS).filter(id => isKnown(g, 'omen', id) && !g.omens.includes(id))
+  const others = Object.keys(OMENS).filter(id => !g.omens.includes(id))
+  const pool = owned.length ? owned : others
+  return pool[Math.floor(Math.random() * pool.length)] ?? null
+}
+
+const deepBands = previous => {
+  const themes = shuffled([0, 1, 2, 3, 4, 5, 6])
+  const fresh = [...themes.filter(t => !previous.includes(t)), ...themes.filter(t => previous.includes(t))]
+  return fresh.slice(0, previous.length)
+}
+
+const landingRoom = map => {
+  const cells = ringCells(map, DEEP.startRing)
+  const open = cells.filter(([x, y]) => map.links[keyOf(x, y)]?.up)
+  const pool = open.length ? open : cells
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+const deepSecrets = (g, omen) => {
+  const strange = shuffled(WARDEN_KINDS.filter(id => !isKnown(g, 'warden', id)))[0]
+  return [
+    ...g.secrets,
+    ...(omen && !isKnown(g, 'omen', omen) ? [`omen:${omen}`] : []),
+    ...(strange ? [`warden:${strange}`] : []),
+  ]
+}
+
+const descend = g => {
+  const p = g.player
+  const from = g.rooms[keyOf(g.x, g.y)]
+  const omen = rollDeepOmen(g)
+  const mutation = rollMutation(g)
+  const omens = omen ? [...g.omens, omen] : g.omens
+  const secrets = deepSecrets(g, omen)
+  const known = knownFrom(secrets)
+  const bands = deepBands(g.bands)
+  const seed = Math.floor(Math.random() * 1e9)
+  const map = buildMap(seed)
+  applyOmens(omens)
+  g.menus.length = 0
+  Object.assign(g, {
+    loop: g.loop + 1, seed, map, bands, omens, secrets, known,
+    omen: g.omen ?? omen,
+    ambient: omenAmbient(omens),
+    flocking: omenFoes(omens).flock === true,
+    mutations: mutation ? [...g.mutations, mutation] : g.mutations,
+    bandFoes: chooseBandFoes(bands, known, secrets),
+    wardenOrder: chooseWardens(known, secrets),
+    wardens: {}, wardenAt: {}, seals: 0, rooms: {},
+    ghost: null, charted: false, ending: null, boss: null,
+    deepestRing: DEEP.startRing, lastTheme: -1, keystoneDue: true,
+  })
+  const [x, y] = landingRoom(map)
+  p.hp = Math.min(heartCap(p), p.hp + DEEP.heal)
+  enterRoom(g, x, y)
+  if (g.rooms[keyOf(x, y)].doors.up) arriveBy(g, 'down', from)
+  else placeAtDoor(g)
+  if (omen && !meet(g, 'omen', omen)) showReveal(g, 'omen', omen)
+  if (mutation) showReveal(g, 'mutation', mutation)
+  g.pulse = 1
+  g.shake = Math.max(g.shake, 10)
+  storeRun(g)
 }
 
 const LOCK_HINTS = { [M.PEAT]: 'FIRE', [M.GATE]: 'CHARGE', [M.BRICK]: 'CRUSHED', [M.ICE]: 'FIRE', [M.SCRAP]: 'CRUSHED' }
@@ -1243,8 +1526,9 @@ const stepLockHints = (g, dt) => {
 const throwBomb = (g, p, input) => {
   const pressed = input.bomb && !p.wasBomb
   p.wasBomb = input.bomb
-  if (!pressed || p.bombs <= 0) return
+  if (!pressed || p.bombs <= 0 || !bombReady(p)) return
   p.bombs -= 1
+  bombThrown(p)
   const from = muzzle(p)
   g.fireballs.push({
     x: from.x - 2, y: from.y - 2, w: 4, h: 4,
@@ -1287,7 +1571,7 @@ const sealArena = (g, room) => {
 const rewardClean = (g, room) => {
   const p = g.player
   const c = centre(p)
-  const coins = R.cleanCoins + room.ring
+  const coins = hasKeystone(p, 'quarry') ? 0 : R.cleanCoins + room.ring
   for (let i = 0; i < coins * R.lootScale; i++) {
     g.pickups.push({ kind: 'coin', x: c.x - 2, y: c.y - 14, w: 5, h: 5, vx: (Math.random() - 0.5) * 90, vy: -70 - Math.random() * 50 })
   }
@@ -1308,9 +1592,10 @@ const stepRoomEvents = (g, dt) => {
   if (foesLeft) room.hadFoes = true
   if (room.hadFoes && !foesLeft && !room.healed) {
     room.healed = true
-    if (!room.hurtHere) rewardClean(g, room)
-    if (p.hp < P.hp) {
-      p.hp = Math.min(P.hp, p.hp + TUNING.feel.roomClearHeal)
+    const unpaid = hasKeystone(p, 'wake')
+    if (!room.hurtHere && !unpaid) rewardClean(g, room)
+    if (p.hp < heartCap(p) && !unpaid) {
+      p.hp = Math.min(heartCap(p), p.hp + TUNING.feel.roomClearHeal)
       const c = centre(p)
       g.popups.push({ x: c.x, y: g.player.y - 11, icon: 'HEAL', colour: 'heal', life: 1.2 })
     }
@@ -1541,6 +1826,7 @@ const stepPlayer = (g, input, dt) => {
   p.stun -= dt
 
   applyHazards(g, p, dt)
+  stepKeystones(g, p, dt)
   stepMercy(g, p, dt)
   collectCards(g, p)
   talkToInhabitants(g, p)
@@ -1582,6 +1868,7 @@ const stepEnemies = (g, dt) => {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
     STEPPERS[e.kind](g, e, dt)
+    stepMutations(g, e, dt)
     if (e.kind !== 'worm' && !e.free) nudgeOutOfSolid(g.world, e)
     settleFooting(g, e, dt)
     clampToRoom(e)
@@ -1623,6 +1910,22 @@ const shotEffects = (g, s, x, y, victim) => {
   }
 }
 
+const deflect = (g, s, victim, dt) => {
+  const c = centre(victim)
+  const d = Math.max(1, Math.hypot(s.x - c.x, s.y - c.y))
+  const speed = Math.hypot(s.vx, s.vy)
+  s.vx = ((s.x - c.x) / d) * speed
+  s.vy = ((s.y - c.y) / d) * speed
+  s.x += s.vx * dt * 2
+  s.y += s.vy * dt * 2
+  impact(g, s.x, s.y, M.METAL, -s.vx, -s.vy)
+}
+
+const landShot = (g, s, victim) => {
+  if (s.stain === undefined || victim.prop) hurt(g, victim, s.power ?? 1, 'player', 'SHOT')
+  else stainStrikes(g, s, cell(s.x), cell(s.y), victim)
+}
+
 const stepShots = (g, dt) => {
   for (const s of g.shots) {
     s.x += s.vx * dt
@@ -1631,20 +1934,16 @@ const stepShots = (g, dt) => {
     const victim = g.enemies.find(e => overlap(s, shotBox(e)) && !e.ally && !e.intangible && !e.stowed && !s.passed?.has(e))
     if (victim) {
       const blocked = victim.shielded && victim.stun <= 0 && Math.sign(s.vx) === -victim.facing
-      if (victim.plated) {
-        const c = centre(victim)
-        const d = Math.max(1, Math.hypot(s.x - c.x, s.y - c.y))
-        const speed = Math.hypot(s.vx, s.vy)
-        s.vx = ((s.x - c.x) / d) * speed
-        s.vy = ((s.y - c.y) / d) * speed
-        s.x += s.vx * dt * 2
-        s.y += s.vy * dt * 2
-        impact(g, s.x, s.y, M.METAL, -s.vx, -s.vy)
-      } else if (blocked) {
+      if (victim.plated) deflect(g, s, victim, dt)
+      else if (blocked) {
         s.vx *= -1
         impact(g, s.x, s.y, M.METAL, -s.vx, -s.vy)
+      } else if (s.stain === undefined && (victim.ward === 'SHOT' || wardedAgainst(g, victim, 'SHOT'))) {
+        landShot(g, s, victim)
+        ;(s.passed ??= new Set()).add(victim)
+        deflect(g, s, victim, dt)
       } else {
-        hurt(g, victim, 1, 'player')
+        landShot(g, s, victim)
         if (!victim.heavy) {
           victim.vx = Math.sign(s.vx) * TUNING.feel.shotKnock
           victim.shoved = Math.max(victim.shoved, 0.07)
@@ -1655,6 +1954,7 @@ const stepShots = (g, dt) => {
       }
     } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid && (matAt(g.world, cell(s.x), cell(s.y)) === M.BEDROCK || !hasRelic(g.player, 'pierce'))) {
       shotEffects(g, s, cell(s.x), cell(s.y))
+      if (s.stain !== undefined) stainStrikes(g, s, cell(s.x - s.vx * dt), cell(s.y - s.vy * dt))
       wallHitFx(g, s, matAt(g.world, cell(s.x), cell(s.y)))
       if (loosen(g.world, cell(s.x), cell(s.y))) burst(g, s.x, s.y, 'pale', 5)
       if (s.bounces > 0) {
@@ -1760,6 +2060,20 @@ const stepFlung = (g, dt) => {
   g.flung = g.flung.filter(f => f.age >= 0)
 }
 
+const stepChain = (g, dt) => {
+  if (!hasKeystone(g.player, 'unbroken')) {
+    g.chainTime = Math.max(0, g.chainTime - dt)
+    if (g.chainTime === 0) g.chain = 0
+    return
+  }
+  if (g.chain === 0 || g.phase !== 'playing' || g.ending) return
+  if (!g.enemies.some(e => !e.friendly && !e.ally && !e.prop && !e.asleep)) return
+  g.chainTime -= dt
+  if (g.chainTime > 0) return
+  g.chainTime = K.unbrokenWindow
+  hurt(g, g.player, 1, 'world', 'LAPSE')
+}
+
 const stepEffects = (g, dt) => {
   if (g.timeStop > 0) g.timeStop -= dt
   for (const b of g.bolts) b.life -= dt
@@ -1781,8 +2095,7 @@ const stepEffects = (g, dt) => {
     if (g.toast.life <= 0) g.toast = null
   }
   g.shake = Math.max(0, g.shake - dt * 14)
-  g.chainTime = Math.max(0, g.chainTime - dt)
-  if (g.chainTime === 0) g.chain = 0
+  stepChain(g, dt)
 }
 
 const handleWorldEvents = g => {
@@ -1826,16 +2139,18 @@ export const continueRun = g => {
     return
   }
   const fresh = createRun(g.depthOverride)
-  applyOmen(saved.omen ?? null)
+  const omens = saved.omens ?? (saved.omen ? [saved.omen] : [])
+  const keystones = new Set(saved.player.keystones ?? [])
+  applyOmens(omens)
   saved.taught = new Set()
   const known = ({ kind }) => SKILLS[kind] || !ALL_SKILLS_EVER.has(kind)
   const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => {
-    const unpacked = unpackRoom(room, saved.map)
+    const unpacked = unpackRoom(room, saved.map, keystones.has('overload'))
     return [key, { ...unpacked, cards: unpacked.cards.filter(known) }]
   }))
   saved.cardPool = saved.cardPool.filter(kind => SKILLS[kind])
-  const player = { ...saved.player, skills: saved.player.skills.filter(known).slice(0, P.skillSlots), upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
-  Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter, known: knownFrom(saved.secrets ?? []) })
+  const player = { ...saved.player, skills: saved.player.skills.filter(known).slice(0, slotsOf({ keystones })), upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), keystones, wasJump: true }
+  Object.assign(g, fresh, saved, { rooms, player, omens, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter, known: knownFrom(saved.secrets ?? []) })
   enterRoom(g, saved.x, saved.y)
   g.shownDepth = g.depth
 }
@@ -1864,13 +2179,27 @@ const edges = (g, input) => {
   return { pausePressed, skillsPressed }
 }
 
+const STILL_INPUTS = ['left', 'right', 'up', 'down', 'jump', 'shoot', 'bomb', ...SKILL_ACTIONS]
+
+const breathing = (g, input) => {
+  const p = g.player
+  if (!hasKeystone(p, 'breath') || g.phase !== 'playing' || g.menus.length > 0 || g.ending) return false
+  return !STILL_INPUTS.some(key => input[key]) && p.grounded && Math.abs(p.vx) < 12
+}
+
+const stepTempo = (g, input) => {
+  g.held = breathing(g, input)
+  g.tempo += ((g.held ? K.breathTempo : 1) - g.tempo) * 0.3
+  return g.tempo
+}
+
 export const step = (g, input, realDt) => {
   if (stepMoment(g, realDt, input.jump || input.shoot)) {
     if (g.moment?.landed) stepFx(g, realDt, 0)
     return
   }
   g.looking = input.look === true && g.phase === 'playing' && g.menus.length === 0
-  const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g)
+  const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g) * stepTempo(g, input)
   g.time += dt
   stepEffects(g, dt)
   stepFx(g, realDt, dt)
@@ -1890,11 +2219,12 @@ export const step = (g, input, realDt) => {
     g.phaseTime += dt
     stepWorld(g.world, dt, g.depth)
     handleWorldEvents(g)
-    if (g.phaseTime > TUNING.feel.deathHold && !g.summaryShown) {
+    if (g.phaseTime > (g.phase === 'cleared' ? TUNING.feel.clearedHold : TUNING.feel.deathHold) && !g.summaryShown) {
       g.summaryShown = true
       openSummary(g)
     }
   }
+  if (g.ending?.asking) holdChoice(g, dt)
   if (g.menus.length > 0) {
     stepMenus(g, input)
     return
@@ -1908,6 +2238,10 @@ export const step = (g, input, realDt) => {
   if (g.phase !== 'playing') return
   if (g.hitstop > 0) {
     g.hitstop -= dt
+    return
+  }
+  if (g.keystoneDue && !g.sealHold && !g.ending) {
+    offerKeystones(g)
     return
   }
   if (pausePressed) {

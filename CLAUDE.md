@@ -28,8 +28,9 @@ half a second first. The page opens on the title screen, and `game.restart()` sk
 
 `node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
-lists the flags, such as `--god`, `--found rand`, `--career` and `--warden bellows --gun`. The bot
-walks badly, so read its time-per-run numbers as an upper bound and its deaths as pessimistic.
+lists the flags, such as `--god`, `--found rand`, `--career`, `--warden bellows --gun` and, to reach and pass the
+Core, `--god --express --deeper --loops 2`. The bot walks badly, so read its time-per-run numbers as an upper bound
+and its deaths as pessimistic.
 
 `node scripts/bundle.mjs` packs everything into `dist/inward.html`, the one page published as the artifact
 at https://claude.ai/artifact/6mA22hzMWHpUoG5f7wEdBS. Republish that file to update it. Add `?touch` to the
@@ -239,6 +240,20 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 
 - Winning makes the room crumble and drains the colour back to four-shade green. If nothing can
   reach an exit, a bomb drops, and if that can't help a vine and a path get carved.
+
+- Each Warden's seal offers one of three keystones, big rule changes with a cost (`src/keystones.js`). A run gets
+  three, plus one per descent. They sit in the found set, eight from the start and nine on the ladder. Set
+  `sealHold` on the game to make the keystone offer wait, which is the seam for anything played when a seal breaks.
+- Wardens from ring 3 and the Core wear a ward against whatever has been doing the killing (`src/wards.js`): that
+  school does a fraction of its damage, the Warden doesn't flinch, its pictogram sits above it and on the boss bar,
+  and shots bounce off. Its own world weak point is never warded. The Core changes its ward at each phase to
+  what hurt it most, and it can throw that school back. Each Warden gains one move at ring 3 and another at ring 5.
+- After the Core a wordless choice: bank the score for a bonus and drain to green, or fall to a new map at a higher
+  score multiplier (`descend` in `game.js`, `src/deep.js`). A loop lands at ring 3 with Wardens at rings 3, 4 and 5,
+  a fresh region order, one more stacked omen, one more foe mutation, a tint and deeper shaders. Hovering the choice
+  previews it on the whole picture. Touch needs a tap to preview and another to commit.
+- The run-end screen shows the score against the best, depth, the build, kills by school, and the chase. The title
+  shows the top three runs with their keystones. The save keeps the top five.
 
 Not built: a design pass on archetypes. Balance has only been tested by a bot that doesn't dodge,
 and no person has played a full run. The starting room is always on the top edge.

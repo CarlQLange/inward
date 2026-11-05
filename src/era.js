@@ -65,7 +65,7 @@ export const eraAt = (depth, power = 1) => {
   return era
 }
 
-export const depthAmount = g => g.depthDrive ?? (g.seals > 0 && g.phase !== 'cleared' ? 1 : 0)
+export const depthAmount = g => g.depthDrive ?? ((g.seals > 0 || g.loop > 0) && g.phase !== 'cleared' ? 1 : 0)
 
 export const tileLook = depth => {
   const row = Math.round(rowOf(depth))
