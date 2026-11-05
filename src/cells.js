@@ -41,15 +41,21 @@ const writeCells = (world, out) => {
   }
 }
 
-const writeFields = (world, out) => {
+const writeFields = (layers, world, out) => {
   out.fill(0)
+  layers.gas = false
+  layers.hot = false
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const i = y * ROOM + x
       const m = world.mat[i]
       const channel = GAS_CHANNEL[m]
-      if (channel !== undefined) out[i * 4 + channel] = Math.min(255, 110 + world.life[i] * GAS_SCALE[m] * 145)
+      if (channel !== undefined) {
+        out[i * 4 + channel] = Math.min(255, 110 + world.life[i] * GAS_SCALE[m] * 145)
+        layers.gas = true
+      }
       const hot = world.burn[i] > 0 ? 255 : m === M.LAVA ? 200 : 0
+      if (hot) layers.hot = true
       out[i * 4 + 3] = hot
     }
   }
@@ -57,7 +63,7 @@ const writeFields = (world, out) => {
 
 export const refreshCells = (layers, world) => {
   writeCells(world, layers.cells.scratch)
-  writeFields(world, layers.fields.scratch)
+  writeFields(layers, world, layers.fields.scratch)
   swapIfChanged(layers.cells)
   swapIfChanged(layers.fields)
 }

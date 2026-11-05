@@ -45,6 +45,9 @@ uniform sampler2D terrain;
 uniform sampler2D cells;
 uniform sampler2D lightMap;
 uniform sampler2D masks;
+uniform sampler2D front;
+uniform vec2 frontOrigin;
+uniform vec2 frontScale;
 uniform vec2 vanish;
 uniform vec2 drift;
 uniform vec3 airBase;
@@ -62,12 +65,14 @@ vec3 lightAt(vec2 at) {
   vec3 l = texture2D(lightMap, at / ${ROOM_PX}).rgb;
   float peak = max(l.r, max(l.g, l.b));
   if (peak <= 0.0) return l;
-  return l * (floor(peak * 9.0 + 0.5) / 9.0) / peak;
+  float grades = bands * 1.5;
+  return l * (floor(peak * grades + 0.5) / grades) / peak;
 }
 
 vec3 shine(vec3 albedo, vec2 at, float fade, float floorLight) {
   vec3 l = lightAt(at) * fade;
-  vec3 lit = albedo * (floorLight + l * 1.9) + l * l * 0.07;
+  vec3 lit = albedo * (floorLight + l * 1.7) + l * l * 0.05;
+  lit /= 1.0 + max(lit.r, max(lit.g, lit.b)) * 0.28;
   return mix(albedo, lit, lightOn);
 }
 
@@ -85,7 +90,9 @@ vec3 farWall(vec2 p, vec2 dir) {
     a = mix(a, airNear, near * step(0.5, texture2D(masks, at / ${MASK_SIZE.toFixed(1)}).r));
   }
   a = mix(airBase, a, calm);
-  return shine(a * mix(1.0, 2.6, lightOn), back + swirl * 0.4, 0.8, ambient);
+  vec3 lit = shine(a * mix(1.0, 2.6, lightOn), back + swirl * 0.4, 0.8, ambient);
+  if (reach > 0.001) lit *= 1.0 - texture2D(front, (back + frontOrigin) * frontScale).a * 0.5;
+  return lit;
 }
 
 vec3 wallFace(vec2 p, vec2 dir, float z, vec2 c, vec2 sgn, bool across, vec4 d) {
@@ -98,9 +105,9 @@ vec3 wallFace(vec2 p, vec2 dir, float z, vec2 c, vec2 sgn, bool across, vec4 d) 
   vec4 t = texture2D(terrain, skin / ${ROOM_PX});
   vec3 albedo = t.rgb + airSide * (1.0 - t.a);
   float tone = across ? 0.5 : (sgn.y > 0.0 ? 0.72 : 0.26);
-  albedo = mix(albedo, airSide, 0.35) * tone * mix(1.0, 0.34, grade);
+  albedo = mix(albedo, airSide, 1.0 - 0.65 * calm) * tone * mix(1.0, 0.34, grade);
   vec2 spot = across ? h - vec2(sgn.x * 3.0, 0.0) : h - vec2(0.0, sgn.y * 3.0);
-  vec3 lit = shine(albedo * mix(1.0, 1.7, lightOn), spot, mix(1.0, 0.5, grade), ambient);
+  vec3 lit = shine(albedo * mix(1.0, 1.35, lightOn), spot, mix(1.0, 0.5, grade), ambient);
   return lit + (d.a > 0.5 ? vec3(0.32, 0.12, 0.03) * (1.0 - z) : vec3(0.0));
 }
 
@@ -166,7 +173,7 @@ void main() {
 }`
 
 export const OPTICS_ERA = ['cycle', 'blend', 'refract', 'reflect', 'haze', 'shafts', 'fog', 'ink', 'bands']
-export const OPTICS_UNIFORMS = ['time', 'lightOn', ...OPTICS_ERA]
+export const OPTICS_UNIFORMS = ['time', 'lightOn', 'gasOn', ...OPTICS_ERA]
 
 const BAYER = `
 float bayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
@@ -221,7 +228,7 @@ vec3 water(vec2 p, float below, float surfaceY) {
   tint = mix(tint, cycled, cycle);
 
   float clear = mix(0.0, mix(0.5, 0.74, refract) * (1.0 - deepness * 0.5), blend);
-  vec3 colour = mix(tint, behind * mix(1.0, vec3(0.62, 0.9, 0.96).r, 0.0) * vec3(0.62, 0.92, 1.0) + tint * 0.22, clear);
+  vec3 colour = mix(tint, behind * vec3(0.62, 0.92, 1.0) + tint * 0.22, clear);
 
   if (refract > 0.01) {
     vec4 cn = noiseAt(p * 0.9 + time * vec2(2.4, -1.2));
@@ -234,7 +241,7 @@ vec3 water(vec2 p, float below, float surfaceY) {
     float strength = reflect * pow(1.0 - below / 40.0, 1.6) * 0.75;
     vec3 sky = worldAt(mirror).rgb;
     vec4 actor = texture2D(front, (mirror + frontOrigin) * frontScale);
-    colour = mix(colour, sky * vec3(0.8, 0.95, 1.0) + actor.rgb * 0.0, strength);
+    colour = mix(colour, sky * vec3(0.8, 0.95, 1.0), strength);
     colour = mix(colour, actor.rgb + colour * (1.0 - actor.a), strength * 0.9);
   }
 
@@ -247,13 +254,13 @@ vec3 lava(vec2 p, float below) {
   vec2 chunk = floor(p / mix(2.0, 1.0, refract)) * mix(2.0, 1.0, refract);
   vec4 warp = noiseAt(chunk * 0.5 + time * vec2(0.9, 0.4));
   float flow = noiseAt(chunk * 0.9 + (warp.rg - 0.5) * 22.0 * refract + time * vec2(-0.6, 0.5)).b;
-  float v = fract(flow * 2.2 + time * 0.16 * cycle);
-  v = mix(flow, v, cycle);
+  float v = mix(flow, fract(flow * 2.2 + time * 0.16), cycle);
+  v *= v * mix(1.0, 1.15, refract);
   float steps = mix(4.0, 32.0, refract);
   v = floor(v * steps + 0.5) / steps;
   vec3 colour = v < 0.36 ? mix(vec3(0.42, 0.11, 0.05), vec3(0.85, 0.28, 0.11), v / 0.36)
     : v < 0.7 ? mix(vec3(0.85, 0.28, 0.11), vec3(1.0, 0.54, 0.18), (v - 0.36) / 0.34)
-    : mix(vec3(1.0, 0.54, 0.18), vec3(1.0, 0.82, 0.3), (v - 0.7) / 0.3);
+    : mix(vec3(0.98, 0.5, 0.16), vec3(1.0, 0.78, 0.28), (v - 0.7) / 0.3);
   if (below < 1.0) return mod(floor(p.x) + floor(time * 7.0), 11.0) < 1.0 ? vec3(1.0, 0.96, 0.75) : vec3(1.0, 0.82, 0.29);
   return colour;
 }
@@ -263,7 +270,7 @@ vec3 oil(vec2 p, float below, vec3 behind) {
   float sheen = noiseAt(chunk * 0.8 + time * vec2(1.0, 0.3)).g;
   vec3 film = 0.5 + 0.5 * cos(6.28 * (sheen * 1.4 + vec3(0.0, 0.33, 0.67)) + time * 0.4);
   vec3 colour = mix(vec3(0.16, 0.09, 0.19), vec3(0.09, 0.03, 0.12), clamp(below / 20.0, 0.0, 1.0));
-  colour += step(0.74, sheen) * mix(vec3(0.3, 0.22, 0.42), film * 0.5, refract);
+  colour += step(0.8, sheen) * mix(vec3(0.16, 0.1, 0.22), film * 0.45, refract);
   if (below < 1.0) return mod(chunk.x + floor(time * 7.0), 11.0) < 1.0 ? vec3(0.9, 0.72, 0.94) : vec3(0.63, 0.42, 0.69);
   return mix(colour, behind, 0.06 * blend);
 }
@@ -280,7 +287,7 @@ vec3 acid(vec2 p, float below, vec3 behind) {
 
 vec3 gas(vec2 p, vec3 under, vec3 glow) {
   vec4 f = texture2D(fields, p / ${ROOM_PX});
-  if (f.r + f.g + f.b < 0.02 && ink < 0.01) return under;
+  if (gasOn < 0.5 || (f.r + f.g + f.b < 0.02 && ink < 0.01)) return under;
   vec4 d = f;
   float curl = 0.0;
   if (ink > 0.01) {
@@ -441,7 +448,8 @@ float slotDrift(float slot, float side) {
 vec4 frayedRoom(vec2 r) {
   vec2 s = r - shake;
   vec4 inner = roomAt(r);
-  if (unmoor < 0.01 || doorOn > 0.5) return inner;
+  if (doorOn > 0.5) return inSquare(s) ? inner : vec4(0.0);
+  if (unmoor < 0.01) return inner;
   vec2 out_ = max(-s, s - SIZE);
   float away = max(out_.x, out_.y);
   bool sideways = out_.x > out_.y;
@@ -455,7 +463,8 @@ vec4 frayedRoom(vec2 r) {
     float into = ${CELL} - (d - away);
     vec2 src = sideways ? vec2(s.x < 0.0 ? into : SIZE - 0.5 - into, s.y) : vec2(s.x, s.y < 0.0 ? into : SIZE - 0.5 - into);
     vec4 chip = rawRoom(roomNow, src);
-    return vec4(chip.rgb * (1.0 - d / 60.0), 1.0);
+    float rimmed = step(away, d - ${CELL} + 1.0);
+    return vec4((chip.rgb + pitColour * (0.1 + rimmed * 0.3)) * (1.0 - d / 70.0), 1.0);
   }
   float inset = min(min(s.x, s.y), min(SIZE - s.x, SIZE - s.y));
   if (inset < ${CELL}) {
@@ -478,9 +487,11 @@ vec3 pitView(vec2 px) {
   vec2 inTile = abs(fract(m + 0.5) - 0.5);
   float seam = smoothstep(0.44, 0.5, max(inTile.x, inTile.y));
   float rim = smoothstep(0.42, 0.5, abs(fract(s + 0.5) - 0.5));
-  vec3 colour = pitColour * (0.012 + shade * 0.16);
+  vec2 towards = fold.x > fold.y ? vec2(sign(m.x), 0.0) : vec2(0.0, sign(m.y));
+  float wallShade = 0.75 + 0.25 * dot(towards, vec2(0.4, -0.9));
+  vec3 colour = pitColour * (0.012 + shade * 0.15) * wallShade;
   colour *= 1.0 - seam * 0.6;
-  colour += pitColour * rim * shade * 0.14;
+  colour += pitColour * rim * (0.03 + shade * 0.22);
   colour += vec3(0.4, 0.85, 1.0) * coreGlow * exp(-s * 1.1) * 0.32 * (0.7 + 0.3 * sin(time * 1.7));
   float dust = step(0.985, noiseAt(floor(px) + vec2(0.0, -floor(time * 7.0))).r);
   colour += pitColour * dust * 0.6;
@@ -544,7 +555,8 @@ void main() {
     world = mix(vec3(grey), world, saturate);
     if (posterise > 0.001) {
       float levels = mix(32.0, 8.0, posterise);
-      world = floor(world * levels + 0.5) / levels;
+      vec3 stepped = floor(world * levels + 0.5) / levels;
+      world = mix(world, stepped, smoothstep(0.1, 0.2, luma(world)));
     }
     vec2 fromMiddle = warped / SIZE - 0.5;
     world *= 1.0 - bloom * 0.3 * dot(fromMiddle, fromMiddle) * 2.0;
@@ -559,7 +571,7 @@ void main() {
     world *= 1.0 - near * halo;
   }
 
-  if (w.a > 0.5 || pit < 0.002) world = handheld(world);
+  if (w.a > 0.5) world = handheld(world);
 
   vec3 actor = f.rgb;
   float spot = 0.0;

@@ -105,30 +105,51 @@ const cone = (into, px, py, dir, reach, spread, [r, g, b], power) => {
 const flicker = (x, y, time) => 0.75 + 0.25 * Math.sin(time * 13 + (x * 7 + y * 13))
 
 const CLUSTER = 3
+const BINS = Math.ceil(ROOM / CLUSTER)
+const FIRE_BUDGET = 10
+const CHARGE_BUDGET = 6
+
+const emptyBins = () => ({ n: new Uint16Array(BINS * BINS), x: new Float32Array(BINS * BINS), y: new Float32Array(BINS * BINS) })
+const fireBins = emptyBins()
+const chargeBins = emptyBins()
+
+const clearBins = bins => {
+  bins.n.fill(0)
+  bins.x.fill(0)
+  bins.y.fill(0)
+}
+
+const addToBin = (bins, x, y) => {
+  const at = ((y / CLUSTER) | 0) * BINS + ((x / CLUSTER) | 0)
+  bins.n[at] += 1
+  bins.x[at] += x
+  bins.y[at] += y
+}
+
+const strongest = (bins, budget) => {
+  const used = []
+  for (let i = 0; i < bins.n.length; i++) if (bins.n[i] > 0) used.push(i)
+  return used.sort((a, b) => bins.n[b] - bins.n[a]).slice(0, budget)
+    .map(i => ({ n: bins.n[i], x: bins.x[i] / bins.n[i], y: bins.y[i] / bins.n[i] }))
+}
 
 const fireLights = (w, time) => {
-  const count = new Map()
+  clearBins(fireBins)
+  clearBins(chargeBins)
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const i = y * ROOM + x
-      const kind = w.burn[i] > 0 ? 'f' : w.charge[i] > 0 ? 'c' : null
-      if (!kind) continue
-      const key = `${kind}${(x / CLUSTER) | 0},${(y / CLUSTER) | 0}`
-      const c = count.get(key) ?? { kind, n: 0, x: 0, y: 0 }
-      c.n += 1
-      c.x += x
-      c.y += y
-      count.set(key, c)
+      if (w.burn[i] > 0) addToBin(fireBins, x, y)
+      else if (w.charge[i] > 0) addToBin(chargeBins, x, y)
     }
   }
-  for (const { kind, n, x, y } of count.values()) {
-    const cx = x / n
-    const cy = y / n
-    const px = (cx + 0.5) * BLOCK
-    const py = (cy + 0.5) * BLOCK
+  for (const { n, x, y } of strongest(fireBins, FIRE_BUDGET)) {
     const swell = Math.sqrt(n)
-    if (kind === 'f') splat(live, px, py, 34 + swell * 6, FIRE, (0.42 + swell * 0.22) * flicker(cx, cy, time))
-    else splat(live, px, py, 18 + swell * 4, CHARGE, 0.3 + swell * 0.14)
+    splat(live, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 34 + swell * 5, FIRE, (0.42 + swell * 0.22) * flicker(x, y, time))
+  }
+  for (const { n, x, y } of strongest(chargeBins, CHARGE_BUDGET)) {
+    const swell = Math.sqrt(n)
+    splat(live, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 18 + swell * 4, CHARGE, 0.3 + swell * 0.14)
   }
 }
 
@@ -185,7 +206,7 @@ export const fixturesOf = (w, seed) => {
 export const standingFixtures = (w, seed) => fixturesOf(w, seed).filter(({ x, y }) => cellSolid(w, x, y - 1) && !cellSolid(w, x, y))
 
 const fixtureLights = (w, seed, colour) => {
-  for (const { x, y } of standingFixtures(w, seed)) splat(still, (x + 0.5) * BLOCK, (y + 0.4) * BLOCK, 72, colour, 0.85)
+  for (const { x, y } of standingFixtures(w, seed)) splat(still, (x + 0.5) * BLOCK, (y + 0.4) * BLOCK, 74, colour, 0.8)
 }
 
 const BEAM_SPACING = 6

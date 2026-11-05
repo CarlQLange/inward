@@ -76,18 +76,13 @@ const shapedTile = (tile, name, detail) => {
   c.drawImage(tile, 0, 0)
   const image = c.getImageData(0, 0, tile.width, tile.height)
   const { data } = image
-  const count = data.length / 4
-  const mean = [0, 1, 2].map(k => {
-    let sum = 0
-    for (let i = 0; i < data.length; i += 4) sum += data[i + k]
-    return sum / count
-  })
+  const solidPixels = Array.from({ length: data.length / 4 }, (_, i) => i * 4).filter(i => data[i + 3] > 127)
+  const mean = [0, 1, 2].map(k => solidPixels.reduce((sum, i) => sum + data[i + k], 0) / Math.max(1, solidPixels.length))
   for (let i = 0; i < data.length; i += 4) {
-    const luma = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11
-    for (let k = 0; k < 3; k++) {
-      const flat = mean[k] + (data[i + k] - mean[k]) * keep
-      data[i + k] = (flat + (luma - flat) * grey) * dim
-    }
+    const flat = [0, 1, 2].map(k => mean[k] + (data[i + k] - mean[k]) * keep)
+    const luma = flat[0] * 0.3 + flat[1] * 0.59 + flat[2] * 0.11
+    flat.forEach((v, k) => { data[i + k] = (v + (luma - v) * grey) * dim })
+    data[i + 3] = 255
   }
   c.putImageData(image, 0, 0)
   cache.set(key, canvas)
@@ -173,11 +168,15 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
       const name = TILE[m]
       if (!name) continue
       const tile = tileFor(name, x, y, theme, look)
-      ctx.drawImage(shapedTile(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, name, look.detail), x * BLOCK, y * BLOCK)
+      const toned = TINTED_TILES.has(name) ? tintTile(theme, tile) : tile
       if (isBuried(world, x, y)) {
-        ctx.fillStyle = look.variety ? 'rgba(5, 12, 10, 0.72)' : 'rgba(5, 12, 10, 0.86)'
+        ctx.drawImage(shapedTile(toned, name, 0), x * BLOCK, y * BLOCK)
+        ctx.fillStyle = `rgba(5, 12, 10, ${look.buried})`
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-      } else paintEdges(ctx, world, x, y)
+      } else {
+        ctx.drawImage(shapedTile(toned, name, look.detail), x * BLOCK, y * BLOCK)
+        paintEdges(ctx, world, x, y)
+      }
     }
   }
   if (look.fixtures) for (const { x, y } of standingFixtures(world, seed)) paintFixture(ctx, x, y, airOf(theme).fixture)
@@ -217,9 +216,9 @@ export const drawSubmergedTint = (ctx, world) => {
 }
 
 const drawVine = (ctx, x, y) => {
-  ctx.fillStyle = '#4f9c3a'
+  ctx.fillStyle = '#3f8432'
   ctx.fillRect(x * BLOCK + 3, y * BLOCK, 2, BLOCK)
-  ctx.fillStyle = '#8ad05a'
+  ctx.fillStyle = '#7ab84e'
   ctx.fillRect(x * BLOCK + (hash(x, y) % 2 ? 1 : 5), y * BLOCK + hash(y, x) % 6, 2, 2)
 }
 

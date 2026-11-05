@@ -9,7 +9,8 @@ const LADDER = {
   ghost:          [0.5,   0.5,  0.22, 0,    0,    0,    0,    0,    0],
   scanline:       [0,     0,    0,    0.5,  0.25, 0,    0,    0,    0],
 
-  detail:         [0.12,  0.12, 0.2,  0.42, 0.6,  0.8,  0.9,  1,    1],
+  detail:         [0,     0,    0.06, 0.42, 0.6,  0.8,  0.9,  1,    1],
+  buried:         [0.4,   0.4,  0.5,  0.68, 0.76, 0.78, 0.8,  0.8,  0.8],
   bands:          [2,     2,    3,    4,    6,    10,   16,   32,   32],
   far:            [0,     0,    1,    1,    1,    1,    1,    1,    1],
   near:           [0,     0,    0,    1,    1,    1,    1,    1,    1],
@@ -70,6 +71,7 @@ export const tileLook = depth => {
   return {
     row,
     detail: LADDER.detail[row],
+    buried: LADDER.buried[row],
     variety: row >= 3,
     fixtures: LADDER.fixtures[row] > 0,
   }

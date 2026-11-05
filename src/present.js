@@ -110,14 +110,13 @@ let stageHook = null
 export const setStage = fn => { stageHook = fn }
 
 export const createPresenter = canvas => {
-  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance' })
-  gl.getExtension('WEBGL_debug_shaders')
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' })
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
   gl.disable(gl.DEPTH_TEST)
   gl.disable(gl.BLEND)
 
   const frameExtras = ['view', 'origin', 'shake', 'slideNew', 'slideOld', 'mapPos', 'zoom', 'pitColour', 'rings']
-  const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks'], WORLD_UNIFORMS, ['vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide'])
+  const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks', 'front'], WORLD_UNIFORMS, ['frontOrigin', 'frontScale', 'vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide'])
   const opticsProgram = programOf(gl, OPTICS, ['worldLayer', 'cells', 'fields', 'lightMap', 'noise', 'front'], OPTICS_UNIFORMS, ['frontOrigin', 'frontScale', 'ripples', 'fogColour', 'beamColour'])
   const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'lightMap', 'noise'], FRAME_UNIFORMS, frameExtras)
   const displayProgram = programOf(gl, DISPLAY, ['scene'], ['lcd', 'scanline'], ['view', 'room'])
@@ -233,7 +232,7 @@ export const createPresenter = canvas => {
     const want = [SIZE / 2 + hx * 0.16, SIZE / 2 + hy * 0.12]
     shown.vanish = state.vanish ?? shown.vanish.map((v, i) => v + (want[i] - v) * 0.08)
     passInto(worldTarget, worldProgram, {
-      terrain: textures.terrain, cells: textures.cells, lightMap: textures.light, masks: textures.masks,
+      terrain: textures.terrain, cells: textures.cells, lightMap: textures.light, masks: textures.masks, front: textures.front,
     }, {
       ...era,
       time: state.time,
@@ -244,6 +243,8 @@ export const createPresenter = canvas => {
       calm: isTouchLayout() ? 0.7 : 1,
     })
     const { at } = worldProgram
+    gl.uniform2f(at.frontOrigin, ORIGIN.x, ORIGIN.y)
+    gl.uniform2f(at.frontScale, 1 / VIEW.w, 1 / VIEW.h)
     gl.uniform2f(at.vanish, shown.vanish[0], shown.vanish[1])
     gl.uniform2f(at.drift, -hx * 0.12 * era.parallax, -hy * 0.08 * era.parallax)
     gl.uniform3fv(at.airBase, air.air)
@@ -269,7 +270,7 @@ export const createPresenter = canvas => {
     const air = airOf(layers.theme)
     passInto(target, opticsProgram, {
       worldLayer: worldTarget.tex, cells: textures.cells, fields: textures.fields, lightMap: textures.light, noise: textures.noise, front: textures.front,
-    }, { ...era, time: state.time, lightOn: lighting.amount })
+    }, { ...era, haze: cellLayers.hot ? era.haze : 0, gasOn: cellLayers.gas ? 1 : 0, time: state.time, lightOn: lighting.amount })
     const { at } = opticsProgram
     gl.uniform2f(at.frontOrigin, ORIGIN.x, ORIGIN.y)
     gl.uniform2f(at.frontScale, 1 / VIEW.w, 1 / VIEW.h)
