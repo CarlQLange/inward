@@ -272,7 +272,9 @@ const poseFor = (g, p, h) => {
   return pose
 }
 
-const armAngle = (p, h) => (h.firedFor > 0 && h.fired ? Math.atan2(h.fired.y, h.fired.x) : Math.atan2(p.aim.y, p.aim.x))
+const angleOf = (p, aim) => Math.atan2(p.upside ? -aim.y : aim.y, aim.x)
+
+const armAngle = (p, h) => angleOf(p, h.firedFor > 0 && h.fired ? h.fired : p.aim)
 
 const closeAngle = (from, to, rate) => {
   const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from))
@@ -509,7 +511,7 @@ export const heroFired = (p, aim) => {
   h.flash = 0.07
   h.fired = aim
   h.firedFor = 0.22
-  h.angle = Math.atan2(aim.y, aim.x)
+  h.angle = angleOf(p, aim)
 }
 
 const drawScarfRun = (ctx, nodes, thickFrom) => {

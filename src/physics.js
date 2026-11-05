@@ -37,17 +37,17 @@ export const moveAxis = (world, e, axis, distance) => {
 
 export const miredAtPx = (world, px, py) => props(matAt(world, cell(px), cell(py))).thick === true
 
-export const move = (world, e, dt) => {
-  const drag = miredAtPx(world, e.x + e.w / 2, e.y + e.h - 1) ? TUNING.world.mudDrag : 1
+export const move = (world, e, dt, down = 1) => {
+  const drag = miredAtPx(world, e.x + e.w / 2, down > 0 ? e.y + e.h - 1 : e.y + 1) ? TUNING.world.mudDrag : 1
   e.hitWall = moveAxis(world, e, 'x', e.vx * dt * drag)
   if (e.hitWall) e.vx = 0
   const blocked = moveAxis(world, e, 'y', e.vy * dt * drag)
-  e.grounded = blocked && e.vy > 0
+  e.grounded = blocked && e.vy * down > 0
   if (blocked) e.vy = 0
 }
 
-export const pushOutOfSolid = (world, e) => {
-  for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= 1
+export const pushOutOfSolid = (world, e, down = 1) => {
+  for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= down
 }
 
 export const unbury = (world, e) => {

@@ -8,6 +8,8 @@ import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
   orbitFires, owns, recordPast, releaseMatter, returnedShot, ring, setAblaze, settleFuse, shoutFront, smash, spend, spill, strike, zap,
 } from './skills.js'
+import { endFloat, stepFloat } from './float.js'
+import { endLink, stepLink } from './link.js'
 
 const S = TUNING.skills
 
@@ -1231,11 +1233,11 @@ const STEP = {
   globe: stepGlobe, nail: stepNail, thrown: stepThrown, fuse: stepFuse, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
   twister: stepTwister, lure: stepLure, pane: stepPane, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
   bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
-  seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle,
+  seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle, float: stepFloat, link: stepLink,
 }
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
-  geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle,
+  geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle, float: endFloat, link: endLink,
 }
 
 const stepAblaze = (g, e, dt) => {

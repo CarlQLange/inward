@@ -6,6 +6,8 @@ import { burst, hurt } from './combat.js'
 import { chunks, liquidColour, sip } from './feel.js'
 import { shotBox } from './cast.js'
 import { feedEvent } from './feed.js'
+import { UP, pullFromAim } from './float.js'
+import { chainFrom, gatherAround, linkable, tieUp } from './link.js'
 
 const S = TUNING.skills
 
@@ -20,6 +22,8 @@ const ACID = '#8ae04a'
 const STONE = '#c9d4c0'
 const BLOOD = '#ff5a4a'
 const WHITE = '#f4f8f2'
+const SKY = '#d8ecff'
+const TIE = '#ff9ad8'
 
 export const FORKS = {
   bolt: [
@@ -134,6 +138,14 @@ export const FORKS = {
     [form('wick.trail', 'TRAIL', 'LAYS THE FUSE WHERE YOU WALK', CHARGE), form('wick.sleeper', 'SLEEPER', 'THE FUSE STAYS UNLIT UNTIL SHOT OR BURNED', GAS)],
     [form('wick.tow', 'TOW', 'FOES ON THE FUSE ARE DRAGGED TO THE END', BLOOD), form('wick.kiln', 'KILN', 'THE BURNT FUSE TURNS TO BRICK', STONE)],
   ],
+  float: [
+    [form('float.carry', 'CARRY', 'THE BUBBLE MOVES WITH YOU', WHITE), form('float.snare', 'SNARE', 'STAYS UNTIL YOU PRESS AGAIN', GAS)],
+    [form('float.tilt', 'TILT', 'FALLS THE WAY YOU AIM', MAGNET), form('float.flip', 'FLIP', 'FALLS UP AND DOWN BY TURNS', BLOOD)],
+  ],
+  link: [
+    [form('link.stake', 'STAKE', 'TIES FOES TO A BLOCK', ACID), form('link.yoke', 'YOKE', 'TIES FOES TO YOU', BLOOD)],
+    [form('link.cable', 'CABLE', 'FIRE AND CHARGE RUN ALONG THE LINKS', MAGNET), form('link.rope', 'ROPE', 'LINKED FOES DRAG EACH OTHER', GAS)],
+  ],
 }
 
 export const TREES = Object.fromEntries(Object.entries(FORKS).map(([kind, forks]) => [kind, forks.flat()]))
@@ -169,6 +181,7 @@ const HANDS = {
   'frost.glide': { type: 'toggle', time: S.frost.glideTime },
   flask: { type: 'hold', anytime: true },
   wick: { type: 'hold' },
+  'float.carry': { type: 'toggle', time: S.float.carryTime },
 }
 
 export const handOf = (p, kind) => ownedForms(p, kind).map(f => HANDS[f.id]).filter(Boolean).at(-1) ?? HANDS[kind] ?? TAP
@@ -1569,6 +1582,87 @@ export const returnedShot = (g, p, b) => {
   if (owns(p, 'mirror.seek')) addEffect(g, { kind: 'seeker', shot: b, life: S.mirror.seekLife })
 }
 
+const solidShare = (g, at, r) => {
+  let solid = 0
+  let all = 0
+  forEachCell((x, y, point) => {
+    if (distance(point, at) >= r) return
+    all += 1
+    if (props(matAt(g.world, x, y)).solid) solid += 1
+  })
+  return solid / Math.max(1, all)
+}
+
+const settleBubble = (g, at, r) => [1, 2, 3, 4]
+  .map(k => ({ x: at.x, y: at.y - k * BLOCK }))
+  .map(spot => ({ ...spot, share: solidShare(g, spot, r) }))
+  .reduce((best, spot) => (spot.share < best.share - 0.04 ? spot : best), { ...at, share: solidShare(g, at, r) })
+
+const floatBubble = (g, p) => {
+  const set = g.effects.find(f => f.kind === 'float' && f.snare && !f.done)
+  if (set) {
+    Object.assign(set, { life: 0, released: true })
+    return
+  }
+  const carry = owns(p, 'float.carry')
+  const snare = owns(p, 'float.snare')
+  const hit = ray(g, muzzle(p), p.aim, S.float.reach)
+  const back = hit.solid ? S.float.radius * S.float.backOff : 0
+  const at = carry ? centre(p) : settleBubble(g, { x: hit.last.x - p.aim.x * back, y: hit.last.y - p.aim.y * back }, S.float.radius)
+  addEffect(g, {
+    kind: 'float', x: at.x, y: at.y, r: carry ? S.float.carryRadius : S.float.radius,
+    life: snare ? S.float.snareLife : carry ? 1 : S.float.life,
+    pull: owns(p, 'float.tilt') ? pullFromAim(p.aim) : UP,
+    tilt: owns(p, 'float.tilt'), flip: owns(p, 'float.flip'), carry, snare,
+    colour: hue(p, 'float', SKY),
+  })
+  g.pulse = Math.max(g.pulse, 0.4)
+  if (snare) return FREE
+}
+
+const floatOn = (g, p) => {
+  const bubble = held(g, 'float')
+  if (!bubble) return false
+  bubble.life = Math.max(bubble.life, 0.2)
+  return true
+}
+
+const floatOff = g => {
+  const bubble = held(g, 'float')
+  if (bubble) bubble.life = 0
+}
+
+const blockAlong = (g, from, aim, reach) => {
+  for (let d = 0; d < reach; d += 2) {
+    const [x, y] = [cell(from.x + aim.x * d), cell(from.y + aim.y * d)]
+    if (props(matAt(g.world, x, y)).solid) return { x, y }
+  }
+  return null
+}
+
+const linkFoes = (g, p) => {
+  const options = { cable: owns(p, 'link.cable'), rope: owns(p, 'link.rope'), colour: hue(p, 'link', TIE) }
+  if (owns(p, 'link.yoke')) {
+    const near = gatherAround(g, centre(p), S.link.reach)
+    if (near.length === 0) return FREE
+    tieUp(g, near, 'hero', options)
+    return
+  }
+  const block = owns(p, 'link.stake') && blockAlong(g, muzzle(p), p.aim, S.link.reach)
+  if (block) {
+    const near = gatherAround(g, { x: (block.x + 0.5) * BLOCK, y: (block.y + 0.5) * BLOCK }, S.link.reach)
+    if (near.length === 0) return FREE
+    tieUp(g, near, block, options)
+    return
+  }
+  const covered = inCone(muzzle(p), p.aim, S.link.reach, S.link.width)
+  const target = nearestTo(g.enemies.filter(e => linkable(e) && covered(centre(e))), centre(p))
+  if (!target) return FREE
+  const chain = chainFrom(g, target)
+  if (chain.length < 2) return FREE
+  tieUp(g, chain, null, options)
+}
+
 const SALVAGE_SPOTS = [[0, 0], [1, 0], [-1, 0], [0, -1]]
 
 export const salvage = (g, e) => {
@@ -1885,13 +1979,14 @@ const STREAMS = {
   'dash.drive': { run: driveOn },
   'grapple.sling': { run: swing, stop: letGo },
   'frost.glide': { run: glideOn, stop: glideOff },
+  'float.carry': { run: floatOn, stop: floatOff },
 }
 
 export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id]).filter(Boolean).at(-1)
 
 export const SKILLS = {
   bolt, repel, ember, frost, hammer, gust, blink, grapple, dash, rewind, mason, seed, spring, acid, melt, alchemy,
-  well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror, flask, wick,
+  well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror, flask, wick, float: floatBubble, link: linkFoes,
 }
 
 export const SKILL_NAMES = Object.fromEntries(Object.keys(SKILLS).map(k => [k, k.toUpperCase()]))
@@ -1925,6 +2020,8 @@ export const SKILL_DETAILS = {
   mirror: 'THROWS SHOTS BACK.',
   flask: 'HOLD TO SOAK UP LIQUID. LET GO TO THROW IT.',
   wick: 'HOLD TO LAY A FUSE. ITS END EXPLODES.',
+  float: 'THINGS IN THE BUBBLE FALL UP.',
+  link: 'TIES FOES. WHAT HAPPENS TO ONE HAPPENS TO ALL.',
 }
 
 export const spillNapalm = (g, x, y) => {

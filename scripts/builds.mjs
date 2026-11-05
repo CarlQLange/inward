@@ -76,6 +76,7 @@ const worker = async () => {
     bolt: 150, repel: 56, ember: 110, frost: 48, hammer: 22, gust: 70, blink: 200, grapple: 125, dash: 60, mason: 40, seed: 60, spring: 50,
     acid: 110, melt: 56, alchemy: 48, well: 90, swap: 105, stop: 90, charm: 110, decoy: 120, drone: 150, rod: 70, mine: 50, roar: 60, mirror: 0, rewind: 0,
     flask: 110, wick: 120,
+    float: 80, link: 120,
   }
   const WHEN = {
     rewind: (g, foe, bot) => g.time - bot.lastHit < 1.5,

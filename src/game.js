@@ -27,11 +27,13 @@ import { exitsFrom } from './reach.js'
 import { KEYSTONE_BY_ID, bombReady, bombThrown, castWait, crowdedOut, hasKeystone, heartCap, openKeystones, rechargeRate, slotsOf, stainColour, stainStrikes, stepKeystones } from './keystones.js'
 import { deepKill, mutateFoe, rollMutation, stepMutations } from './deep.js'
 import { emptyTally, noteKill, outwitted, wardedAgainst } from './wards.js'
+import { driftFoe, heroPull } from './float.js'
 
 const P = TUNING.player
 const R = TUNING.run
 const K = R.keystones
 const DEEP = R.deep
+const FLOAT = TUNING.skills.float
 const CARD_SIZES = { core: [16, 16] }
 const ALL_SKILLS = Object.keys(SKILLS)
 const ALL_SKILLS_EVER = new Set([...ALL_SKILLS, 'echo', 'pact'])
@@ -942,6 +944,7 @@ const blastJustNow = (g, c) => {
 const feedOnKill = (g, e, c, environmental) => {
   if (environmental && e.lastCause === 'CRUSHED' && blastJustNow(g, c)) feedEvent(g, 'blastKill', c.x, c.y)
   if (!environmental) return
+  feedEvent(g, 'worldKill', c.x, c.y)
   const ally = g.enemies.filter(o => o.ally > 0 && o !== e).map(o => [Math.hypot(centre(o).x - c.x, centre(o).y - c.y), o]).filter(([d]) => d < TUNING.feed.allyReach).sort((a, b) => a[0] - b[0])[0]?.[1]
   if (!ally) return
   feedEvent(g, 'allyKill', c.x, c.y)
@@ -1713,14 +1716,17 @@ const stepPlayer = (g, input, dt) => {
   const p = g.player
   const world = g.world
   const middle = p.x + p.w / 2
+  const [pullX, pullY] = heroPull(p)
+  const down = pullY < 0 ? -1 : 1
+  p.upside = down < 0
   const swimming = liquidAtPx(world, middle, p.y + p.h / 2)
-  const wading = liquidAtPx(world, middle, p.y + p.h - 1)
-  const mired = miredAtPx(world, middle, p.y + p.h - 1)
-  const headUnder = liquidAtPx(world, middle, p.y - 4)
+  const wading = liquidAtPx(world, middle, down > 0 ? p.y + p.h - 1 : p.y + 1)
+  const mired = miredAtPx(world, middle, down > 0 ? p.y + p.h - 1 : p.y + 1)
+  const headUnder = liquidAtPx(world, middle, down > 0 ? p.y - 4 : p.y + p.h + 4)
   applyCrush(g, p)
   const stunned = p.stun > 0
   const plant = input.plant && p.grounded
-  crouch(world, p, input.down && !input.jump && p.grounded && !swimming && !plant)
+  crouch(world, p, input.down && !input.jump && p.grounded && !swimming && !plant && down > 0)
   const wish = stunned ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0)
   const fins = hasRelic(p, 'gills') && swimming ? 1.5 : 1
   const top = P.run * fins * (swimming ? P.swimRun : 1)
@@ -1737,7 +1743,10 @@ const stepPlayer = (g, input, dt) => {
   const gravity = swimming ? P.gravity * P.swimGravity : P.gravity
   const maxFall = swimming ? P.swimMaxFall : floating ? R.featherFall : vine ? R.vineSlide : P.maxFall
   if (climbing) p.vy = input.up ? -R.climbSpeed : R.climbSpeed
-  else if (p.dashing <= 0 && !(p.zipping > 0)) p.vy = Math.min(maxFall, p.vy + gravity * dt)
+  else if (p.dashing <= 0 && !(p.zipping > 0)) {
+    p.vy = down * Math.min(down > 0 ? maxFall : Math.min(maxFall, FLOAT.heroRise), down * p.vy + gravity * dt)
+    p.vx += pullX * gravity * FLOAT.sideways * dt
+  }
   p.zipping = Math.max(0, (p.zipping ?? 0) - dt)
   if (hasRelic(p, 'wind') && props(matAt(world, cell(middle), cell(p.y + p.h / 2))).gas) p.vy = Math.max(-R.updraft, p.vy - P.gravity * 2.2 * dt)
 
@@ -1750,22 +1759,22 @@ const stepPlayer = (g, input, dt) => {
   p.sinceJump = input.jump && !p.wasJump ? 0 : p.sinceJump + dt
   if (!stunned && !p.crouching && p.sinceJump < P.buffer) {
     if (wading && !headUnder) {
-      p.vy = -P.jump
+      p.vy = -P.jump * down
       p.jumpHeld = true
       p.sinceJump = 1
     } else if (swimming) {
-      p.vy = -P.swimStroke
+      p.vy = -P.swimStroke * down
       p.sinceJump = 1
     } else if (p.sinceGround < P.coyote || vine) {
-      p.vy = -P.jump
+      p.vy = -P.jump * down
       p.jumpHeld = true
       p.sinceJump = 1
       p.sinceGround = 1
     } else if (mired) {
-      p.vy = -P.swimStroke
+      p.vy = -P.swimStroke * down
       p.sinceJump = 1
     } else if (p.clinging > 0) {
-      p.vy = -P.jump
+      p.vy = -P.jump * down
       p.vx = -p.facing * R.wallKick
       p.drift = 0.18
       p.facing *= -1
@@ -1774,14 +1783,14 @@ const stepPlayer = (g, input, dt) => {
       p.clinging = 0
     } else if (p.airJumps > 0) {
       p.airJumps -= 1
-      p.vy = -P.jump * 0.9
+      p.vy = -P.jump * 0.9 * down
       p.jumpHeld = true
       p.sinceJump = 1
       burst(g, p.x + 3, p.y + p.h, 'pale', 4)
     }
   }
   if (p.jumpHeld && !input.jump) {
-    if (p.vy < 0) p.vy *= P.jumpCut
+    if (p.vy * down < 0) p.vy *= P.jumpCut
     p.jumpHeld = false
   }
   p.wasJump = input.jump
@@ -1790,11 +1799,11 @@ const stepPlayer = (g, input, dt) => {
   const wasGrounded = p.grounded
   if (input.jump && !p.wasJumpFeel && p.sinceJump === 1) dust(g, p.x + p.w / 2, p.y + p.h, 4)
   p.wasJumpFeel = input.jump
-  move(world, p, dt)
-  pushOutOfSolid(world, p)
+  move(world, p, dt, down)
+  pushOutOfSolid(world, p, down)
   if (hitsSolid(world, p)) unbury(world, p)
   stepMotionFeel(g, p, input, dt, wasGrounded, falling, swimming)
-  seatPlayer(world, p, wish, dt)
+  if (down > 0) seatPlayer(world, p, wish, dt)
   stepDash(g, p, dt)
   if (p.slam && p.grounded) {
     p.slam = false
@@ -1877,7 +1886,8 @@ const stepEnemies = (g, dt) => {
   for (const e of g.enemies) {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
-    STEPPERS[e.kind](g, e, dt)
+    if (e.floated > 0) driftFoe(g, e, dt)
+    else STEPPERS[e.kind](g, e, dt)
     stepMutations(g, e, dt)
     if (e.kind !== 'worm' && !e.free) nudgeOutOfSolid(g.world, e)
     settleFooting(g, e, dt)

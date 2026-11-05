@@ -14,6 +14,8 @@ const MAKES = {
   'seed.tinder': ['blast', 'blastKill'], 'melt.flash': ['blast', 'steam'], 'roar.rime': ['ice', 'stun'], 'alchemy.vapour': ['gas', 'fuel'], 'mine.gas': ['gas', 'fuel'], 'decoy.gas': ['gas', 'fuel'],
   'ember.napalm': ['fire'], 'melt.forge': ['lava'], 'acid.rain': ['pouring'], 'spring.font': ['pouring'],
   flask: ['pouring'], 'flask.leech': ['water'], wick: ['fire', 'blast'], 'wick.tow': ['blastKill'],
+  float: ['falling', 'stun', 'air', 'worldKill'], 'float.flip': ['falling', 'worldKill'],
+  link: ['worldKill', 'stun'], 'link.cable': ['fire', 'charge'], 'link.stake': ['fire', 'charge'],
 }
 
 const REGION_FOOD = [

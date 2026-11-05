@@ -976,3 +976,21 @@ export const sloshAt = (g, x, y, vx) => {
 export const swimBubble = (g, x, y) => spawn(g, 'bubble', x, y, 0, rand(-26, -14), rand(0.8, 1.6), '#bff2ff', '#bff2ff', rnd() < 0.5 ? 2 : 1)
 
 export const wetAt = (g, x, y) => liquidAtPx(g.world, x, y)
+
+export const liftMote = (g, x, y, gx, gy, colour) => spawn(g, 'mote', x, y, gx * rand(14, 26) + rand(-3, 3), gy * rand(14, 26) + rand(-3, 3), rand(0.5, 0.9), colour)
+
+export const bubblePop = (g, x, y, r, colour) => {
+  const count = many(g, r / 4)
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2
+    spawn(g, 'pop', x + Math.cos(a) * r, y + Math.sin(a) * r, 0, 0, rand(0.12, 0.2), colour, colour, rnd() < 0.5 ? 3 : 2)
+  }
+  if (eraOf(g).shapes === 0) glitter(g, x, y, colour, many(g, 6), r * 2)
+}
+
+export const slamAt = (g, x, y, gx, gy, mat) => {
+  const colour = mix(MATERIAL_COLOURS[mat]?.[0] ?? '#8c9884', '#8c9884', 0.5)
+  for (let i = many(g, 5); i > 0; i--) dustPuff(g, x + rand(-4, 4), y, -gx * rand(10, 30) + rand(-16, 16), -gy * rand(10, 30) + rand(-6, 6), colour)
+}
+
+export const tieGlint = (g, x, y, colour) => glint(g, x, y, colour, 2, 0.22)
