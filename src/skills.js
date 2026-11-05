@@ -1707,8 +1707,8 @@ const shine = (g, p, dt) => {
   beamFrom(g, p, muzzle(p), p.aim, S.lens.reach, S.lens.splits, S.lens.bounces, out, foes)
   out.ends.forEach(end => { end.changed = end.foe ? heatFoe(g, p, end.foe, dt) : heatCell(g, p, end, dt) })
   const beam = held(g, 'beam')
-  if (beam) Object.assign(beam, out, { life: S.lens.linger, held: (beam.held ?? 0) + dt })
-  else addEffect(g, { kind: 'beam', ...out, life: S.lens.linger, held: 0, tint: hue(p, 'lens', null), dazzle: owns(p, 'lens.dazzle') })
+  if (beam) Object.assign(beam, out, { life: S.lens.linger })
+  else addEffect(g, { kind: 'beam', ...out, life: S.lens.linger, tint: hue(p, 'lens', null), dazzle: owns(p, 'lens.dazzle') })
   return true
 }
 
