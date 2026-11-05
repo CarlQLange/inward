@@ -4,7 +4,8 @@ import { burningAt, chargedAt, matAt } from './world.js'
 import { ENEMY_DEFS } from './enemies.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
-import { drawMapGrid, drawMenus, drawToast } from './screens.js'
+import { drawMenus, drawToast } from './screens.js'
+import { drawHud } from './hud.js'
 import { save } from './store.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
@@ -368,77 +369,6 @@ const box = (ctx, x, y, w, h, colour = GREEN) => {
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
 }
 
-const drawLeftHud = (ctx, g) => {
-  const x = 33
-  for (let slot = 0; slot < TUNING.player.skillSlots; slot++) {
-    const top = ORIGIN.y + slot * 38
-    const skill = g.player.skills[slot]
-    box(ctx, x, top, 32, 32)
-    if (skill) ctx.drawImage(SPRITES.icons[skill.kind], x + 8, top + 8)
-    const ready = skill ? 1 - Math.max(0, skill.ready) / TUNING.skills[skill.kind].every : 0
-    for (let i = 0; i < 6; i++) {
-      ctx.fillStyle = ready * 6 > i ? GREEN : DIM
-      ctx.fillRect(x + i * 5 + 1, top + 34, 4, 2)
-    }
-    drawText(ctx, skillKey(slot), x - 7, top + 2, skill ? GREEN : DIM)
-  }
-  for (let i = 0; i < TUNING.player.hp; i++) {
-    const jolt = g.hurtFlash > 0.4 ? Math.round((Math.random() - 0.5) * 3) : 0
-    ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + (i % 4) * 9 + jolt, ORIGIN.y + 152 + Math.floor(i / 4) * 7)
-  }
-  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 168, DIM)
-  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 175, DIM)
-  drawText(ctx, 'M MAP', x - 7, ORIGIN.y + 182, DIM)
-  drawText(ctx, 'SHIFT LOOK', x - 7, ORIGIN.y + 189, DIM)
-  const { jump, shoot, bomb } = scheme().labels
-  drawText(ctx, `${jump} JUMP`, x - 7, ORIGIN.y + 198, DIM)
-  drawText(ctx, `${shoot} SHOOT`, x - 7, ORIGIN.y + 205, DIM)
-  drawText(ctx, `${bomb} BOMB`, x - 7, ORIGIN.y + 212, DIM)
-}
-
-const drawMinimap = (ctx, g, x) => {
-  const span = 15 * 5 + 3
-  box(ctx, x, ORIGIN.y, span, span)
-  drawMapGrid(ctx, g, x + 2, ORIGIN.y + 2, 5)
-}
-
-const drawRightHud = (ctx, g) => {
-  const span = 15 * 5 + 3
-  const x = VIEW.w - 101 + Math.floor((101 - span) / 2)
-  drawMinimap(ctx, g, x)
-  let y = ORIGIN.y + span + 8
-  drawText(ctx, 'SCORE', x, y, DIM)
-  drawText(ctx, g.score, x + span - textWidth(String(g.score)), y, GREEN)
-  y += 9
-  drawText(ctx, 'BEST', x, y, DIM)
-  drawText(ctx, g.best, x + span - textWidth(String(g.best)), y, DIM)
-  y += 9
-  drawIcon(ctx, 'coin', x, y - 1, 7)
-  drawText(ctx, g.gold, x + 10, y, COLOURS.charge)
-  drawIcon(ctx, 'bomb', x + 28, y - 1, 7)
-  drawText(ctx, g.player.bombs, x + 38, y, COLOURS.pale)
-  const level = `L${g.level}`
-  drawText(ctx, level, x + span - textWidth(level), y, GREEN)
-  y += 8
-  for (let i = 0; i < g.nextLevel; i++) {
-    ctx.fillStyle = i < g.xp ? GREEN : DIM
-    ctx.fillRect(x + Math.floor((i * span) / g.nextLevel), y, Math.max(1, Math.floor(span / g.nextLevel) - 1), 2)
-  }
-  y += 8
-  if (g.chain > 1) {
-    const text = `CHAIN X${g.chain}`
-    drawText(ctx, text, x, y, COLOURS.charge)
-    ctx.fillStyle = COLOURS.charge
-    ctx.fillRect(x, y + 7, Math.min(span, Math.floor((span * g.chainTime) / TUNING.run.chainWindow)), 1)
-  }
-  y += 12
-  let n = 0
-  for (const id of g.player.relics) {
-    drawIcon(ctx, RELIC_BY_ID[id].icon, x + (n % 8) * 10, y + Math.floor(n / 8) * 10, 9)
-    n += 1
-  }
-}
-
 const drawLook = (ctx, g) => {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
   ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
@@ -495,7 +425,7 @@ export const draw = (ctx, g, pointer) => {
   ctx.beginPath()
   ctx.rect(0, 0, ROOM_PX, ROOM_PX)
   ctx.clip()
-  const theme = g.rooms[keyOf(g.x, g.y)]?.theme ?? 0
+  const theme = g.phase === 'title' ? 0 : g.rooms[keyOf(g.x, g.y)]?.theme ?? 0
   ctx.drawImage(backdrops[theme], 0, 0)
   drawSolids(ctx, g.world, g.depth, THEMES[theme]?.skin, theme)
   drawCards(ctx, g)
@@ -523,8 +453,7 @@ export const draw = (ctx, g, pointer) => {
   }
   ctx.restore()
   if (g.phase !== 'title') {
-    drawLeftHud(ctx, g)
-    drawRightHud(ctx, g)
+    drawHud(ctx, g)
     if (g.menus.length === 0) drawToast(ctx, g)
     if (g.looking) drawLookLegend(ctx)
   }

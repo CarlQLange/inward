@@ -187,3 +187,31 @@ const CHASM = {
 }
 
 export const STARTERS = [PEAT_WALL, LAVA_CROSSING, CHIMNEY, JUNKYARD, QUARRY, GAS_POCKET, SOLID_WALL, CHASM]
+
+const TITLE_LETTERS = [
+  ['#', '#', '#', '#', '#'],
+  ['#..#', '##.#', '#.##', '#..#', '#..#'],
+  ['#...#', '#...#', '#.#.#', '#.#.#', '.#.#.'],
+  ['###', '#.#', '###', '#.#', '#.#'],
+  ['##.', '#.#', '##.', '#.#', '#.#'],
+  ['##.', '#.#', '#.#', '#.#', '##.'],
+]
+
+const titleMap = () => {
+  const grid = blank()
+  paint(grid, 1, 1, 26, 21, '.')
+  paint(grid, 1, 22, 26, 22, 'm')
+  paint(grid, 10, 22, 26, 25, '~')
+  paint(grid, 2, 10, 25, 10, 'M')
+  let x = 2
+  for (const letter of TITLE_LETTERS) {
+    letter.forEach((row, dy) => [...row].forEach((c, dx) => {
+      if (c === '#') grid[4 + dy][x + dx] = 'M'
+    }))
+    grid[9][x] = 'M'
+    x += letter[0].length + 1
+  }
+  return grid.map(row => row.join(''))
+}
+
+export const TITLE_ROOM = { map: titleMap(), spawn: at(4, 22) }

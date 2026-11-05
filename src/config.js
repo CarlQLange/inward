@@ -55,7 +55,7 @@ export const TUNING = {
     swimRun: 0.7,
     smokeTolerance: 3,
     drift: 0.45,
-    skillSlots: 4,
+    skillSlots: 3,
     startBombs: 1,
   },
   skills: {

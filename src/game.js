@@ -1,7 +1,7 @@
 import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
-import { STARTERS } from './room.js'
+import { STARTERS, TITLE_ROOM } from './room.js'
 import { THEMES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
@@ -272,7 +272,7 @@ const storeRun = g => {
   persist()
 }
 
-const showToast = (g, title, text) => { g.toast = { title, text, life: R.toastLife } }
+const showToast = (g, title) => { g.toast = { title, life: R.toastLife, born: R.toastLife } }
 
 const ringCells = (map, ring) =>
   Object.keys(map.links)
@@ -386,7 +386,11 @@ const createRun = (depthOverride, quickRing = null) => {
 export const createGame = (depthOverride = null, phase = 'playing', quickRing = null) => {
   const g = createRun(depthOverride, quickRing)
   if (phase === 'title') {
-    Object.assign(g, { phase: 'title', titleTime: 0, toast: null, shownDepth: 0.25 })
+    Object.assign(g, {
+      phase: 'title', titleTime: 0, toast: null, shownDepth: 0.25,
+      world: createWorld(TITLE_ROOM.map, false), enemies: [], cards: [], wares: [], pickups: [],
+      player: createPlayer(TITLE_ROOM.spawn),
+    })
     openTitle(g)
   }
   return g
@@ -1323,16 +1327,10 @@ const stepTitle = (g, dt) => {
   g.shownDepth = 0.3 + Math.sin(g.time * 0.25) * 0.25
   stepWorld(g.world, dt, 0.25)
   g.world.events.length = 0
-  if (g.titleTime > 2 && !g.lit) {
-    g.lit = true
-    ignite(g.world, 9, 10)
-  }
-  if (g.titleTime > 45) {
-    delete g.rooms[keyOf(...g.map.start)]
-    enterRoom(g, ...g.map.start)
-    g.titleTime = 0
-    g.lit = false
-  }
+  g.titleSpark = (g.titleSpark ?? 1) - dt
+  if (g.titleSpark > 0) return
+  g.titleSpark = 2.4 + Math.random() * 2
+  energize(g.world, 2 + Math.floor(Math.random() * 24), 10, 40)
 }
 
 const edges = (g, input) => {
