@@ -68,11 +68,30 @@ export const buildMap = seed => {
     chosen.forEach((cell, i) => {
       const dir = inwardDir(cell, r)
       const to = [cell[0] + STEP[dir][0], cell[1] + STEP[dir][1]]
-      const lock = i === 0 ? (r < 2 ? null : 'peat') : rand() < LOCK_CHANCE[r] ? 'any' : null
+      const lock = r === CORE_RING - 1 ? 'seal' : i === 0 ? (r < 2 ? null : 'peat') : rand() < LOCK_CHANCE[r] ? 'any' : null
       link(cell, to, lock)
     })
   }
   return { start: [startX, 0], links }
 }
+
+const stepsFrom = (links, from, within) => {
+  const dist = new Map([[keyOf(...from), 0]])
+  const queue = [from]
+  while (queue.length) {
+    const here = queue.shift()
+    for (const { to } of Object.values(links[keyOf(...here)] ?? {})) {
+      const key = keyOf(...to)
+      if (dist.has(key) || !within(to)) continue
+      dist.set(key, dist.get(keyOf(...here)) + 1)
+      queue.push(to)
+    }
+  }
+  return dist
+}
+
+export const loopRooms = (map, from, ring) =>
+  [...stepsFrom(map.links, from, ([x, y]) => ringOf(x, y) === ring)]
+    .map(([key, steps]) => ({ cell: key.split(',').map(Number), steps }))
 
 export const MAP_SIZE = SIZE

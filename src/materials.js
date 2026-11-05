@@ -21,7 +21,7 @@ const PROPS = {
   [M.LAVA]: { liquid: true, hot: true },
   [M.VINE]: { flammability: 1.2, burnTime: 1, burnsTo: M.EMPTY, smoke: 0.3, climbable: true },
   [M.ACID]: { liquid: true, corrosive: true },
-  [M.SOURCE]: { solid: true, source: true },
+  [M.SOURCE]: { solid: true, source: true, startLife: 18 },
   [M.OIL]: { liquid: true, flammability: 2, burnTime: 1.6, burnsTo: M.EMPTY, smoke: 1 },
   [M.METHANE]: { gas: true, expires: true, flammability: 6, burnTime: 0.12, burnsTo: M.EMPTY, smoke: 0, blast: 1, startLife: 40 },
   [M.ASH]: { falls: true, expires: true },

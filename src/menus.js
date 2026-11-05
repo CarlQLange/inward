@@ -56,7 +56,7 @@ const openOptions = g => openMenu(g, {
           {
             label: 'YES, FORGET',
             run: gc => {
-              Object.assign(save, { best: 0, bestChain: 0, runs: 0, coresReached: 0, deepest: 0, worldKills: 0 })
+              Object.assign(save, { best: 0, bestChain: 0, runs: 0, coresReached: 0, deepest: 0, worldKills: 0, found: [], ghost: null })
               knownNotes.clear()
               persist()
               closeMenu(gc)

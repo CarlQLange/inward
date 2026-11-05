@@ -105,7 +105,7 @@ export const ignite = (w, x, y) => {
   const i = idx(x, y)
   if (flammabilityOf(w, w.mat[i]) && w.burn[i] <= 0) {
     note(w, 'burn', w.mat[i])
-    w.burn[i] = (props(w.mat[i]).burnTime ?? T.overloadBurnTime) * (0.7 + Math.random() * 0.6)
+    w.burn[i] = (props(w.mat[i]).burnTime ?? T.overloadBurnTime) * (0.7 + Math.random() * 0.6) * T.burnScale
   }
 }
 
@@ -266,11 +266,15 @@ const growVine = (w, x, y) => {
 }
 
 const growMoss = w => {
+  for (let n = 0; n < T.growthTries; n++) tryMoss(w)
+}
+
+const tryMoss = w => {
   const x = 1 + Math.floor(Math.random() * (ROOM - 2))
   const y = 1 + Math.floor(Math.random() * (ROOM - 2))
   if (w.mat[idx(x, y)] !== M.ROCK || Math.random() > T.growth * ROOM) return
   const around = N4.map(([dx, dy]) => matAt(w, x + dx, y + dy))
-  if (!around.includes(M.WATER) || !around.includes(M.EMPTY)) return
+  if ((!T.mossAnywhere && !around.includes(M.WATER)) || !around.includes(M.EMPTY)) return
   note(w, 'grow', M.MOSS)
   place(w, idx(x, y), M.MOSS)
 }
@@ -337,7 +341,7 @@ const burnOut = (w, x, y) => {
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
   if (blast) {
     note(w, 'blast', mat)
-    explode(w, x, y, blast)
+    explode(w, x, y, blast + T.blastBonus)
   }
 }
 
@@ -412,7 +416,7 @@ const every = (w, clock, rate, dt, run) => {
 }
 
 export const stepWorld = (w, dt, depth) => {
-  const excite = 1 + depth * T.exciteAtCore
+  const excite = T.excite + depth * T.exciteAtCore
   every(w, 'fluid', T.fluidRate, dt, step => stepFluids(w, step))
   every(w, 'fire', T.fireRate, dt, step => stepFire(w, step, excite))
   every(w, 'charge', T.chargeRate, dt, step => stepCharge(w, step))
