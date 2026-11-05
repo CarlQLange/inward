@@ -65,7 +65,7 @@ export const TUNING = {
     ember: { every: 0.8, speed: 150, lift: 70, wispSpeed: 54, wispLife: 6, wispSeek: 90, torchTime: 6, torchEvery: 1.2 },
     frost: { every: 1.1, reach: 48, width: 14, freeze: 2.5, floeSpeed: 170, floeLift: 60, glideTime: 3.2, forms: { 'frost.floe': 1.5, 'frost.glide': 4 } },
     hammer: { every: 0.45, reach: 2, hurlSpeed: 190, hurlReach: 96, fuseTime: 1.1, tremorHeight: 8, forms: { 'hammer.fuse': 1.1, 'hammer.hurl': 0.8 } },
-    gust: { every: 0.7, reach: 72, width: 16, shove: 200, lift: 300, lungs: 30, twisterSpeed: 40, twisterLife: 4.5, twisterHeight: 44, twisterLift: 150, forms: { 'gust.twister': 3 } },
+    gust: { every: 0.7, reach: 72, width: 16, shove: 200, lungs: 30, twisterSpeed: 40, twisterLife: 4.5, twisterHeight: 44, twisterLift: 150, forms: { 'gust.twister': 3 } },
     blink: { every: 1.4, reach: 72, anchorLife: 14, lanceDamage: 2 },
     grapple: { every: 0.9, reach: 130, pull: 330, reel: 240, tetherLife: 5, tetherPull: 150, tetherDamage: 3 },
     dash: { every: 0.9, speed: 340, time: 0.16, tackleThrow: 300, tackleDamage: 3 },

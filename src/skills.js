@@ -15,11 +15,9 @@ const MAGNET = '#6fd0ff'
 const COLD = '#bff2ff'
 const GAS = '#c79ae0'
 const ACID = '#8ae04a'
-const LEAF = '#8ad05a'
 const STONE = '#c9d4c0'
 const BLOOD = '#ff5a4a'
 const WHITE = '#f4f8f2'
-const INK = '#7a6ad8'
 
 export const FORKS = {
   bolt: [
@@ -152,7 +150,6 @@ export const hostile = g => g.enemies.filter(e => !e.friendly && !e.ally)
 
 export const muzzle = p => ({ x: p.x + p.w / 2, y: p.y + (p.crouching ? 4 : 5) })
 
-const rotate = ({ x, y }, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) })
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
 const towards = (from, to) => {
   const d = Math.max(1, distance(from, to))

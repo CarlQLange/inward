@@ -840,11 +840,11 @@ const stepCloud = (g, f, dt) => {
 }
 
 const stepFissure = (g, f, dt) => {
-  const M_ = S.melt
+  const F = S.melt
   f.clock -= dt
   while (f.clock <= 0 && !f.done) {
-    f.clock += M_.fissureStep
-    if (f.laid >= M_.fissureMost) {
+    f.clock += F.fissureStep
+    if (f.laid >= F.fissureMost) {
       end(f)
       return
     }
@@ -857,7 +857,7 @@ const stepFissure = (g, f, dt) => {
     f.y = surface
     heat(g, g.player, f.x, surface, f.budget)
     heat(g, g.player, f.x, surface + 1, f.budget)
-    ignite(g.world, f.x, surface - 1)
+    heat(g, g.player, f.x, surface - 1, f.budget)
     burst(g, (f.x + 0.5) * BLOCK, surface * BLOCK, 'fire', 4)
     g.shake = Math.max(g.shake, 2)
     f.laid += 1
