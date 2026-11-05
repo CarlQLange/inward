@@ -6,7 +6,7 @@ import { burst, hurt } from './combat.js'
 import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, splash } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
-  orbitFires, owns, recordPast, releaseMatter, returnedShot, ring, setAblaze, shoutFront, smash, spend, spill, strike, zap,
+  orbitFires, owns, recordPast, releaseMatter, returnedShot, ring, setAblaze, settleFuse, shoutFront, smash, spend, spill, strike, zap,
 } from './skills.js'
 
 const S = TUNING.skills
@@ -321,6 +321,8 @@ const stepWick = (g, f, dt) => {
   if (f.laying) {
     if (f.trail) growTrail(g, f)
     else f.laid = Math.min(f.cells.length, f.laid + W.layRate * dt)
+    const held = g.player.skills.some(s => s.kind === 'wick' && s.holding)
+    if (!held && (f.trail || f.laid >= f.cells.length)) settleFuse(g)
     return
   }
   if (!f.lit) catchFire(g, f)

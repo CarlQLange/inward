@@ -168,7 +168,13 @@ const ART = {
   },
   thrown: (ctx, g, f) => {
     if (f.lands === 'floe' && iceTile()) ctx.drawImage(iceTile(), Math.round(f.x), Math.round(f.y))
-    else dot(ctx, f.x, f.y, f.w, f.h, f.colour)
+    else if (f.lands === 'splash' && f.bottle) drawBottle(ctx, f.x + 2, f.y + 3, f.colour, f.cells / S.flask.most)
+    else if (f.lands === 'splash') {
+      const speed = Math.max(1, Math.hypot(f.vx, f.vy))
+      for (let i = 1; i <= 3; i++) dot(ctx, f.x + 2 - (f.vx / speed) * i * 3, f.y + 2 - (f.vy / speed) * i * 3, 2, 2, f.colour)
+      dot(ctx, f.x, f.y, f.w, f.h, f.colour)
+      dot(ctx, f.x + 1, f.y + 1, 1, 1, WHITE)
+    } else dot(ctx, f.x, f.y, f.w, f.h, f.colour)
   },
   fuse: (ctx, g, f) => {
     dot(ctx, f.x - 2, f.y - 2, 5, 5, '#2a2a2a')
@@ -412,9 +418,9 @@ const drawFlask = (ctx, g) => {
   const p = g.player
   const skill = p.skills.find(s => s.kind === 'flask')
   if (!skill) return
-  const back = p.facing > 0 ? -2 : p.w - 2
+  const side = p.facing > 0 ? p.x - 3 : p.x + p.w + 3
   const cells = p.flask?.cells ?? 0
-  drawBottle(ctx, p.x + back + 2, p.y + 9, cells ? liquidOf(p.flask.mat) : GLASS, cells / S.flask.most)
+  drawBottle(ctx, side, p.y + 9 + (p.crouching ? 3 : 0), cells ? liquidOf(p.flask.mat) : GLASS, cells / S.flask.most)
   if (skill.holding && !skill.pouring) circle(ctx, p.x + p.w / 2, p.y + 8, S.flask.reach * (1 - ((g.time * 2.5) % 1)), cells ? liquidOf(p.flask.mat) : GLASS, 20)
 }
 

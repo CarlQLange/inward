@@ -1779,7 +1779,7 @@ const retireSleepers = (g, keep) => {
   waiting.slice(0, Math.max(0, waiting.length - S.wick.sleepers + 1)).forEach(f => { f.life = 0; f.done = true })
 }
 
-const settleFuse = g => {
+export const settleFuse = g => {
   const f = layingFuse(g)
   if (!f) return FREE
   f.laying = false
