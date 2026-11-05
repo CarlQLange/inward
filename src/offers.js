@@ -16,6 +16,8 @@ const MAKES = {
   flask: ['pouring'], 'flask.leech': ['water'], wick: ['fire', 'blast'], 'wick.tow': ['blastKill'],
   float: ['falling', 'stun', 'air', 'worldKill'], 'float.flip': ['falling', 'worldKill'],
   link: ['worldKill', 'stun'], 'link.cable': ['fire', 'charge'], 'link.stake': ['fire', 'charge'],
+  clay: ['mud'], 'clay.daub': ['stun'], 'clay.bog': ['mud'], 'clay.roll': ['falling'],
+  'burrow.tunnel': ['falling'], 'burrow.grind': ['rubble', 'falling'], 'burrow.quicksand': ['stun', 'falling'], 'burrow.breach': ['air'],
 }
 
 const REGION_FOOD = [

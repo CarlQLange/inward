@@ -211,7 +211,7 @@ const stanceOf = (g, p, h) => {
   const middle = p.x + p.w / 2
   if (h.hurt > 0.16) return 'hurt'
   if (p.dashing > 0) return 'dash'
-  if (liquidAtPx(world, middle, p.y + p.h / 2)) return 'swim'
+  if (liquidAtPx(world, middle, p.y + p.h / 2) || (p.digging > 0 && solidAt(world, middle, p.y + p.h / 2))) return 'swim'
   if (p.crouching) return 'crouch'
   if (p.clinging > 0 && !p.grounded) return 'cling'
   if (!p.grounded && vineAt(world, Math.floor(middle / 8), Math.floor((p.y + p.h / 2) / 8))) return 'climb'
@@ -286,7 +286,7 @@ const anchorOf = (p, h, pose) => ({
   y: p.y + p.h + pose.body.y,
 })
 
-const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
+const stepNodes = (world, nodes, dt, dtWas, force, pinned, through = false) => {
   const scale = dt / dtWas
   nodes.forEach((n, i) => {
     if (i === 0 && pinned) return
@@ -331,7 +331,7 @@ const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
     b.y += dy * push
   }
   nodes.forEach((n, i) => {
-    if ((i === 0 && pinned) || !solidAt(world, n.x, n.y) || solidAt(world, n.px, n.py)) return
+    if (through || (i === 0 && pinned) || !solidAt(world, n.x, n.y) || solidAt(world, n.px, n.py)) return
     if (!solidAt(world, n.px, n.y)) n.x = n.px
     else if (!solidAt(world, n.x, n.py)) n.y = n.py
     else {
@@ -494,7 +494,7 @@ export const stepHero = (g, p, dt, carried = false) => {
     const root = h.nodes[0]
     root.x = anchor.x
     root.y = anchor.y
-    stepNodes(g.world, h.nodes, dtStep, h.dtWas, scarfForce(p, h), true)
+    stepNodes(g.world, h.nodes, dtStep, h.dtWas, scarfForce(p, h), true, p.digging > 0)
   }
   for (const shred of h.shreds) {
     shred.age += dt
@@ -611,7 +611,7 @@ export const drawHero = (ctx, g, p) => {
   const tip = (p.keystones?.has('fists') ? paintFist : paintGun)(shoulder, h.angle, h.recoil > 0.45 ? 2 : h.recoil > 0 ? 1 : 0)
   outline()
   const palette = h.hurt > 0.26 ? FLASH_WHITE : h.hurt > 0.2 ? FLASH_RED : PALETTE
-  blit(ctx, wx, wy, palette)
+  blit(ctx, wx, wy, palette, p.digging > 0 ? y => solidAt(g.world, p.x + p.w / 2, wy + y - OY) : undefined)
   const anchor = anchorOf(p, h, pose)
   drawKnot(ctx, Math.round(anchor.x + f), Math.round(anchor.y))
   h.tip = { x: wx + tip.x, y: wy + tip.y }

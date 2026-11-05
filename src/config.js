@@ -114,6 +114,8 @@ export const TUNING = {
     wick: { every: 2.6, most: 20, least: 5, drop: 6, layRate: 28, burnRate: 7.5, holdMost: 6, bang: 2, damage: 3, radius: 24, sparkDamage: 1, trailMost: 48, sleepers: 3, towMost: 4 },
     float: { every: 5.5, reach: 96, radius: 44, backOff: 0.45, life: 3.6, rise: 80, heroRise: 95, drift: 0.9, slam: 150, slamStep: 45, slamMost: 4, dropTime: 2.5, sideways: 0.85, snareLife: 24, carryTime: 3.2, carryRadius: 34, flipEvery: 1.1, forms: { 'float.snare': 7 } },
     link: { every: 6.5, reach: 130, width: 28, hop: 80, most: 4, life: 8, burn: 2.2, energy: 22, ropeLeast: 20, ropeMost: 96, ropeSlack: 1.15, ropeHaul: 6, hopTime: 0.12, liveTime: 0.4, yokeEvery: 0.45, stakeEvery: 0.4, forms: { 'link.stake': 7.5 } },
+    clay: { every: 1.6, stock: 3, speed: 180, lift: 22, damage: 2, splatStun: 0.4, daubTime: 6, dripEvery: 0.25, sag: 45, bakeHold: 3, bakeDamage: 2, rollSpeed: 64, rollLife: 5, rollMost: 18, rollDamage: 2, bogRadius: 3, castStun: 1.4, forms: { 'clay.roll': 2.2 } },
+    burrow: { every: 3, time: 2.6, speed: 86, mudSpeed: 112, rockSpeed: 42, wakeEvery: 0.07, breach: 280, breachDrift: 0.3, sinkDepth: 2, sinkStun: 0.9, sinkEvery: 1.6, sinkReach: 4, surfaceSpeed: 130, surfaceLimit: 2 },
   },
   feed: {
     reach: 7,

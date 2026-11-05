@@ -143,6 +143,7 @@ export const DIETS = {
   blink: ['crossed'], drone: ['coin'], flask: ['pouring'], wick: ['fuel'],
   float: ['airborne'],
   link: ['worldKill'],
+  clay: ['fire', 'lava'], burrow: ['mud', 'falling'],
 }
 
 const foodOf = (p, kind) => {

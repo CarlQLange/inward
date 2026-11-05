@@ -46,6 +46,34 @@ export const move = (world, e, dt, down = 1) => {
   if (blocked) e.vy = 0
 }
 
+export const SOIL = new Set([M.SAND, M.MUD, M.SNOW, M.ASH, M.PEAT])
+
+const blocksThrough = (world, box, passes) => cellsUnder(box).some(([x, y]) => {
+  const m = matAt(world, x, y)
+  return props(m).solid === true && !passes(m)
+})
+
+const throughAxis = (world, e, axis, distance, passes) => {
+  const sign = Math.sign(distance)
+  let left = Math.abs(distance)
+  while (left > 0) {
+    const step = Math.min(0.25, left)
+    const next = { x: e.x, y: e.y, w: e.w, h: e.h, [axis]: e[axis] + sign * step }
+    if (blocksThrough(world, next, passes) || next.x < 0 || next.y < 0 || next.x + e.w > WORLD_PX || next.y + e.h > WORLD_PX) return true
+    e[axis] = next[axis]
+    left -= step
+  }
+  return false
+}
+
+export const moveThrough = (world, e, dt, passes) => {
+  e.hitWall = throughAxis(world, e, 'x', e.vx * dt, passes)
+  if (e.hitWall) e.vx = 0
+  const blocked = throughAxis(world, e, 'y', e.vy * dt, passes)
+  e.grounded = blocked && e.vy > 0
+  if (blocked) e.vy = 0
+}
+
 export const pushOutOfSolid = (world, e, down = 1) => {
   for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= down
 }

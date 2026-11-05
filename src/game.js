@@ -10,6 +10,7 @@ import { LOOSE_EVENTS, stepMagnets } from './loose.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
+import { swim } from './earth.js'
 import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { TASTES, feedEvent, stepFeeds, stepHand } from './feed.js'
 import { addTaste, composeOffer, offerExists } from './offers.js'
@@ -78,7 +79,7 @@ const depthFor = (g, ring) => {
 }
 
 const LOCK_OPENERS = {
-  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick'],
+  peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick', 'burrow'],
   gate: ['bolt', 'rod', 'acid', 'blink', 'melt', 'wick'],
   brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
   ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick'],
@@ -1112,7 +1113,7 @@ const assisted = (g, p, aim) => {
   return best ?? aim
 }
 
-const ASSISTED_SKILLS = new Set(['bolt', 'swap', 'charm', 'grapple', 'melt', 'ember', 'acid', 'mine', 'frost'])
+const ASSISTED_SKILLS = new Set(['bolt', 'swap', 'charm', 'grapple', 'melt', 'ember', 'acid', 'mine', 'frost', 'clay'])
 
 const fireShot = (g, p, aim, life = P.shotLife) => {
   const from = muzzle(p)
@@ -1723,7 +1724,7 @@ const stepPlayer = (g, input, dt) => {
   const wading = liquidAtPx(world, middle, down > 0 ? p.y + p.h - 1 : p.y + 1)
   const mired = miredAtPx(world, middle, down > 0 ? p.y + p.h - 1 : p.y + 1)
   const headUnder = liquidAtPx(world, middle, down > 0 ? p.y - 4 : p.y + p.h + 4)
-  applyCrush(g, p)
+  if (!(p.digging > 0)) applyCrush(g, p)
   const stunned = p.stun > 0
   const plant = input.plant && p.grounded
   crouch(world, p, input.down && !input.jump && p.grounded && !swimming && !plant && down > 0)
@@ -1799,9 +1800,12 @@ const stepPlayer = (g, input, dt) => {
   const wasGrounded = p.grounded
   if (input.jump && !p.wasJumpFeel && p.sinceJump === 1) dust(g, p.x + p.w / 2, p.y + p.h, 4)
   p.wasJumpFeel = input.jump
-  move(world, p, dt, down)
-  pushOutOfSolid(world, p, down)
-  if (hitsSolid(world, p)) unbury(world, p)
+  if (p.digging > 0) swim(g, p, input, dt)
+  else {
+    move(world, p, dt, down)
+    pushOutOfSolid(world, p, down)
+    if (hitsSolid(world, p)) unbury(world, p)
+  }
   stepMotionFeel(g, p, input, dt, wasGrounded, falling, swimming)
   if (down > 0) seatPlayer(world, p, wish, dt)
   stepDash(g, p, dt)

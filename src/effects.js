@@ -10,6 +10,7 @@ import {
 } from './skills.js'
 import { endFloat, stepFloat } from './float.js'
 import { endLink, stepLink } from './link.js'
+import { clodLands, endKiln, stepBall, stepDaub, stepKiln } from './earth.js'
 
 const S = TUNING.skills
 
@@ -170,6 +171,7 @@ const LANDS = {
     g.effects.push({ age: 0, kind: 'setting', x: was.x, y: was.y, life: S.melt.slagSet, sets: M.LAVA })
     burst(g, at.x, at.y, 'fire', 14)
   },
+  clod: (...args) => clodLands(...args),
 }
 
 const coat = (e, mat, cells) => {
@@ -1234,10 +1236,12 @@ const STEP = {
   twister: stepTwister, lure: stepLure, pane: stepPane, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
   bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
   seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle, float: stepFloat, link: stepLink,
+  ball: (...args) => stepBall(...args), daub: (...args) => stepDaub(...args), kiln: (...args) => stepKiln(...args),
 }
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle, float: endFloat, link: endLink,
+  kiln: (...args) => endKiln(...args),
 }
 
 const stepAblaze = (g, e, dt) => {

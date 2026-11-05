@@ -21,6 +21,9 @@ const ACID = '#8ae04a'
 const LEAF = '#4f9c3a'
 const LEAF_LIGHT = '#8ad05a'
 const STONE = '#c9d4c0'
+const MUD = '#8e7c60'
+const MUD_DARK = '#5c4c3a'
+const MUD_LIGHT = '#b8a684'
 
 const icons = new Map()
 
@@ -468,6 +471,33 @@ const ART = {
   },
   float: drawBubble,
   link: drawTies,
+  ball: (ctx, g, f) => {
+    const r = (f.size ?? 5) / 2
+    const c = { x: f.x, y: f.y - r }
+    for (let dy = -r; dy <= r; dy++) {
+      const half = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy)))
+      dot(ctx, c.x - half, c.y + dy, half * 2 + 1, 1, Math.abs(dy) > r - 1 ? MUD_DARK : MUD)
+    }
+    for (let i = 0; i < Math.min(6, 1 + Math.floor(f.held / 3)); i++) {
+      const a = (f.spin ?? 0) + i * 2.1
+      dot(ctx, c.x + Math.cos(a) * r * 0.6, c.y + Math.sin(a) * r * 0.6, 1, 1, i % 2 ? '#e2d28c' : MUD_LIGHT)
+    }
+  },
+  daub: (ctx, g, f) => {
+    const e = f.foe
+    for (let i = 0; i < 4; i++) dot(ctx, e.x + ((i * 5 + Math.floor(e.x)) % Math.max(1, e.w)), e.y + e.h * 0.45 + (i % 2) * 3, 2, 2, i % 2 ? MUD_DARK : MUD)
+    const fall = (g.time * 30 + e.x) % 8
+    dot(ctx, e.x + e.w / 2, e.y + e.h + fall - 2, 1, 2, MUD)
+  },
+  kiln: (ctx, g, f) => {
+    const e = f.foe
+    const [shell, mortar] = MATERIAL_COLOURS[M.BRICK]
+    if (f.life < 0.5 && Math.floor(g.time * 14) % 2) return
+    const box = { x: Math.round(e.x) - 2, y: Math.round(e.y) - 2, w: Math.round(e.w) + 4, h: Math.round(e.h) + 4 }
+    dot(ctx, box.x, box.y, box.w, box.h, shell)
+    for (let y = box.y + 3; y < box.y + box.h; y += 4) dot(ctx, box.x, y, box.w, 1, mortar)
+    for (let y = box.y; y < box.y + box.h; y += 4) dot(ctx, box.x + ((y - box.y) % 8 ? 2 : box.w / 2), y, 1, 3, mortar)
+  },
   still: (ctx, g, f) => {
     if (f.life > 0.5 || Math.floor(g.time * 12) % 2) {
       ctx.fillStyle = 'rgba(191, 242, 255, 0.08)'
@@ -550,6 +580,23 @@ const FLOWS = {
   },
 }
 
+const drawBurrowing = (ctx, g) => {
+  const p = g.player
+  if (!(p.digging > 0)) return
+  const x = Math.floor((p.x + p.w / 2) / BLOCK)
+  let y = Math.floor((p.y + p.h / 2) / BLOCK)
+  if (!props(matAt(g.world, x, y)).solid) return
+  while (y > 0 && props(matAt(g.world, x, y - 1)).solid) y--
+  const m = matAt(g.world, x, y)
+  if (y <= 0 || m === M.BEDROCK) return
+  const [light, dark] = MATERIAL_COLOURS[m] ?? [MUD_LIGHT, MUD]
+  const top = y * BLOCK
+  const lift = Math.round(Math.abs(Math.sin(g.time * 11)) * 2)
+  dot(ctx, p.x - 2, top - 1 - lift, p.w + 4, 1 + lift, light)
+  dot(ctx, p.x - 3, top - 1, p.w + 6, 1, dark)
+  for (let i = 0; i < 2; i++) dot(ctx, p.x + 3 + Math.sin(g.time * 17 + i * 3) * 6, top - 3 - Math.abs(Math.sin(g.time * 9 + i)) * 3, 1, 1, light)
+}
+
 const drawHeldSkills = (ctx, g) => {
   const p = g.player
   const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 }
@@ -577,6 +624,7 @@ export const drawSkillEffects = (ctx, g) => {
   drawLungs(ctx, g)
   drawFlask(ctx, g)
   drawHeldSkills(ctx, g)
+  drawBurrowing(ctx, g)
   drawFeedMotes(ctx, g)
   drawEvolving(ctx, g)
 }
