@@ -8,6 +8,8 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from cast import build_cast, build_region_tiles, build_signs, pack
+
 ROOT = Path(__file__).parent
 RAW = ROOT / 'raw'
 OUT = ROOT.parent / 'assets'
@@ -73,6 +75,9 @@ def build(sheet, name, cell_size, longest, colours, finish=lambda sprite: sprite
 
 
 OUT.mkdir(exist_ok=True)
+pack(build_cast())
+build_signs()
+build_region_tiles()
 CREATURE_SIZES = {i: 14 for i in range(16)} | {3: 20, 4: 13, 5: 13, 6: 14, 7: 12, 8: 15, 9: 16, 10: 15, 11: 15, 12: 15, 13: 28, 14: 15, 15: 16}
 build('creatures.png', 'creatures', 28, CREATURE_SIZES, 6)
 build('icons.png', 'icons', 16, 14, 5)
