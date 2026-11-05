@@ -315,6 +315,7 @@ const enterRoom = (g, x, y) => {
   room.enemies.forEach(e => knownNotes.add(`met:${e.kind}`))
   openCoreSeals(g, room)
   if (firstVisit) g.roomsSeen += 1
+  const warden = firstVisit && room.enemies.find(e => e.warden)
   Object.assign(g, {
     x, y,
     ring: room.ring,
@@ -331,7 +332,8 @@ const enterRoom = (g, x, y) => {
     roomHp: g.player?.hp ?? P.hp,
   })
   if (firstVisit) {
-    if (room.theme !== g.lastTheme) showToast(g, THEMES[room.theme].name, '')
+    if (warden) showToast(g, `THE ${warden.kind.toUpperCase()}`)
+    else if (room.theme !== g.lastTheme) showToast(g, THEMES[room.theme].name)
     g.lastTheme = room.theme
     if (g.phase === 'playing') meetInhabitants(g, room)
   }
@@ -440,7 +442,8 @@ const placeAtDoor = g => {
 const chooseWardens = (known, secrets) => {
   const fresh = secrets.filter(key => key.startsWith('warden:')).map(key => key.split(':')[1])
   const owned = [...known].filter(key => key.startsWith('warden:')).map(key => key.split(':')[1]).filter(id => !fresh.includes(id))
-  return [...fresh, ...shuffled(owned)].slice(0, R.wardenRings.length)
+  const order = [...fresh, ...shuffled(owned)].slice(0, R.wardenRings.length)
+  return order[0] === 'crucible' ? [...order.slice(1, 2), 'crucible', ...order.slice(2)] : order
 }
 
 const createRun = (depthOverride, quickRing = null, discovering = false) => {

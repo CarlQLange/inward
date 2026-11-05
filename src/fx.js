@@ -242,8 +242,10 @@ export const killFx = (g, e) => {
 
 export const roomClearFx = g => {
   const at = g.lastKill ?? centre(g.player)
-  slowMo(g, 0.55, 0.22)
-  zoomPunch(g, at.x, at.y, 0.2, 0.3)
+  if (g.chain >= TUNING.feel.grandClear) {
+    slowMo(g, 0.55, 0.22)
+    zoomPunch(g, at.x, at.y, 0.2, 0.3)
+  }
   g.doorPulse = 1.8
   addRing(g, at.x, at.y, 240, 3.5, 0.5, 9)
   rumble(g, 0.5)

@@ -94,6 +94,7 @@ const drawCounts = (ctx, g, top) => {
   drawText(ctx, g.gold, 28, top, YELLOW)
   ctx.drawImage(bomb, 56, top - 1, 8, 8)
   drawText(ctx, g.player.bombs, 66, top, WHITE)
+  drawPrompt(ctx, 'bomb', 74, top - 2)
 }
 
 const drawLeft = (ctx, g) => {
