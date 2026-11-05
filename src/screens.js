@@ -3,6 +3,7 @@ import { ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
 import { FORKS, SKILL_DETAILS, formOf, owns } from './skills.js'
 import { tintedIcon } from './skillart.js'
+import { eatsLine } from './feed.js'
 import { SPRITES, creatureFrames } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { almanac } from './discover.js'
@@ -126,6 +127,10 @@ const skillColumn = (ctx, g, menu) => {
   let y = frame.detailY
   wrapText(SKILL_DETAILS[chosen.kind], 22).forEach(line => {
     drawText(ctx, line, left, y, PALE)
+    y += 7
+  })
+  wrapText(eatsLine(p, chosen.kind), 22).forEach(line => {
+    drawText(ctx, line, left, y, YELLOW)
     y += 7
   })
   y += 4
@@ -340,7 +345,7 @@ const drawCard = (ctx, card, x, y, w, h, on, time) => {
     drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 32 + name.length * 7 + n * 6, PALE)
   })
   if (card.prompt) drawPrompt(ctx, card.prompt, x + (w - promptWidth(card.prompt)) / 2, y + h - PROMPT_HEIGHT - 3)
-  else if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, DIM)
+  else if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, card.subBright ? YELLOW : DIM)
 }
 
 const drawCards = (ctx, g, menu, cards) => {

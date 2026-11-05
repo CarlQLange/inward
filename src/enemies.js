@@ -804,7 +804,6 @@ export const onDeath = (g, e) => {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) < 4) puff(g.world, x + dx, y + dy, M.METHANE, [8, 12])
   }
   if (e.kind === 'bomber') explode(g.world, x, y, 2)
-  if (e.detonates) explode(g.world, x, y, 2)
   if (e.shatters) explode(g.world, x, y, 1)
   if (e.kind === 'snapweed') for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ignite(g.world, x + dx, y + dy)
   if (e.kind === 'dripper') for (const dx of [-1, 0, 1, -2, 2]) puff(g.world, x + dx, y + 1, e.drips ?? M.OIL, [1, 1])

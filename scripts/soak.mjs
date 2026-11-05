@@ -352,6 +352,7 @@ const worker = async ({ opts, from, to }) => {
   const answerMenu = g => {
     const menu = g.menus.at(-1)
     if (!menu) return
+    if (menu.page === 'offer' && menu.items[0]?.option && menu.title === 'LEVEL UP') (g.offerLog ??= []).push({ types: menu.items.map(i => i.option.type + (i.option.type === 'upgrade' ? ':' + i.option.skill : '')), size: menu.items.length, level: g.level, rooms: g.roomsSeen, relics: g.relicPool.length, ring: g.ring })
     const real = menu.items.filter(i => !/NOT NOW|NOT TODAY/.test(i.card?.name ?? ''))
     const choice = real[Math.floor(Math.random() * real.length)] ?? menu.items[0]
     choice.run(g)
@@ -457,6 +458,9 @@ const worker = async ({ opts, from, to }) => {
     if (opts.trace) console.log(asciiRoom(g, g.rooms[keyOf(g.x, g.y)], { x: cell(g.player.x + 3), y: cell(g.player.y + g.player.h - 1) }), `p ${g.player.x},${g.player.y} v ${g.player.vx},${g.player.vy}`)
     return {
       index,
+      offers: g.offerLog ?? [],
+      forms: g.player.upgrades.size,
+      slots: g.player.skills.length,
       phase: g.phase,
       timedOut,
       error,
@@ -564,6 +568,13 @@ const report = (results, opts, realSeconds) => {
     const killed = these.filter(f => f.killed)
     const dmg = these.reduce((n, f) => n + f.gun + f.world, 0) || 1
     line(`  warden ${kind}: ${these.length} fights, ${killed.length} killed, secs ${spread(killed.map(f => f.secs))}, hits ${spread(these.map(f => f.hits))}, damage from world ${((100 * these.reduce((n, f) => n + f.world, 0)) / dmg).toFixed(0)}%`)
+  }
+  const allOffers = results.flatMap(r => r.offers)
+  const bucket = o => o.types.map(t => t.split(':')[0]).sort().join('+')
+  line(`offers per run: ${spread(results.map(r => r.offers.length))}; forms held at end ${spread(results.map(r => r.forms))}`)
+  for (const [from, to] of [[0, 4], [4, 8], [8, 12], [12, 16], [16, 20], [20, 30], [30, 99]]) {
+    const here = results.flatMap(r => r.offers.slice(from, to))
+    line(`  offers ${from + 1}-${to}: n=${here.length}: ${top(tally(here.map(bucket)), 6)}`)
   }
   const ticks = results.map(r => r.tickMean)
   line(`ms per tick: mean ${mean(ticks).toFixed(3)}, worst run mean ${Math.max(...ticks).toFixed(3)}, worst single tick ${Math.max(...results.map(r => r.tickMax)).toFixed(2)} (budget 16.67)`)

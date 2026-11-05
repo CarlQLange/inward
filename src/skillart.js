@@ -16,6 +16,7 @@ const BLOOD = '#ff5a4a'
 const ACID = '#8ae04a'
 const LEAF = '#4f9c3a'
 const LEAF_LIGHT = '#8ad05a'
+const STONE = '#c9d4c0'
 
 const icons = new Map()
 
@@ -153,7 +154,13 @@ const ART = {
     }
     if (f.vx || f.vy) for (let i = 1; i < 6; i++) dot(ctx, f.x - f.vx * i * 0.08, f.y - f.vy * i * 0.08, 1, 1, BLOOD)
     if (f.lodestone) circle(ctx, f.x, f.y, 14 + Math.sin(g.time * 8) * 2, MAGNET, 10)
-    if (f.collapse && f.life < 0.6 && Math.floor(g.time * 12) % 2) circle(ctx, f.x, f.y, 10, FIRE, 12)
+    if (f.grinder) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + g.time * 7
+        const [cos, sin] = [Math.cos(a), Math.sin(a)]
+        for (let r = S.well.grindReach - 3; r <= S.well.grindReach + 2; r++) dot(ctx, f.x + cos * r, f.y + sin * r, 1, 1, STONE)
+      }
+    }
   },
   lure: (ctx, g, f) => {
     const e = f.follow
@@ -232,12 +239,28 @@ const ART = {
   decoy: (ctx, g, f) => {
     if (f.clone) dot(ctx, f.x + 8, f.y + 5, 4, 1, MAGNET)
     if (f.runner) dot(ctx, f.x + 1 + Math.round(Math.sin(g.time * 20) * 2), f.y + 16, 6, 1, WHITE)
-    if (f.explosive && Math.floor(g.time * 8) % 2) dot(ctx, f.x + 3, f.y, 2, 2, FIRE)
+    if (f.double) {
+      const bob = Math.round(Math.sin(g.time * 6))
+      dot(ctx, f.x + 1, f.y - 4 + bob, 6, 1, STONE)
+      dot(ctx, f.x + 1, f.y - 4 + bob, 1, 2, STONE)
+      dot(ctx, f.x + 6, f.y - 5 + bob, 1, 2, STONE)
+      dotted(ctx, { x: f.x + 4, y: f.y + 8 }, { x: g.player.x + 3, y: g.player.y + 8 }, STONE, 6, g.time * 12)
+    }
     if (f.gas) dot(ctx, f.x + 3, f.y + 4, 2, 2, GAS)
   },
   drone: (ctx, g, f) => {
-    const colour = f.sparks ? CHARGE : f.embers ? FIRE : f.sapper ? BLOOD : f.mole ? WHITE : null
+    const colour = f.sapper ? BLOOD : f.mole ? WHITE : f.magpie ? CHARGE : f.sentry ? MAGNET : null
     if (colour) dot(ctx, f.x + 2, f.y + 2, 4, 4, colour)
+    if (f.sentry) {
+      dot(ctx, f.x + 1, f.y + 8, 1, 4, MAGNET)
+      dot(ctx, f.x + 6, f.y + 8, 1, 4, MAGNET)
+      dot(ctx, f.x + 3, f.y + 7, 2, 2, MAGNET)
+    }
+    if (f.magpie) {
+      dot(ctx, f.x - 2, f.y + 1, 2, 1, CHARGE)
+      dot(ctx, f.x + 8, f.y + 1, 2, 1, CHARGE)
+      if (f.carrying) dot(ctx, f.x + 2, f.y + 9, 3, 3, CHARGE)
+    }
     if (f.sapper && Math.floor(g.time * 12) % 2) circle(ctx, f.x + 4, f.y + 4, 8, BLOOD, 8)
     if (f.mole) for (let i = 0; i < 3; i++) dot(ctx, f.x + f.aim.x * (6 + i * 2), f.y + f.aim.y * (6 + i * 2), 1, 1, WHITE)
   },
@@ -251,12 +274,44 @@ const ART = {
     dot(ctx, x - 1, y - 1, 2, 2, WHITE)
   },
   mirror: (ctx, g, f) => {
+    if (f.parry) {
+      const p = g.player
+      ctx.strokeStyle = WHITE
+      ctx.lineWidth = 1
+      const grow = Math.round((1 - f.life / S.mirror.parryLife) * 4)
+      ctx.strokeRect(Math.round(p.x) - 6.5 - grow, Math.round(p.y) - 6.5 - grow, p.w + 13 + grow * 2, p.h + 13 + grow * 2)
+    }
     if (!f.maw) return
     const p = g.player
     ctx.strokeStyle = BLOOD
     ctx.lineWidth = 1
     ctx.strokeRect(Math.round(p.x) - 7.5, Math.round(p.y) - 7.5, p.w + 15, p.h + 15)
     for (let i = 0; i < f.swallowed; i++) dot(ctx, p.x + i * 3 - 2, p.y - 10, 2, 2, BLOOD)
+  },
+  rope: (ctx, g, f) => {
+    if (!f.from || !f.to) return
+    dotted(ctx, f.from, f.to, WHITE, 2, 0)
+    dot(ctx, f.x - 1, f.y - 1, 3, 3, WHITE)
+  },
+  caught: (ctx, g, f) => {
+    if (!f.from || !f.to) return
+    dotted(ctx, f.from, f.to, BLOOD, 2, g.time * 30)
+    const e = f.foe
+    ctx.strokeStyle = Math.floor(g.time * 10) % 2 ? BLOOD : WHITE
+    ctx.lineWidth = 1
+    ctx.strokeRect(Math.round(e.x) - 1.5, Math.round(e.y) - 1.5, e.w + 3, e.h + 3)
+  },
+  hurled: (ctx, g, f) => {
+    const e = f.foe
+    for (let i = 1; i < 5; i++) dot(ctx, e.x + e.w / 2 - e.vx * i * 0.012, e.y + e.h / 2 - e.vy * i * 0.012, 2, 2, BLOOD)
+  },
+  recall: (ctx, g, f) => {
+    const p = g.player
+    if (f.life < 0.6 && Math.floor(g.time * 12) % 2) return
+    ctx.strokeStyle = MAGNET
+    ctx.lineWidth = 1
+    ctx.strokeRect(Math.round(f.x) - 0.5, Math.round(f.y) - 0.5, p.w + 1, p.h + 1)
+    dotted(ctx, { x: f.x + p.w / 2, y: f.y + p.h / 2 }, { x: p.x + p.w / 2, y: p.y + p.h / 2 }, MAGNET, 5, g.time * 20)
   },
   hold: (ctx, g, f) => {
     if (f.life > 0.5 || Math.floor(g.time * 12) % 2) {
@@ -289,7 +344,54 @@ const drawCreatureStates = (ctx, g) => {
       ctx.drawImage(frame, Math.round(e.x + e.w / 2 - 6), Math.round(e.y - 1), 6, 6)
     }
     if (e.ally && e.plague) dot(ctx, e.x + e.w / 2 - 1, e.y - 4, 2, 2, ACID)
-    if (e.ally && e.volt) dot(ctx, e.x + Math.random() * e.w, e.y + Math.random() * e.h, 1, 1, CHARGE)
+    if (e.ally && e.pact) dot(ctx, e.x + e.w / 2 - 2, e.y - 4, 4, 1, WHITE)
+    if (e.ally && e.bond) dotted(ctx, { x: e.x + e.w / 2, y: e.y + e.h / 2 }, { x: g.player.x + 3, y: g.player.y + 8 }, MAGNET, 4, g.time * 16)
+  }
+}
+
+const MOTE_SIZE = { blob: 3, tumble: 2, puff: 3, shard: 2, streak: 1, rise: 2, drip: 2, leaf: 2, hop: 2, zig: 2, curl: 2, gather: 2 }
+
+const drawFeedMotes = (ctx, g) => {
+  for (const m of g.feedMotes ?? []) {
+    const size = MOTE_SIZE[m.flight] ?? 1
+    ctx.globalAlpha = m.flight === 'puff' ? 0.6 : 1
+    dot(ctx, m.x, m.y, m.flight === 'streak' ? 3 : size, size, m.age / m.life > 0.75 ? WHITE : m.colour)
+  }
+  ctx.globalAlpha = 1
+}
+
+const SWELLS = {
+  roar: (ctx, g, skill, c) => {
+    const reach = S.roar.reach * (S.roar.swellMin + (S.roar.swellMax - S.roar.swellMin) * skill.swell)
+    circle(ctx, c.x, c.y, reach, skill.swell >= 1 ? WHITE : BLOOD, 56)
+    circle(ctx, c.x, c.y, reach * (0.5 + 0.5 * Math.sin(g.time * 14) ** 2), BLOOD, 12)
+  },
+  bolt: (ctx, g, skill, c) => {
+    const stored = 1 + Math.floor(skill.swell * S.bolt.leydenMost)
+    for (let i = 0; i < stored; i++) {
+      const a = g.time * 9 + (i / stored) * Math.PI * 2
+      dot(ctx, c.x + Math.cos(a) * 9, c.y + Math.sin(a) * 9, 2, 2, Math.floor(g.time * 20 + i) % 2 ? CHARGE : WHITE)
+    }
+  },
+}
+
+const FLOWS = {
+  gust: (ctx, g, p) => {
+    for (let i = 0; i < 4; i++) dot(ctx, p.x + Math.random() * p.w, p.y + p.h + Math.random() * 7, 1, 2, i % 2 ? COLD : WHITE)
+  },
+  dash: (ctx, g, p) => {
+    ctx.globalAlpha = 0.5
+    for (let i = 1; i < 4; i++) dot(ctx, p.x - p.vx * i * 0.018, p.y + 3 - p.vy * i * 0.018, p.w, p.h - 6, i % 2 ? FIRE : BLOOD)
+    ctx.globalAlpha = 1
+  },
+}
+
+const drawHeldSkills = (ctx, g) => {
+  const p = g.player
+  const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 }
+  for (const skill of p.skills) {
+    if (skill.swelling) SWELLS[skill.kind]?.(ctx, g, skill, c)
+    if (skill.flowing) FLOWS[skill.kind]?.(ctx, g, p)
   }
 }
 
@@ -309,5 +411,7 @@ export const drawSkillEffects = (ctx, g) => {
   for (const f of g.effects) ART[f.kind]?.(ctx, g, f)
   drawCreatureStates(ctx, g)
   drawLungs(ctx, g)
+  drawHeldSkills(ctx, g)
+  drawFeedMotes(ctx, g)
   drawEvolving(ctx, g)
 }

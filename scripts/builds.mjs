@@ -6,7 +6,8 @@
 //   node scripts/builds.mjs --pairs ember:jet:torch+gust    forms follow the skill, separated by colons
 //   node scripts/builds.mjs --forms                         each skill's four finished forms in every region
 //   flags: --rooms N per cell, --ring N, --seconds N cap per room, --gunless, --nofood (bot ignores food), --starve (nothing feeds),
-//          --waves (foes keep arriving near the hero, so kills measure killing power rather than walking; no clear times)
+//          --waves (foes keep arriving near the hero, so kills measure killing power rather than walking; no clear times),
+//          --gorged N (every skill recharges N seconds faster per second, what a running engine could do at most)
 //          --regions 0,4 --seed N --workers N --out file (resume from a results file) --top N
 // The bot walks to foes, shoots, and casts when a skill suits the moment. It never dodges, never sets up a
 // combo on purpose and only goes looking for food when --nofood is off, so read kills per minute as
@@ -111,7 +112,7 @@ const worker = async () => {
         input[key] = wants
       } else if (hand.type === 'swell') {
         const holding = (s.swell ?? 0) > 0
-        input[key] = wants ? !(holding && s.swell >= hand.time * 0.7) : false
+        input[key] = wants ? !(holding && s.swell >= 0.7) : false
       } else if (hand.type === 'toggle') {
         input[key] = wants !== Boolean(s.flowing) && !bot.was[slot]
       } else {
@@ -199,6 +200,10 @@ const worker = async () => {
   const playRoom = (loadout, theme, opts, tally) => {
     const g = createGame(null, 'playing', opts.ring)
     g.menus.length = 0
+    if (opts.starve && TUNING.feed) {
+      Object.keys(TUNING.feed.gain).forEach(k => { TUNING.feed.gain[k] = 0 })
+      Object.keys(TUNING.feed.refund).forEach(k => { TUNING.feed.refund[k] = 0 })
+    }
     g.bands = [theme, theme, theme, theme]
     g.bandFoes = g.bands.map(t => THEMES[t].foes.slice(0, 7))
     g.omen = null
@@ -231,9 +236,10 @@ const worker = async () => {
       g.pendingOffers = 0
       g.cards = []
       g.wares = []
-      if (opts.waves && t % 60 === 0 && g.enemies.filter(fighting).length < TUNING.run.foeLimit[opts.ring]) spawnWave(g, theme, opts, g.rooms[keyOf(g.x, g.y)])
+      if (opts.waves && t % 30 === 0 && g.enemies.filter(fighting).length < TUNING.run.foeLimit[opts.ring] + 2) spawnWave(g, theme, opts, g.rooms[keyOf(g.x, g.y)])
       p.hp = Math.max(p.hp, 1)
       const input = decide(g, bot)
+      if (opts.gorged) p.skills.forEach(s => { s.ready = Math.max(0, s.ready - TICK * opts.gorged) })
       step(g, input, TICK)
       if (g.world !== here || g.phase !== 'playing') {
         if (g.phase !== 'playing') tally.deaths += 1
@@ -272,10 +278,6 @@ const worker = async () => {
   }
 
   parentPort.on('message', ({ id, loadout: text, theme, opts }) => {
-    if (opts.starve && TUNING.feed) {
-      Object.keys(TUNING.feed.gain).forEach(k => { TUNING.feed.gain[k] = 0 })
-      Object.keys(TUNING.feed.refund).forEach(k => { TUNING.feed.refund[k] = 0 })
-    }
     Math.random = seededRandom(opts.seed * 1000003 + hash(`${text}|${theme}`))
     const loadout = parseLoadout(text)
     const tally = { rooms: 0, ticks: 0, kills: 0, worldKills: 0, hits: 0, cleared: 0, clearSeconds: 0, deaths: 0, casts: {}, fedTicks: {} }

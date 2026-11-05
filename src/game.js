@@ -8,7 +8,9 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOut
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
-import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
+import { SKILLS, SKILL_DETAILS, SKILL_NAMES, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
+import { TASTES, feedEvent, stepFeeds, stepHand } from './feed.js'
+import { addTaste, composeOffer, offerExists } from './offers.js'
 import { dust } from './feel.js'
 import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
@@ -272,7 +274,6 @@ const settleFlung = (g, f) => {
   const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
   if (!spot) return
   setCell(g.world, x + spot[0], y + spot[1], M.SCRAP)
-  if (f.charged) energize(g.world, x + spot[0], y + spot[1], 30)
   if (f.shrapnel) {
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2
@@ -640,14 +641,23 @@ const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
 }
 
 const OPTION_RESULTS = {
-  new: g => {
-    const kind = shuffled(unownedSkills(g))[0]
+  new: (g, { kind }) => {
     learnOrSwap(g, kind, () => {}, gm => dropCard(gm, kind))
   },
   upgrade: (g, option) => {
     evolve(g, option.skill, option.node)
   },
   relic: g => gainRelic(g, nextRelic(g)),
+  taste: (g, { kind, tag }) => {
+    addTaste(g.player, kind, tag)
+    const c = centre(g.player)
+    ring(g, c.x, c.y, TASTES[tag].colours[0], 26, 120)
+    g.pulse = 1
+  },
+  reform: (g, { skill, node, drop }) => {
+    g.player.upgrades.delete(drop.id)
+    evolve(g, skill, node)
+  },
   mend: g => {
     g.player.hp = P.hp
     g.player.bombs += 1
@@ -664,32 +674,15 @@ const chooseOption = (g, option) => {
   }
 }
 
-const forkChoices = p => {
-  const open = shuffled(availableUpgrades(p))
-  const chosen = open[0]?.skill
-  return [...open.filter(o => o.skill === chosen), ...open.filter(o => o.skill !== chosen)]
-}
-
-const fallbacks = g => [...(g.relicPool.length ? [{ type: 'relic', relic: g.relicPool[0] }] : []), { type: 'mend' }]
-
-const offersFor = (g, kinds) => {
-  const p = g.player
-  const forks = kinds.includes('upgrade') ? forkChoices(p) : []
-  const fresh = kinds.includes('new') && unownedSkills(g).length > 0 ? [{ type: 'new' }] : []
-  const third = slotsFull(p) ? [...forks.slice(2), ...fresh] : [...fresh, ...forks.slice(2)]
-  const rest = kinds.length > 1 && p.skills.length > 0 ? fallbacks(g) : []
-  return [...forks.slice(0, 2), ...third, ...rest].slice(0, 3)
-}
-
 const openOffer = (g, kinds = ['new', 'upgrade'], title = 'LEVEL UP') => {
-  const options = offersFor(g, kinds)
+  const options = composeOffer(g, kinds, unownedSkills(g), slotsFull(g.player))
   if (options.length === 0) return
   openMenu(g, {
     page: 'offer',
     layout: 'cards',
     back: false,
     title,
-    items: options.map(option => ({ option, run: gm => chooseOption(gm, option) })),
+    items: options.map(option => ({ option, card: option.card, run: gm => chooseOption(gm, option) })),
   })
 }
 
@@ -793,6 +786,25 @@ const onWardenKilled = (g, e) => {
 const killXp = (g, environmental) =>
   (environmental ? R.environmentXp : 1) * (1 + Math.min(R.chainXpCap, g.chain - 1) * R.chainXpStep)
 
+const blastJustNow = (g, c) => {
+  const recent = g.world.lastBlast && g.time - g.world.lastBlast.at < TUNING.feed.blastWindow ? [g.world.lastBlast] : []
+  return [...recent, ...g.world.events.filter(event => event.type === 'blast')]
+    .some(blast => Math.hypot(blast.x * BLOCK - c.x, blast.y * BLOCK - c.y) < (blast.reach + 3) * BLOCK)
+}
+
+const feedOnKill = (g, e, c, environmental) => {
+  if (environmental && e.lastCause === 'CRUSHED' && blastJustNow(g, c)) feedEvent(g, 'blastKill', c.x, c.y)
+  if (!environmental) return
+  const ally = g.enemies.filter(o => o.ally > 0 && o !== e).map(o => [Math.hypot(centre(o).x - c.x, centre(o).y - c.y), o]).filter(([d]) => d < TUNING.feed.allyReach).sort((a, b) => a[0] - b[0])[0]?.[1]
+  if (!ally) return
+  feedEvent(g, 'allyKill', c.x, c.y)
+  if (ally.pact) {
+    ally.ally = TUNING.skills.charm.time
+    ally.hp = Math.max(ally.hp, ENEMY_DEFS[ally.kind].hp)
+    ring(g, centre(ally).x, centre(ally).y, '#f4f8f2', 10, 50)
+  }
+}
+
 const onKill = (g, e) => {
   if (e.partOf || e.silent) return
   onDeath(g, e)
@@ -813,8 +825,9 @@ const onKill = (g, e) => {
   if (e.kind === 'mimic') gainRelic(g, nextRelic(g))
   const p = g.player
   const environmental = e.lastSource !== 'player'
-  if (hasRelic(p, 'battery') && environmental) p.skills.forEach(s => { s.ready = 0 })
+  feedOnKill(g, e, c, environmental)
   if (hasRelic(p, 'sack')) spillMatter(g, e, 3)
+  if (owns(p, 'repel.salvage')) salvage(g, e)
   const gained = environmental ? R.worldChain : 1
   const before = g.chainTime > 0 ? g.chain : 0
   g.chain = before + gained
@@ -962,27 +975,14 @@ const shoot = (g, p) => {
 const castSkill = (g, p, skill) => {
   const aim = p.aim
   if (ASSISTED_SKILLS.has(skill.kind)) p.aim = assisted(g, p, aim)
-  SKILLS[skill.kind](g, p)
+  const result = SKILLS[skill.kind](g, p)
   p.aim = aim
-  skill.ready = cooldownOf(p, skill.kind)
-}
-
-const nearFire = (g, p) => {
-  const reach = Math.ceil(R.hotHandsReach / BLOCK)
-  const [cx, cy] = [cell(p.x + p.w / 2), cell(p.y + p.h / 2)]
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) if (burningAt(g.world, cx + dx, cy + dy)) return true
-  }
-  return false
+  return result
 }
 
 const useSkills = (g, p, input, stunned, dt) => {
-  const rate = hasRelic(p, 'hands') && nearFire(g, p) ? R.hotHandsRate : 1
-  p.skills.forEach((skill, slot) => {
-    skill.ready -= dt * rate
-    const pressed = input[SKILL_ACTIONS[slot]] === true
-    if (!stunned && pressed && !p.wasSkills[slot] && skill.ready <= 0) castSkill(g, p, skill)
-  })
+  stepFeeds(g, p, dt)
+  p.skills.forEach((skill, slot) => stepHand(g, p, skill, input[SKILL_ACTIONS[slot]] === true, p.wasSkills[slot], stunned, dt, castSkill))
   SKILL_ACTIONS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
 }
 
@@ -1103,7 +1103,7 @@ const talkToInhabitants = (g, p) => {
       e.spent = true
       openBloodletter(g)
     }
-    if (e.kind === 'hermit' && availableUpgrades(p).length > 0) {
+    if (e.kind === 'hermit' && p.skills.length > 0 && offerExists(g, [])) {
       e.spent = true
       openOffer(g, ['upgrade'], 'THE HERMIT TEACHES')
     }
@@ -1166,6 +1166,7 @@ const usePickups = (g, p, dt) => {
     if (c.kind === 'coin') {
       g.gold += 1
       coinMote(g, c.x, c.y)
+      feedEvent(g, 'coin', c.x, c.y)
     } else if (c.kind === 'bomb') p.bombs += 1
     else if (c.kind === 'skull') {
       g.gold += c.coins
@@ -1586,10 +1587,7 @@ const stepEnemies = (g, dt) => {
     e.frozen -= dt
     if (e.ally > 0) {
       e.ally -= dt
-      if (e.ally <= 0) {
-        e.ally = 0
-        if (e.detonates) e.hp = 0
-      }
+      if (e.ally <= 0) e.ally = 0
     }
     stepElite(g, e, dt)
     applyHazards(g, e, dt)
@@ -1693,7 +1691,6 @@ const landFireball = (g, f) => {
     f.age = -1
     return
   }
-  if (f.comet) explode(g.world, x, y, 1)
   for (const [dx, dy] of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) {
     ignite(g.world, x + dx, y + dy)
     if (matAt(g.world, x + dx, y + dy) === M.ICE) setCell(g.world, x + dx, y + dy, M.WATER)
@@ -1784,7 +1781,11 @@ const stepEffects = (g, dt) => {
 const handleWorldEvents = g => {
   for (const event of g.world.events) {
     g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.12 + event.reach * 0.1 : 1)
-    if (event.type === 'blast') blastFx(g, event)
+    if (event.type === 'blast') {
+      blastFx(g, event)
+      g.world.lastBlast = { ...event, at: g.time }
+      feedEvent(g, 'blast', (event.x + 0.5) * BLOCK, (event.y + 0.5) * BLOCK)
+    }
   }
   g.world.events.length = 0
 }
