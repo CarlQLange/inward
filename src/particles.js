@@ -1,6 +1,5 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { isTouchLayout } from './layout.js'
-import { M } from './materials.js'
 import { matAt } from './world.js'
 import { cell, liquidAtPx, solidAt } from './physics.js'
 import { CORE_RING } from './map.js'
@@ -39,7 +38,7 @@ export const rgbOf = colour => {
 }
 
 const lumaOf = ([r, g, b]) => (0.3 * r + 0.59 * g + 0.11 * b) / 255
-const fourShade = rgb => FOUR[lumaOf(rgb) < 0.3 ? 0 : lumaOf(rgb) < 0.62 ? 1 : 2]
+const fourShade = rgb => FOUR[lumaOf(rgb) < 0.16 ? 0 : lumaOf(rgb) < 0.5 ? 1 : 2]
 const snapped = rgb => rgb.map(v => Math.round(v / 85) * 85)
 
 const TONES = {
@@ -70,6 +69,8 @@ export const mix = (colour, other, amount) => {
   return out
 }
 
+const LATER_KINDS = new Set(['pop', 'glint', 'ray', 'ghost', 'soul', 'mote'])
+
 const blank = () => ({ kind: 'spark', x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, colour: '', alt: '', size: 1, spin: 0, turn: 0, seed: 0, hold: 0, hits: 0, rest: false, tag: 0, nx: 0, ny: 0, ref: null })
 const pool = []
 const OVERFLOW = blank()
@@ -79,6 +80,7 @@ export const spawn = (g, kind, x, y, vx, vy, life, colour, alt = colour, size = 
   const cap = capOf()
   if (list.length >= cap || (list.length > cap * T.thinFrom && rnd() < T.thinning)) return OVERFLOW
   const era = eraOf(g)
+  if (era.shapes === 0 && LATER_KINDS.has(kind)) return OVERFLOW
   const p = pool.pop() ?? blank()
   const scaled = life * era.life * (isTouchLayout() ? T.touchLife : 1)
   p.kind = kind
@@ -148,8 +150,8 @@ const drawn = (p, dt) => {
   p.vy += (dy / d) * pullOf.strength * dt
 }
 
-const WEST = 1
-const SOUTH = 2
+const HIT_SIDE = 1
+const HIT_FLOOR = 2
 
 const air = (g, p, dt, gravity, terminal) => {
   const w = g.world
@@ -160,20 +162,20 @@ const air = (g, p, dt, gravity, terminal) => {
   let hit = 0
   const nx = p.x + p.vx * dt
   if (solidAt(w, nx, p.y)) {
-    hit |= WEST
+    hit |= HIT_SIDE
     p.x = p.vx > 0 ? cell(nx) * BLOCK - 1 : (cell(nx) + 1) * BLOCK
   } else p.x = nx
   const ny = p.y + p.vy * dt
   if (solidAt(w, p.x, ny)) {
-    hit |= SOUTH
+    hit |= HIT_FLOOR
     p.y = p.vy > 0 ? cell(ny) * BLOCK - 1 : (cell(ny) + 1) * BLOCK
   } else p.y = ny
   return hit
 }
 
 const rebound = (p, hit, keep, rub) => {
-  if (hit & WEST) p.vx *= -keep
-  if (hit & SOUTH) {
+  if (hit & HIT_SIDE) p.vx *= -keep
+  if (hit & HIT_FLOOR) {
     p.vy *= -keep
     p.vx *= rub
   }
@@ -208,15 +210,14 @@ export const glint = (g, x, y, colour, size = 2, life = 0.2) => spawn(g, 'glint'
 const stain = (g, p, hit, colour, length) => {
   if (rnd() >= eraOf(g).marks) return
   const w = g.world
-  if (hit & WEST) stainWall(w, p.x, p.y, Math.sign(p.vx) || 1, colour, length)
+  if (hit & HIT_SIDE) stainWall(w, p.x, p.y, Math.sign(p.vx) || 1, colour, length)
   else if (p.vy > 0) stainFloor(w, p.x, p.y, colour, length + 1)
   else stainCeiling(w, p.x, p.y, colour, length)
 }
 
 const fizzUp = (g, x, y, colour, alt, life = rand(0.35, 0.7)) => spawn(g, 'fizz', x, y, rand(-6, 6), rand(-22, -8), life, colour, alt)
 
-const LIQUIDS = { water: 0, oil: 1, lava: 2, acid: 3, gore: 4 }
-export const LIQUID = LIQUIDS
+export const LIQUID = { water: 0, oil: 1, lava: 2, acid: 3, gore: 4 }
 
 const toWall = (p, side, life) => {
   p.kind = 'run'
@@ -228,21 +229,21 @@ const toWall = (p, side, life) => {
 }
 
 const land = {
-  [LIQUIDS.water]: (g, p, hit) => {
+  [LIQUID.water]: (g, p, hit) => {
     stain(g, p, hit, mix(p.colour, '#102028', 0.45), 2)
     if (p.size < 1) return
     for (let i = 0; i < 2; i++) spawn(g, 'drop', p.x, p.y - 1, rand(-34, 34) - p.vx * 0.2, rand(-46, -14), 0.35, p.colour, p.alt, 0).tag = p.tag
   },
-  [LIQUIDS.oil]: (g, p, hit) => stain(g, p, hit, '#2c1c34', 4),
-  [LIQUIDS.lava]: (g, p, hit) => {
+  [LIQUID.oil]: (g, p, hit) => stain(g, p, hit, '#2c1c34', 4),
+  [LIQUID.lava]: (g, p, hit) => {
     stain(g, p, hit, '#ff7a22', 2)
     for (let i = 0; i < 2; i++) spawn(g, 'ember', p.x, p.y - 1, rand(-10, 10), rand(-30, -10), rand(0.3, 0.7), '#ffd24a', '#a03a18')
   },
-  [LIQUIDS.acid]: (g, p, hit) => {
+  [LIQUID.acid]: (g, p, hit) => {
     stain(g, p, hit, '#567a18', 3)
     for (let i = 0; i < 2; i++) fizzUp(g, p.x + rand(-1, 1), p.y - 1, p.colour, p.alt)
   },
-  [LIQUIDS.gore]: (g, p, hit) => {
+  [LIQUID.gore]: (g, p, hit) => {
     stain(g, p, hit, mix(p.colour, '#000000', 0.45), 2)
     if (p.size >= 1) spawn(g, 'drop', p.x, p.y - 1, rand(-26, 26), rand(-30, -10), 0.3, p.colour, p.alt, 0).tag = p.tag
   },
@@ -291,7 +292,7 @@ const STEP = {
     const falling = p.vy
     const hit = air(g, p, dt, 430, 300)
     if (!hit) return
-    if ((hit & SOUTH) && falling > 0 && falling < 40) return settle(p)
+    if ((hit & HIT_FLOOR) && falling > 0 && falling < 40) return settle(p)
     if (falling > 130 && !p.hits && eraOf(g).shapes > 1) dustPuff(g, p.x, p.y - 1, rand(-14, 14), rand(-10, -2), mix(p.colour, '#8c9884', 0.6))
     p.hits += 1
     p.turn *= 0.6
@@ -333,11 +334,11 @@ const STEP = {
     const speed = Math.hypot(p.vx, p.vy)
     const hit = air(g, p, dt, 470, 340)
     if (!hit) return
-    if ((hit & SOUTH) && falling > 0 && falling < 46) return settle(p)
+    if ((hit & HIT_FLOOR) && falling > 0 && falling < 46) return settle(p)
     if (speed > 50 && p.hits < 6) {
       p.tag = 0.07
       p.hits += 1
-      const up = hit & SOUTH ? -1 : 0
+      const up = hit & HIT_FLOOR ? -1 : 0
       for (let i = many(g, 2.4); i > 0; i--) spawn(g, 'spark', p.x, p.y, rand(-70, 70), up * rand(20, 90), rand(0.08, 0.2), '#ffe84a', '#ffffff').hits = 1
     }
     p.turn = -p.turn * 0.8
@@ -346,8 +347,8 @@ const STEP = {
   grain: (g, p, dt) => {
     p.vx *= 1 - 2.4 * dt
     const hit = air(g, p, dt, 340, 210)
-    if (hit & WEST) p.vx = 0
-    if (!(hit & SOUTH)) return
+    if (hit & HIT_SIDE) p.vx = 0
+    if (!(hit & HIT_FLOOR)) return
     if (p.vy > 0) {
       if (p.tag && eraOf(g).marks) addToPile(g.world, p.x, p.y, p.colour)
       p.life = 0
@@ -380,12 +381,12 @@ const STEP = {
     if (p.seed < 0 && eraOf(g).shapes > 1) {
       p.seed = rand(0.05, 0.12)
       const d = spawn(g, 'drop', p.x, p.y, p.vx * 0.2, p.vy * 0.2, 0.35, p.alt, p.alt, 0)
-      d.tag = LIQUIDS.gore
+      d.tag = LIQUID.gore
     }
     const hit = air(g, p, dt, 430, 320)
     if (!hit) return
-    land[LIQUIDS.gore](g, p, hit)
-    if (hit & WEST) toWall(p, Math.sign(p.vx) || 1, rand(0.5, 1.2))
+    land[LIQUID.gore](g, p, hit)
+    if (hit & HIT_SIDE) toWall(p, Math.sign(p.vx) || 1, rand(0.5, 1.2))
     else p.life = 0
   },
   run: (g, p, dt) => {
@@ -436,7 +437,7 @@ const STEP = {
     if (solidAt(g.world, p.x, p.y)) p.life = Math.min(p.life, 0.08)
   },
   drop: (g, p, dt) => {
-    const hit = air(g, p, dt, p.tag === LIQUIDS.oil ? 240 : 360, p.tag === LIQUIDS.oil ? 150 : 340)
+    const hit = air(g, p, dt, p.tag === LIQUID.oil ? 240 : 360, p.tag === LIQUID.oil ? 150 : 340)
     if (p.vy > 0 && liquidAtPx(g.world, p.x, p.y)) {
       if (p.size >= 1) g.ripples.push({ x: p.x, y: p.y, age: 0, power: 0.12 })
       if (g.ripples.length > 6) g.ripples.shift()
@@ -445,7 +446,7 @@ const STEP = {
     }
     if (!hit) return
     land[p.tag]?.(g, p, hit)
-    if ((hit & WEST) && p.size >= 1 && p.tag !== LIQUIDS.lava) toWall(p, Math.sign(p.vx) || 1, rand(0.4, 0.9))
+    if ((hit & HIT_SIDE) && p.size >= 1 && p.tag !== LIQUID.lava) toWall(p, Math.sign(p.vx) || 1, rand(0.4, 0.9))
     else p.life = 0
   },
   bubble: (g, p, dt) => {
@@ -607,13 +608,13 @@ const dot = (ctx, colour, x, y, w = 1, h = 1) => {
   ctx.fillRect(x, y, w, h)
 }
 
-export const softDisc = (ctx, x, y, radius, colour, alpha) => {
+export const softDisc = (ctx, x, y, radius, colour, alpha, softness = 0.2) => {
   ctx.fillStyle = colour
   ink = colour
   for (let layer = radius > 3 ? 3 : 2; layer > 0; layer--) {
     const r = Math.max(1, Math.round((radius * layer) / (radius > 3 ? 3 : 2)))
-    const narrow = Math.ceil(r * 0.6)
-    ctx.globalAlpha = alpha * 0.5
+    const narrow = r === 1 ? 0 : Math.round(r * 0.6)
+    ctx.globalAlpha = alpha * softness
     ctx.fillRect(x - r, y - narrow, r * 2 + 1, narrow * 2 + 1)
     ctx.fillRect(x - narrow, y - r, narrow * 2 + 1, r - narrow)
     ctx.fillRect(x - narrow, y + narrow + 1, narrow * 2 + 1, r - narrow)
@@ -650,7 +651,7 @@ const flushGlows = ctx => {
 }
 
 const lit = (era, p, radius, colour, strength = 0.8) => {
-  if (era.glow) halo(Math.round(p.x), Math.round(p.y), radius, colour, era.glow * strength)
+  if (era.glow) halo(Math.round(p.x), Math.round(p.y), radius, colour, era.glow * strength * Math.min(1, (p.life / p.max) * 2))
 }
 
 const square = (ctx, p) => {
@@ -694,7 +695,7 @@ const billow = (ctx, p, era, grow) => {
   if (overActor(x, y)) return
   if (era.soft) {
     const r = 1 + Math.round(age * grow) + (p.size >= 2 ? 1 : 0)
-    softDisc(ctx, x, y, r, p.colour, (1 - age) * 0.6)
+    softDisc(ctx, x, y, r, p.colour, (1 - age) * 0.6, 0.4)
     ctx.globalAlpha = 1
     return
   }
@@ -727,7 +728,7 @@ const DRAW = {
   },
   splinter: (ctx, p, era, clock) => tumble(ctx, p, era, 'splinter', clock),
   scrap: (ctx, p, era, clock) => {
-    tumble(ctx, p, era, 'scrap', clock, p.tag > 0 ? '#ffffff' : p.colour)
+    tumble(ctx, p, era, 'scrap', clock, p.tag > 0 && era.shapes > 1 ? '#ffffff' : p.colour)
     if (p.tag > 0) lit(era, p, 3, '#ffe84a', 0.7)
   },
   grain: (ctx, p) => dot(ctx, p.colour, Math.round(p.x), Math.round(p.y)),
@@ -812,7 +813,7 @@ const DRAW = {
       const wobble = Math.round(jitter(Math.floor(clock * 24) + i + p.tag, 1.4))
       dot(ctx, i < 3 ? p.colour : p.alt, Math.round(x - p.vx * i + p.nx * Math.abs(wobble)), Math.round(y - p.vy * i + p.ny * Math.abs(wobble)))
     }
-    dot(ctx, '#ffffff', x, y)
+    dot(ctx, era.shapes > 1 ? '#ffffff' : p.colour, x, y)
     lit(era, p, 3, p.colour, 0.7)
   },
   fork: (ctx, p, era, clock) => {
@@ -828,7 +829,7 @@ const DRAW = {
       ax = bx
       ay = by
     }
-    lit(era, p, 4, p.alt, 0.5)
+    lit(era, p, 3, p.alt, 0.3)
   },
   flame: (ctx, p, era) => {
     const age = 1 - p.life / p.max
@@ -950,6 +951,5 @@ export const drawParticles = (ctx, g) => {
   ink = ''
 }
 
-export const liquidTagOf = mat => ({ [M.WATER]: LIQUID.water, [M.OIL]: LIQUID.oil, [M.LAVA]: LIQUID.lava, [M.ACID]: LIQUID.acid })[mat] ?? LIQUID.water
 export const stainCell = (g, cx, cy, colour) => { if (rnd() < eraOf(g).marks) stainBlock(g.world, cx, cy, colour) }
 export const atMat = (g, x, y) => matAt(g.world, cell(x), cell(y))

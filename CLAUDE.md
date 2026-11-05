@@ -50,7 +50,7 @@ is drawn procedurally each frame. Creatures are named clips listed in `art/anim.
 `art/proof/body-sizes.json` into the table in `cast.js`, which drives shot boxes.
 
 Presentation is separate from the simulation. `hero.js` animates and draws the player,
-`fx.js` holds particles, shake, slow motion, door slides and the moments, `creatures.js`
+`fx.js` holds shake, slow motion, door slides and the moments, `particles.js` is the pooled particle kinds and the era ladder, `matter.js` says what each material, foe and death does and watches the world for changes, `marks.js` holds stains and piles, `projectiles.js` draws shots, fireballs and bolts, `creatures.js`
 draws foes and their squash, `scene.js` draws the room and its materials, `light.js`
 builds a small light map, and `present.js` runs the WebGL passes. The scene pass runs at
 game resolution, which keeps it cheap and keeps every distortion in chunky pixels. These

@@ -60,7 +60,7 @@ const PIECE = {
 }
 
 const SPREAD = {
-  chip: { speed: [25, 100], lift: 30, big: 0.3, count: 1 },
+  chip: { speed: [25, 100], lift: 30, big: 0.42, count: 1 },
   clod: { speed: [20, 70], lift: 30, big: 0.45, count: 0.8 },
   splinter: { speed: [30, 95], lift: 50, big: 0.45, count: 1.2 },
   scrap: { speed: [55, 135], lift: 55, big: 0.4, count: 0.9 },
@@ -449,7 +449,7 @@ const landedAt = (g, x, y, mat) => {
 }
 
 const pouringAt = (g, x, y, mat) => {
-  if (FAMILY[mat] !== 'grain') return
+  if (mat !== M.SAND) return
   const colours = coloursOf(mat)
   for (let i = many(g, 2); i > 0; i--) PIECE.grain(g, (x + rnd()) * BLOCK, y * BLOCK + 2, rand(-12, 12), rand(30, 80), pick(colours), colours[1])
 }
@@ -578,9 +578,14 @@ export const watchWorld = g => {
   const s = stateOf(w)
   if (s.fresh) return
   let changes = 0
-  for (let i = 0; i < SIZE; i++) if (w.mat[i] !== s.mat[i]) changedList[changes++] = i
+  let solids = 0
+  for (let i = 0; i < SIZE; i++) {
+    if (w.mat[i] === s.mat[i]) continue
+    changedList[changes++] = i
+    if (props(s.mat[i]).solid) solids += 1
+  }
   let budget = T.watchBudget
-  if (changes <= T.watchSkipAbove) {
+  if (solids <= T.watchSkipAbove) {
     for (let n = 0; n < changes && budget > 0; n++) {
       const i = changedList[n]
       if (cellChanged(g, w, s, i, s.mat[i], w.mat[i])) budget -= 1
@@ -604,7 +609,7 @@ export const watchWorld = g => {
       s.fell[i] += 1
       if (s.fell[i] > 14) {
         s.fell[i] = 0
-        if (props(w.mat[i]).falls && budget > 0) {
+        if (props(w.mat[i]).falls && props(w.mat[i]).solid && budget > 0) {
           landedAt(g, i % ROOM, Math.floor(i / ROOM), w.mat[i])
           budget -= 1
         }
@@ -734,6 +739,7 @@ const DEATH_EXTRA = {
   shocked: (g, c, e) => {
     for (let i = many(g, 6); i > 0; i--) forkAt(g, c.x, c.y, Math.max(e.w, e.h) + 6, '#ffe84a', '#bff2ff', rand(0.06, 0.16))
     for (let i = many(g, 6); i > 0; i--) spawn(g, 'spark', c.x, c.y, rand(-120, 120), rand(-120, 60), rand(0.08, 0.2), '#ffe84a', '#ffffff')
+    chargeBurst(g, c.x, e.y + e.h - 1, 10)
   },
   dissolved: (g, c, e) => {
     acidBurst(g, c.x, c.y + e.h / 3, 8)
@@ -913,9 +919,6 @@ export const followProjectiles = (g, dt) => {
   }
 }
 
-export const swimBubble = (g, x, y) => {
-  const p = spawn(g, 'bubble', x, y, 0, rand(-26, -14), rand(0.8, 1.6), '#bff2ff', '#bff2ff', rnd() < 0.5 ? 2 : 1)
-  return p
-}
+export const swimBubble = (g, x, y) => spawn(g, 'bubble', x, y, 0, rand(-26, -14), rand(0.8, 1.6), '#bff2ff', '#bff2ff', rnd() < 0.5 ? 2 : 1)
 
 export const wetAt = (g, x, y) => liquidAtPx(g.world, x, y)
