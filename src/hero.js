@@ -284,7 +284,7 @@ const anchorOf = (p, h, pose) => ({
   y: p.y + p.h + pose.body.y,
 })
 
-const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
+const stepNodes = (world, nodes, dt, dtWas, force, pinned, through = false) => {
   const scale = dt / dtWas
   nodes.forEach((n, i) => {
     if (i === 0 && pinned) return
@@ -329,7 +329,7 @@ const stepNodes = (world, nodes, dt, dtWas, force, pinned) => {
     b.y += dy * push
   }
   nodes.forEach((n, i) => {
-    if ((i === 0 && pinned) || !solidAt(world, n.x, n.y) || solidAt(world, n.px, n.py)) return
+    if (through || (i === 0 && pinned) || !solidAt(world, n.x, n.y) || solidAt(world, n.px, n.py)) return
     if (!solidAt(world, n.px, n.y)) n.x = n.px
     else if (!solidAt(world, n.x, n.py)) n.y = n.py
     else {
@@ -492,7 +492,7 @@ export const stepHero = (g, p, dt, carried = false) => {
     const root = h.nodes[0]
     root.x = anchor.x
     root.y = anchor.y
-    stepNodes(g.world, h.nodes, dtStep, h.dtWas, scarfForce(p, h), true)
+    stepNodes(g.world, h.nodes, dtStep, h.dtWas, scarfForce(p, h), true, p.digging > 0)
   }
   for (const shred of h.shreds) {
     shred.age += dt

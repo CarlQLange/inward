@@ -4,13 +4,13 @@ import { burningAt, lavaAt, matAt, setCell } from './world.js'
 import { SOIL, cell, cellsUnder, centre, hitsSolid, moveAxis, moveThrough, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { chunks } from './feel.js'
-import { hostile, muzzle, owns, thrown } from './skills.js'
+import { formOf, hostile, owns, thrown } from './skills.js'
 
 const S = TUNING.skills
 const C = S.clay
 const B = S.burrow
 
-export const MUD_TINT = '#b8a684'
+const MUD_TINT = '#b8a684'
 const N4 = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 const PICKS = new Set([M.SAND, M.ASH, M.SNOW, M.MUD])
 const SOFTENS = new Set([M.SAND, M.ASH, M.SNOW])
@@ -85,16 +85,19 @@ const daub = (g, p, e) => {
 const smear = (g, p, e) => {
   hurt(g, e, C.damage, 'player')
   e.ablaze = 0
+  const [x, y] = [cell(centre(e).x), cell(centre(e).y)]
   if (owns(p, 'clay.daub')) daub(g, p, e)
   else if (owns(p, 'clay.cast')) encase(g, p, e)
   else {
     e.stun = Math.max(e.stun, C.splatStun)
-    splat(g, p, cell(centre(e).x), cell(centre(e).y), 6)
+    splat(g, p, x, y, 6)
+    return
   }
+  if (owns(p, 'clay.bog')) soften(g, x, y + 1)
 }
 
 export const clay = (g, p) => {
-  thrown(g, p, p.aim, 'clod', { speed: C.speed, lift: C.lift, size: 5, colour: MUD_TINT, splashes: true })
+  thrown(g, p, p.aim, 'clod', { speed: C.speed, lift: C.lift, size: 5, colour: formOf(p, 'clay').tint ?? MUD_TINT, splashes: true })
   g.pulse = Math.max(g.pulse, 0.3)
 }
 
@@ -114,7 +117,7 @@ export const clodLands = (g, f, was, at, foe) => {
   splat(g, p, cell(was.x), cell(was.y), 6)
 }
 
-export const ballSize = f => Math.min(12, 5 + f.held * 0.45)
+const ballSize = f => Math.min(12, 5 + f.held * 0.45)
 
 const ballBox = f => {
   const size = ballSize(f)
@@ -326,7 +329,7 @@ const grind = (g, keys) => keys.filter(k => {
 
 const tunnelBehind = (g, state, now, soil) => {
   const kept = new Set(now)
-  state.cells.filter(k => !kept.has(k) && soil.has(g.world.mat[k])).forEach(k => setCell(g.world, k % ROOM, Math.floor(k / ROOM), M.EMPTY))
+  state.cells.filter(k => !kept.has(k) && soil.has(g.world.mat[k]) && props(g.world.mat[k]).solid).forEach(k => setCell(g.world, k % ROOM, Math.floor(k / ROOM), M.EMPTY))
 }
 
 const sink = (g, e) => {
@@ -401,5 +404,3 @@ export const swim = (g, p, input, dt) => {
   state.cells = now
   if (p.digging <= 0 && inside && hitsSolid(w, p)) surface(g, p)
 }
-
-export const burrowing = p => p.digging > 0
