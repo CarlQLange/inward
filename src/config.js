@@ -197,7 +197,7 @@ export const TUNING = {
     coil: { hop: 200, every: 1.5, speed: 40, energy: 16 },
     puffer: { near: 52, tell: 1, every: 4, spines: 8, spineSpeed: 95 },
     lantern: { near: 46, lunge: 120, lungeFor: 0.6, every: 2.5 },
-    warden: { world: 3, stuck: 30 },
+    warden: { world: 3, stuck: 30, pace: { 1: 1.5, 3: 1.2, 5: 1, 7: 1 } },
   },
   feel: {
     hurtStop: 0.09,

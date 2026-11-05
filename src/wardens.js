@@ -52,7 +52,7 @@ const runMoves = (g, e, dt, moves, pick) => {
     move_.during?.(g, e, dt)
     if (e.clock > 0) return
     move_.end?.(g, e)
-    Object.assign(e, { stage: 'rest', clock: move_.rest * (0.55 + 0.45 * (e.hp / e.maxHp)) })
+    Object.assign(e, { stage: 'rest', clock: move_.rest * (e.pace ?? 1) * (0.55 + 0.45 * (e.hp / e.maxHp)) })
   } else if (e.clock <= 0) {
     const next = pick(g, e)
     Object.assign(e, { move: next, stage: 'tell', clock: moves[next].tell, windup: true })
@@ -247,7 +247,7 @@ const crucibleMoves = {
       e.vx = toward(centre(e).x, centre(g.player).x) * 14
       e.x += e.vx * dt
       e.pourClock = (e.pourClock ?? 0) + dt
-      if (e.pourClock < 0.09) return
+      if (e.pourClock < 0.09 * (e.pace ?? 1)) return
       e.pourClock = 0
       const c = centre(e)
       const x = cell(c.x)

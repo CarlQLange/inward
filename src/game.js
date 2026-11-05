@@ -188,7 +188,7 @@ const arenaFor = (g, key, ring) => {
 const dressEnemy = (g, ring) => e => {
   if (e.warden) {
     const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.wardenHpPerRing))
-    return { ...e, hp, maxHp: hp, asleep: true }
+    return { ...e, hp, maxHp: hp, asleep: true, pace: TUNING.enemies.warden.pace[ring] ?? 1 }
   }
   const omen = omenFoes(g.omen)
   return {
