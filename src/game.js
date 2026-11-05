@@ -9,7 +9,8 @@ import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, pourAcid, recordTrail, spillNapalm, stepDash } from './skills.js'
 import { chunks, dust } from './feel.js'
-import { scheme, skillKey, usesMouse } from './controls.js'
+import { SKILL_ACTIONS, skillAction } from './controls.js'
+import { rumble } from './pad.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
 import { dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
@@ -18,7 +19,6 @@ import { clearRun, knownNotes, loadRun, persist, recordRun, save, saveRun } from
 const P = TUNING.player
 const R = TUNING.run
 const CARD_SIZES = { core: [16, 16] }
-const SKILL_KEYS = ['skill', 'skill2', 'skill3', 'skill4']
 const ALL_SKILLS = Object.keys(SKILLS)
 
 const shuffled = list => list.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
@@ -359,10 +359,10 @@ const createRun = (depthOverride, quickRing = null) => {
     environmentKills: 0,
     menus: [],
     menuHeld: {},
+    menuRepeat: {},
     wasPause: false,
     wasSkillsPage: false,
     pendingOffers: 0,
-    toast: { title: starter.name, text: scheme().intro, life: 8 },
     rekindle: 0,
     newBest: false,
     summaryShown: false,
@@ -375,10 +375,11 @@ const createRun = (depthOverride, quickRing = null) => {
     g.lastTheme = -1
     enterRoom(g, x, y)
     placeAtDoor(g)
-    g.toast = { title: `QUICKSTART: RING ${quickRing + 1}`, text: 'RECORDS ARE NOT KEPT. TAB SHOWS YOUR SKILLS.', life: 6 }
+    g.toast = { title: `QUICKSTART: RING ${quickRing + 1}`, text: 'RECORDS ARE NOT KEPT.', life: 6 }
     g.shownDepth = g.depth
   } else {
     enterRoom(g, ...map.start)
+    g.toast = { title: starter.name, text: '', prompts: [['move', 'MOVE'], ['jump', 'JUMP'], ['shoot', 'SHOOT'], ['look', 'LOOK']], life: 8 }
   }
   return g
 }
@@ -406,8 +407,8 @@ const learn = (g, kind) => {
   const p = g.player
   p.skills.push({ kind, ready: 0 })
   g.cardPool = g.cardPool.filter(s => s !== kind)
-  const key = skillKey(p.skills.length - 1)
-  showToast(g, `${SKILL_NAMES[kind]}: PRESS ${key}`, SKILL_DETAILS[kind])
+  showToast(g, SKILL_NAMES[kind], SKILL_DETAILS[kind])
+  g.toast.prompts = [[skillAction(p.skills.length - 1), '']]
   g.pulse = 1
   g.shake = Math.max(g.shake, 3)
   if (!g.awake) {
@@ -440,11 +441,15 @@ const chooseOption = (g, option) => {
     showToast(g, option.node.name, option.node.text)
     g.pulse = 1
   }
-  if (g.menus.length === 0) p.wasJump = true
+  if (g.menus.length === 0) {
+    p.wasJump = true
+    p.wasBomb = true
+  }
 }
 
 const openOffer = (g, kinds = ['new', 'upgrade'], title = 'LEVEL UP') => {
   const p = g.player
+  rumble(0.6, 220)
   const options = []
   if (kinds.includes('new') && unownedSkills(g).length > 0) options.push({ type: 'new' })
   if (kinds.includes('new') && hasRelic(p, 'dice') && unownedSkills(g).length > 1) options.push({ type: 'new' })
@@ -563,17 +568,39 @@ const crouch = (world, p, wants) => {
   }
 }
 
+const snapToFlat = (x, y, snap) => {
+  const angle = Math.atan2(Math.abs(y), Math.abs(x))
+  const eased = Math.max(0, angle - snap) * (Math.PI / 2) / (Math.PI / 2 - snap)
+  return { x: Math.sign(x) * Math.cos(eased), y: Math.sign(y) * Math.sin(eased) }
+}
+
+const stickAim = (p, { x, y, free }, planted) => {
+  const F = TUNING.feel
+  const lifted = free || planted || !p.grounded ? y : Math.min(0, y)
+  if (!free && Math.abs(x) < 0.2 && lifted >= 0) return { x: p.facing, y: 0 }
+  const aim = snapToFlat(x, lifted, free ? F.snapFree : p.grounded ? F.snapRun : F.snapAir)
+  if (Math.abs(aim.x) > 0.05) p.facing = aim.x < 0 ? -1 : 1
+  return aim
+}
+
 const aimFrom = (p, input) => {
-  if (usesMouse() && input.pointer) {
+  const F = TUNING.feel
+  if (input.pointer) {
     const from = muzzle(p)
     const dx = input.pointer.x - from.x
     const dy = input.pointer.y - from.y
     const length = Math.hypot(dx, dy)
     if (length > 2) {
       if (Math.abs(dx) > 1) p.facing = dx < 0 ? -1 : 1
+      p.assist = 0
       return { x: dx / length, y: dy / length }
     }
   }
+  if (input.aim) {
+    p.assist = F.assistStick
+    return stickAim(p, input.aim, input.plant)
+  }
+  p.assist = F.assistAngle
   const x = input.left ? -1 : input.right ? 1 : 0
   const y = input.up ? -1 : input.down && (!p.grounded || input.plant) ? 1 : 0
   if (x === 0 && y === 0) return { x: p.facing, y: 0 }
@@ -582,11 +609,11 @@ const aimFrom = (p, input) => {
 }
 
 const assisted = (g, p, aim) => {
-  if (usesMouse()) return aim
+  if (!p.assist) return aim
   const from = muzzle(p)
   const F = TUNING.feel
   let best = null
-  let bestAngle = F.assistAngle
+  let bestAngle = p.assist
   for (const e of g.enemies) {
     if (e.friendly || e.ally) continue
     const c = centre(e)
@@ -649,10 +676,10 @@ const castSkill = (g, p, skill) => {
 const useSkills = (g, p, input, stunned, dt) => {
   p.skills.forEach((skill, slot) => {
     skill.ready -= dt
-    const pressed = input[SKILL_KEYS[slot]] === true
+    const pressed = input[SKILL_ACTIONS[slot]] === true
     if (!stunned && pressed && !p.wasSkills[slot] && skill.ready <= 0) castSkill(g, p, skill)
   })
-  SKILL_KEYS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
+  SKILL_ACTIONS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
 }
 
 const finishRun = (g, phase) => {
@@ -945,7 +972,7 @@ const stepPlayer = (g, input, dt) => {
   const change = P.accel * dt * (p.drift > 0 ? 0.15 : 1)
   p.drift -= dt
   p.vx += Math.max(-change, Math.min(change, towards - p.vx))
-  if (wish !== 0 && !usesMouse()) p.facing = wish
+  if (wish !== 0 && !input.pointer && !input.aim?.free) p.facing = wish
   p.aim = aimFrom(p, input)
 
   const vine = vineAt(world, cell(middle), cell(p.y + p.h / 2))
@@ -1027,7 +1054,8 @@ const stepPlayer = (g, input, dt) => {
   recordTrail(p, dt)
 
   p.shotReady -= dt
-  if (!stunned && input.shoot && p.shotReady <= 0) shoot(g, p)
+  if (!input.shoot) p.holdFire = false
+  if (!stunned && input.shoot && !p.holdFire && p.shotReady <= 0) shoot(g, p)
   useSkills(g, p, input, stunned, dt)
   if (!stunned) throwBomb(g, p, input)
   p.iframes -= dt
@@ -1271,6 +1299,7 @@ const handleWorldEvents = g => {
     g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.5 + event.reach * 0.25 : 1)
     if (event.type !== 'blast') continue
     g.shake = Math.max(g.shake, 3 + event.reach * 2)
+    rumble(0.35 + event.reach * 0.2, 120 + event.reach * 60)
     burst(g, (event.x + 0.5) * BLOCK, (event.y + 0.5) * BLOCK, 'fire', 8 + event.reach * 6)
   }
   g.world.events.length = 0
@@ -1307,7 +1336,7 @@ export const continueRun = g => {
   const fresh = createRun(g.depthOverride)
   saved.taught = new Set()
   const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => [key, unpackRoom(room, saved.map)]))
-  const player = { ...saved.player, upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
+  const player = { ...saved.player, skills: saved.player.skills.slice(0, P.skillSlots), upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
   Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter })
   enterRoom(g, saved.x, saved.y)
   g.shownDepth = g.depth

@@ -8,7 +8,8 @@ import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
 import { RELIC_BY_ID } from './relics.js'
-import { COMMON_HELP, scheme, skillKey } from './controls.js'
+import { CONTROL_ROWS, promptFor, skillAction } from './controls.js'
+import { PROMPT_HEIGHT, drawPrompt, drawPromptRow, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
 const DIM = '#3d7a3c'
@@ -39,6 +40,7 @@ const drawList = (ctx, menu, top) => {
     const on = i === menu.selected
     const y = top + i * 11
     centred(ctx, label, y, on ? YELLOW : PALE)
+    menu.hits.push({ index: i, x: ROOM_PX / 2 - textWidth(label) / 2 - 10, y: y - ORIGIN.y - 3, w: textWidth(label) + 20, h: 11 })
     if (on) drawText(ctx, '+', CENTRE - textWidth(label) / 2 - 8, y, YELLOW)
   })
   const detail = menu.items[menu.selected]?.detail
@@ -63,7 +65,6 @@ const drawTitle = (ctx, g, menu) => {
   panel(ctx, CENTRE - 56, ORIGIN.y + 86, 112, 12 + menu.items.length * 11)
   drawList(ctx, menu, ORIGIN.y + 94)
   if (save.best > 0) centred(ctx, `BEST ${save.best}`, ORIGIN.y + 186, YELLOW)
-  centred(ctx, `CONTROLS: ${scheme().name}`, ORIGIN.y + 212, DIM)
 }
 
 const drawPause = (ctx, menu) => {
@@ -89,12 +90,11 @@ const drawOptions = (ctx, menu) => {
 
 const drawControls = (ctx, menu) => {
   sheet(ctx, menu.title)
-  const lines = [...scheme().help, ...COMMON_HELP]
-  centred(ctx, `${scheme().name}: CHANGE IN OPTIONS`, ORIGIN.y + 28, DIM)
-  lines.forEach(([key, action], i) => {
-    const y = ORIGIN.y + 38 + i * 12
-    drawText(ctx, key, ORIGIN.x + 16, y, YELLOW)
-    drawText(ctx, action, ORIGIN.x + 72, y, PALE)
+  const shown = CONTROL_ROWS.filter(([action]) => [action].flat().some(promptFor))
+  shown.forEach(([action, word], i) => {
+    const y = ORIGIN.y + 32 + i * 13
+    drawPromptRow(ctx, [action].flat(), ORIGIN.x + 72, y)
+    drawText(ctx, word, ORIGIN.x + 104, y + 2, PALE)
   })
   drawList(ctx, menu, ORIGIN.y + 196)
 }
@@ -126,13 +126,13 @@ const drawSkills = (ctx, g, menu) => {
     const skill = p.skills[slot]
     const on = slot === menu.slot && skill
     panel(ctx, ORIGIN.x + 12, top, 22, 22, on ? YELLOW : skill ? GREEN : FAINT)
-    drawText(ctx, skillKey(slot), ORIGIN.x + 38, top + 2, skill ? (on ? YELLOW : GREEN) : FAINT)
+    drawPrompt(ctx, skillAction(slot), ORIGIN.x + 38, top)
     if (!skill) {
-      drawText(ctx, 'EMPTY', ORIGIN.x + 38, top + 10, FAINT)
+      drawText(ctx, 'EMPTY', ORIGIN.x + 38, top + 11, FAINT)
       continue
     }
     ctx.drawImage(SPRITES.icons[skill.kind], ORIGIN.x + 15, top + 3)
-    drawText(ctx, SKILL_NAMES[skill.kind], ORIGIN.x + 38, top + 10, on ? YELLOW : WHITE)
+    drawText(ctx, SKILL_NAMES[skill.kind], ORIGIN.x + 38, top + 11, on ? YELLOW : WHITE)
   }
   const chosen = p.skills[menu.slot]
   if (chosen) {
@@ -260,6 +260,7 @@ const drawCard = (ctx, card, x, y, w, h, on) => {
     drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 32 + name.length * 7 + n * 6, PALE)
   })
   if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, DIM)
+  if (card.prompt) drawPrompt(ctx, card.prompt, x + (w - promptWidth(card.prompt)) / 2, y + h - PROMPT_HEIGHT - 3)
 }
 
 const drawCards = (ctx, menu, cards) => {
@@ -272,8 +273,11 @@ const drawCards = (ctx, menu, cards) => {
   const top = ORIGIN.y + 66
   centred(ctx, menu.title, ORIGIN.y + 36, YELLOW, menu.title.length > 18 ? 1 : 2)
   if (menu.subtitle) wrapText(menu.subtitle, 50).forEach((line, n) => centred(ctx, line, ORIGIN.y + 50 + n * 6, PALE))
-  cards.forEach((card, i) => drawCard(ctx, card, left + i * (w + gap), top, w, 90, i === menu.selected))
-  centred(ctx, 'LEFT AND RIGHT, THEN Z', top + 98, DIM)
+  cards.forEach((card, i) => {
+    const x = left + i * (w + gap)
+    drawCard(ctx, card, x, top, w, 90, i === menu.selected)
+    menu.hits.push({ index: i, x: x - ORIGIN.x, y: top - ORIGIN.y, w, h: 90 })
+  })
 }
 
 const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW }
@@ -347,13 +351,27 @@ const PAGES = {
 
 export const drawMenus = (ctx, g) => {
   const menu = g.menus.at(-1)
-  if (menu) PAGES[menu.page](ctx, g, menu)
+  if (!menu) return
+  menu.hits = []
+  PAGES[menu.page](ctx, g, menu)
+  drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
+}
+
+const drawToastPrompts = (ctx, prompts, y) => {
+  const widths = prompts.map(([action, word]) => promptWidth(action) + (word ? textWidth(word) + 2 : 0))
+  const total = widths.reduce((a, b) => a + b + 6, -6)
+  prompts.reduce((x, [action, word], i) => {
+    const drawn = drawPrompt(ctx, action, x, y)
+    if (word) drawText(ctx, word, x + drawn + 2, y + 2, PALE)
+    return x + widths[i] + 6
+  }, CENTRE - total / 2)
 }
 
 export const drawToast = (ctx, g) => {
   if (!g.toast) return
   const lines = wrapText(g.toast.text, 48)
-  const h = 12 + lines.length * 6 + (g.toast.title ? 7 : 0)
+  const prompts = g.toast.prompts ?? []
+  const h = 12 + (g.toast.text ? lines.length * 6 : 0) + (g.toast.title ? 7 : 0) + (prompts.length ? 11 : 0)
   const y = ORIGIN.y + 6
   panel(ctx, CENTRE - 100, y, 200, h)
   let row = y + 5
@@ -361,5 +379,6 @@ export const drawToast = (ctx, g) => {
     centred(ctx, g.toast.title, row, YELLOW)
     row += 8
   }
-  lines.forEach((line, n) => centred(ctx, line, row + n * 6, PALE))
+  if (g.toast.text) lines.forEach((line, n) => centred(ctx, line, row + n * 6, PALE))
+  if (prompts.length) drawToastPrompts(ctx, prompts, row + (g.toast.text ? lines.length * 6 : 0))
 }

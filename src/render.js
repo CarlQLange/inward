@@ -9,7 +9,8 @@ import { save } from './store.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
 import { keyOf } from './map.js'
-import { scheme, skillKey, usesMouse } from './controls.js'
+import { skillAction } from './controls.js'
+import { drawPrompt, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -380,20 +381,12 @@ const drawLeftHud = (ctx, g) => {
       ctx.fillStyle = ready * 6 > i ? GREEN : DIM
       ctx.fillRect(x + i * 5 + 1, top + 34, 4, 2)
     }
-    drawText(ctx, skillKey(slot), x - 7, top + 2, skill ? GREEN : DIM)
+    drawPrompt(ctx, skillAction(slot), x - 2 - promptWidth(skillAction(slot)), top)
   }
   for (let i = 0; i < TUNING.player.hp; i++) {
     const jolt = g.hurtFlash > 0.4 ? Math.round((Math.random() - 0.5) * 3) : 0
     ctx.drawImage(i < g.player.hp ? SPRITES.heart : SPRITES.heartEmpty, x - 7 + (i % 4) * 9 + jolt, ORIGIN.y + 152 + Math.floor(i / 4) * 7)
   }
-  drawText(ctx, 'ESC MENU', x - 7, ORIGIN.y + 168, DIM)
-  drawText(ctx, 'TAB SKILLS', x - 7, ORIGIN.y + 175, DIM)
-  drawText(ctx, 'M MAP', x - 7, ORIGIN.y + 182, DIM)
-  drawText(ctx, 'SHIFT LOOK', x - 7, ORIGIN.y + 189, DIM)
-  const { jump, shoot, bomb } = scheme().labels
-  drawText(ctx, `${jump} JUMP`, x - 7, ORIGIN.y + 198, DIM)
-  drawText(ctx, `${shoot} SHOOT`, x - 7, ORIGIN.y + 205, DIM)
-  drawText(ctx, `${bomb} BOMB`, x - 7, ORIGIN.y + 212, DIM)
 }
 
 const drawMinimap = (ctx, g, x) => {
@@ -417,6 +410,7 @@ const drawRightHud = (ctx, g) => {
   drawText(ctx, g.gold, x + 10, y, COLOURS.charge)
   drawIcon(ctx, 'bomb', x + 28, y - 1, 7)
   drawText(ctx, g.player.bombs, x + 38, y, COLOURS.pale)
+  drawPrompt(ctx, 'bomb', x + 47, y - 2)
   const level = `L${g.level}`
   drawText(ctx, level, x + span - textWidth(level), y, GREEN)
   y += 8
@@ -510,7 +504,7 @@ export const draw = (ctx, g, pointer) => {
   drawOverlays(ctx, g.world, g.time)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
-  if (usesMouse() && pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
+  if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
   if (g.looking) drawLook(ctx, g)
   if (g.hurtFlash > 0) {
     ctx.fillStyle = `rgba(255, 40, 30, ${0.45 * g.hurtFlash})`

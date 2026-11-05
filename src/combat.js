@@ -2,6 +2,7 @@ import { TUNING } from './config.js'
 import { props } from './materials.js'
 import { acidAt, burningAt, chargedAt, crushingAt, explode, lavaAt, matAt, vineAt } from './world.js'
 import { cell, cellsUnder, centre } from './physics.js'
+import { rumble } from './pad.js'
 
 export const burst = (g, x, y, colour, count) => {
   for (let i = 0; i < count; i++) {
@@ -27,6 +28,7 @@ const hurtPlayer = (g, p, cause) => {
   p.iframes = TUNING.player.iframes
   p.lastCause = cause
   g.hurtFlash = 1
+  rumble(p.hp <= 0 ? 1 : 0.7, p.hp <= 0 ? 400 : 180)
   g.hitstop = Math.max(g.hitstop, TUNING.feel.hurtStop)
   g.shake = Math.max(g.shake, 5)
   p.vy = -TUNING.feel.hurtKick
