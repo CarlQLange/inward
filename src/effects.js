@@ -113,7 +113,10 @@ const LANDS = {
       plantBottle(g, f, was, foe)
       return
     }
-    if (foe) hurt(g, foe, S.flask.damage, 'player')
+    if (foe) {
+      hurt(g, foe, S.flask.damage, 'player')
+      foe.stun = Math.max(foe.stun, S.flask.stun)
+    }
     if (foe && f.drip) coat(foe, f.mat, f.cells)
     else spill(g, cell(was.x), cell(was.y), f.mat, f.cells)
   },
@@ -208,7 +211,7 @@ const stepBottle = (g, f, dt) => {
   const box = { x: f.x - 3, y: f.y - 3, w: 6, h: 6 }
   const shot = g.shots.find(s => overlap(s, box))
   if (shot) shot.life = 0
-  const struck = shot || g.fireballs.some(b => overlap(b, box)) || g.flung.some(b => overlap(b, box))
+  const struck = shot || g.fireballs.some(b => overlap(b, box)) || g.flung.some(b => overlap(b, box)) || (f.rider && f.rider.iframes > 0 && f.age > 0.1)
   if (struck || heated(g.world, cell(f.x), cell(f.y))) breakBottle(g, f)
 }
 

@@ -127,11 +127,11 @@ export const FORKS = {
     [form('mirror.parry', 'PARRY', 'SHORTER. EACH RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
   flask: [
-    [form('flask.hose', 'HOSE', 'HOLD TO POUR IT OUT IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'IT LANDS WHOLE. SHOOT IT TO BREAK IT', WHITE)],
-    [form('flask.drip', 'DRIP', 'FOES IT HITS DRIP IT WHERE THEY GO', ACID), form('flask.leech', 'LEECH', 'ALSO SOAKS FOES. IT HURTS THEM', BLOOD)],
+    [form('flask.hose', 'HOSE', 'HOLD TO POUR IT OUT IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'THE FLASK LANDS WHOLE. SHOOT IT TO BREAK IT', WHITE)],
+    [form('flask.drip', 'DRIP', 'FOES IT HITS DRIP THE LIQUID WHERE THEY GO', ACID), form('flask.leech', 'LEECH', 'ALSO SOAKS LIQUID FROM FOES. IT HURTS THEM', BLOOD)],
   ],
   wick: [
-    [form('wick.trail', 'TRAIL', 'THE FUSE FOLLOWS YOUR FEET', CHARGE), form('wick.sleeper', 'SLEEPER', 'STAYS UNLIT UNTIL SHOT OR BURNED', GAS)],
+    [form('wick.trail', 'TRAIL', 'LAYS THE FUSE WHERE YOU WALK', CHARGE), form('wick.sleeper', 'SLEEPER', 'THE FUSE STAYS UNLIT UNTIL SHOT OR BURNED', GAS)],
     [form('wick.tow', 'TOW', 'FOES ON THE FUSE ARE DRAGGED TO THE END', BLOOD), form('wick.kiln', 'KILN', 'THE BURNT FUSE TURNS TO BRICK', STONE)],
   ],
 }

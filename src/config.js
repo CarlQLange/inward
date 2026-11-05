@@ -94,7 +94,7 @@ export const TUNING = {
     mine: { every: 2.4, stock: 3, reach: 40, life: 40, trigger: 16, damage: 3, radius: 28, limpetFuse: 1.6, farReach: 130 },
     roar: { every: 4, reach: 62, shoutStep: 0.03, shoutRange: 190, shoutShove: 300, swellTime: 1.4, swellMin: 0.6, swellMax: 2.1, swellBreaks: 1.6, forms: { 'roar.shout': 3 } },
     mirror: { every: 4.5, life: 1.3, parryLife: 0.3, paneLife: 5, paneReach: 26, paneHalf: 15, shotReturn: 200, seekLife: 2, seekTurn: 9 },
-    flask: { every: 1.3, most: 12, reach: 44, soakEvery: 0.04, throwSpeed: 180, throwLift: 50, damage: 2, pourEvery: 0.06, pourSpeed: 200, bottles: 3, bottleLife: 40, dripEvery: 0.28, leechReach: 40, leechEvery: 0.3, leechDamage: 1, leechCells: 2, forms: { 'flask.hose': 2.2 } },
+    flask: { every: 1.3, most: 12, reach: 44, soakEvery: 0.04, throwSpeed: 180, throwLift: 50, damage: 3, stun: 0.5, pourEvery: 0.06, pourSpeed: 200, bottles: 3, bottleLife: 40, dripEvery: 0.28, leechReach: 40, leechEvery: 0.3, leechDamage: 1, leechCells: 2, forms: { 'flask.hose': 2.2 } },
     wick: { every: 2.6, most: 20, least: 5, drop: 6, layRate: 28, burnRate: 7.5, holdMost: 6, bang: 2, damage: 3, radius: 24, sparkDamage: 1, trailMost: 48, sleepers: 3, towMost: 4 },
   },
   feed: {

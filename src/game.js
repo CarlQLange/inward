@@ -78,7 +78,7 @@ const LOCK_OPENERS = {
   peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick'],
   gate: ['bolt', 'rod', 'acid', 'blink', 'melt', 'wick'],
   brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
-  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy'],
+  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick'],
   scrap: ['repel', 'hammer', 'well', 'grapple', 'acid', 'blink'],
 }
 const LOCKS = Object.keys(LOCK_OPENERS)
