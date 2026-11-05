@@ -16,17 +16,18 @@ export const MATERIAL_COLOURS = {
   [M.WATER]: ['#6fd0e0', '#bff2ff'], [M.OIL]: ['#a06ab0', '#5a3a66'], [M.LAVA]: ['#ff9a2e', '#ffe84a'], [M.ACID]: ['#c8ff5a', '#7fd030'],
   [M.ASH]: ['#8c8c84', '#5a5a54'], [M.VINE]: ['#6f9f40', '#a8c84a'], [M.FLOE]: ['#bff2ff', '#ffffff'], [M.RIME]: ['#d8f8ff', '#ffffff'],
   [M.STILL]: ['#8a9c3e', '#5e6e30'],
+  [M.GLASS]: ['#d6f6f0', '#ffffff'], [M.MUD]: ['#6e5234', '#4c3622'], [M.SNOW]: ['#eef4f4', '#c2d0d8'],
 }
 
 const coloursOf = mat => MATERIAL_COLOURS[mat] ?? ['#c9d4c0', '#8a9484']
 
 const FAMILY = {
   [M.ROCK]: 'chip', [M.BRICK]: 'chip', [M.BEDROCK]: 'chip', [M.STILL]: 'chip',
-  [M.MOSS]: 'clod', [M.PEAT]: 'clod',
+  [M.MOSS]: 'clod', [M.PEAT]: 'clod', [M.MUD]: 'clod',
   [M.WOOD]: 'splinter', [M.VINE]: 'splinter',
   [M.METAL]: 'scrap', [M.GATE]: 'scrap', [M.SCRAP]: 'scrap',
-  [M.SAND]: 'grain', [M.ASH]: 'grain',
-  [M.ICE]: 'shard', [M.FLOE]: 'shard', [M.RIME]: 'shard',
+  [M.SAND]: 'grain', [M.ASH]: 'grain', [M.SNOW]: 'grain',
+  [M.ICE]: 'shard', [M.FLOE]: 'shard', [M.RIME]: 'shard', [M.GLASS]: 'shard',
   [M.VOLATILE]: 'crystal',
 }
 
@@ -433,6 +434,34 @@ const crustedAt = (g, x, y) => {
   for (let i = many(g, 2); i > 0; i--) PIECE.chip(g, px + rand(-3, 3), y * BLOCK, rand(-30, 30), rand(-50, -20), '#3a3028', '#ff7a22', 1)
 }
 
+const glazedAt = (g, x, y) => {
+  const px = (x + 0.5) * BLOCK
+  const py = (y + 0.5) * BLOCK
+  for (let i = many(g, 3); i > 0; i--) glint(g, px + rand(-3, 3), py + rand(-3, 3), '#ffffff', rnd() < 0.4 ? 3 : 2, rand(0.18, 0.32))
+  spawn(g, 'pop', px, py, 0, 0, 0.16, '#d6f6f0', '#d6f6f0', 6)
+  for (let i = many(g, 2); i > 0; i--) emberAt(g, px + rand(-3, 3), py - 2, '#ffd24a')
+}
+
+const soakedAt = (g, x, y) => {
+  const px = (x + 0.5) * BLOCK
+  const colours = coloursOf(M.MUD)
+  for (let i = many(g, 3); i > 0; i--) PIECE.clod(g, px + rand(-3, 3), y * BLOCK, rand(-16, 16), rand(-34, -12), pick(colours), colours[1], 1)
+}
+
+const bakedAt = (g, x, y) => {
+  hissAt(g, x, y)
+  const px = (x + 0.5) * BLOCK
+  for (let i = many(g, 3); i > 0; i--) PIECE.chip(g, px + rand(-3, 3), y * BLOCK, rand(-26, 26), rand(-46, -16), '#9a6a40', '#ff7a22', 1)
+}
+
+const grownAt = (g, x, y) => burstOf(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, '#8ad05a', 4)
+
+const TURNS = new Map([
+  [[M.SAND, M.GLASS], glazedAt], [[M.ICE, M.GLASS], glazedAt], [[M.FLOE, M.GLASS], glazedAt],
+  [[M.SAND, M.MUD], soakedAt], [[M.ASH, M.MUD], soakedAt], [[M.MUD, M.BRICK], bakedAt],
+  [[M.STEAM, M.SNOW], (g, x, y) => frozenAt(g, x, y)], [[M.ASH, M.MOSS], grownAt],
+].map(([[was, now], fx]) => [was * 64 + now, fx]))
+
 const landedAt = (g, x, y, mat) => {
   const px = (x + 0.5) * BLOCK
   const py = (y + 1) * BLOCK - 1
@@ -522,10 +551,16 @@ const movedTo = (w, s, was, i, step) => {
 }
 
 const ICY = new Set([M.ICE, M.FLOE, M.RIME])
+const THAWS = new Set([...ICY, M.SNOW])
 
 const cellChanged = (g, w, s, i, was, now) => {
   const x = i % ROOM
   const y = Math.floor(i / ROOM)
+  const turned = TURNS.get(was * 64 + now)
+  if (turned) {
+    turned(g, x, y)
+    return true
+  }
   const before = props(was)
   const after = props(now)
   if (before.falls || before.floats) {
@@ -553,7 +588,7 @@ const cellChanged = (g, w, s, i, was, now) => {
     return true
   }
   if (!before.solid && was !== M.VINE) return false
-  if (ICY.has(was) && now === M.WATER) {
+  if (THAWS.has(was) && now === M.WATER) {
     meltedAt(g, x, y)
     return true
   }
@@ -661,6 +696,8 @@ export const emitWorld = g => {
       chargedAt(g, x, y, mat)
     } else if (mat === M.WATER && matAt(w, x, y + 1) !== M.WATER && !props(matAt(w, x, y + 1)).solid && rnd() < 0.12) {
       dropOf(g, (x + rnd()) * BLOCK, (y + 1) * BLOCK, 0, 10, '#6fd0e0', 0.8)
+    } else if (mat === M.MUD && matAt(w, x, y - 1) !== M.MUD && !props(matAt(w, x, y - 1)).solid) {
+      if (rnd() < 0.05) spawn(g, 'pop', (x + rnd()) * BLOCK, y * BLOCK, 0, 0, 0.2, '#7a5c3a', '#7a5c3a', 3)
     } else if (ICY.has(mat) && matAt(w, x, y + 1) === M.EMPTY && era.tail > 2 && rnd() < 0.05) {
       dropOf(g, (x + rnd()) * BLOCK, (y + 1) * BLOCK, 0, 6, '#bff2ff', 0.7)
     } else if (mat === M.EMPTY && era.soft && rnd() < 0.015) {
@@ -674,7 +711,7 @@ export const FOE_MATTER = {
   bomber: 'scrap', imp: 'shard', emberbat: 'cinder', slime: 'goo', crab: 'chip', nest: 'splinter', mimic: 'splinter', gasbag: 'puff',
   tick: 'chip', pillbug: 'chip', gnat: 'feather', stilt: 'chip', snapweed: 'splinter', scrapper: 'scrap', dripper: 'goo', shade: 'ink',
   urchin: 'chip', coil: 'scrap', puffer: 'puff', lantern: 'crystal', lamp: 'scrap', battery: 'scrap', tank: 'scrap', carboy: 'shard',
-  ladle: 'scrap', mole: 'gib', hermit: 'gib', miner: 'gib', cartographer: 'gib', tinker: 'gib', bloodletter: 'gib', orbit: 'gib',
+  ladle: 'scrap', sandbag: 'clod', mole: 'gib', hermit: 'gib', miner: 'gib', cartographer: 'gib', tinker: 'gib', bloodletter: 'gib', orbit: 'gib',
   bellows: 'scrap', colossus: 'chip', crucible: 'scrap', eel: 'gib', eelseg: 'gib', brood: 'gib', conductor: 'scrap', core: 'crystal',
 }
 

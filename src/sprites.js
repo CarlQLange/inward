@@ -29,6 +29,17 @@ const FLAMES = [
 
 const HEART = ['.gg.gg.', 'ggggggg', 'ggggggg', '.ggggg.', '..ggg..', '...g...']
 
+const SNOW = [
+  ['aaaaaaaa', 'aaabaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaaacaa', 'aacaaaaa', 'aaaaaaaa', 'caaabaac'],
+  ['aaaaaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaacaaa', 'aaaaaaaa', 'aaabaaca', 'caaaaaaa', 'aacaaaba'],
+]
+const MUD = [
+  ['aaaaaaaa', 'aacaaaaa', 'aaaaaaba', 'abaaaaaa', 'aaaaacaa', 'aaaaaaaa', 'abaaaaba', 'aaacaaaa'],
+  ['aaaaaaaa', 'aaaaaaca', 'abaaaaaa', 'aaaacaaa', 'aaaaaaaa', 'acaaaaba', 'aaaaaaaa', 'aaabaaca'],
+]
+const SNOW_COLOURS = { a: '#e4ecee', b: '#c2d0d8', c: '#ffffff' }
+const MUD_COLOURS = { a: '#4c3622', b: '#33251a', c: '#6e5234' }
+
 const TILE_INDEX = {
   rock: [0, 1], brick: [12], moss: [2], peat: [3], wood: [4], metal: [5], scrap: [6],
   bedrock: [7], sand: [8], volatile: [9], gate: [11], ice: [15],
@@ -122,6 +133,7 @@ export const SPRITES = {
   ash: paint(ASH, { b: '#5a5a52', c: '#8a8a80' }),
   flames: FLAMES.map(rows => paint(rows, { f: '#d9531c', g: '#ff9a2e', y: '#ffe84a' })),
   heart: paint(HEART, { g: '#76d648' }),
+  painted: { snow: SNOW.map(rows => paint(rows, SNOW_COLOURS)), mud: MUD.map(rows => paint(rows, MUD_COLOURS)) },
   heartEmpty: paint(HEART, { g: '#26542a' }),
 }
 
@@ -171,6 +183,7 @@ export const loadSprites = async () => {
   for (const [name, indices] of Object.entries(TILE_INDEX)) {
     SPRITES.tiles[name] = indices.map(i => cutTile(tiles, i, 8))
   }
+  Object.assign(SPRITES.tiles, SPRITES.painted)
   SPRITES.extra.bones = cutTile(tiles, 13, 8)
   SPRITES.extra.fungus = cutTile(tiles, 14, 8)
   SPRITES.extra.charred = cutTile(tiles, 10, 8)

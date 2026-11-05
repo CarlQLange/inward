@@ -22,6 +22,7 @@ const TILE = {
   [M.BEDROCK]: 'bedrock', [M.ROCK]: 'rock', [M.MOSS]: 'moss', [M.PEAT]: 'peat',
   [M.WOOD]: 'wood', [M.METAL]: 'metal', [M.GATE]: 'gate', [M.SAND]: 'sand',
   [M.SCRAP]: 'scrap', [M.VOLATILE]: 'volatile', [M.ICE]: 'ice', [M.BRICK]: 'brick', [M.SOURCE]: 'metal',
+  [M.SNOW]: 'snow', [M.MUD]: 'mud',
 }
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
@@ -147,6 +148,33 @@ const paintEdges = (ctx, world, x, y) => {
   if (!isSolid(world, x, y + 1)) ctx.fillRect(x * BLOCK, y * BLOCK + BLOCK - 1, BLOCK, 1)
 }
 
+const GLASS_FILL = 'rgba(150, 214, 206, 0.22)'
+const GLASS_FRAME = 'rgba(214, 246, 240, 0.92)'
+const GLASS_GLINT = '#ffffff'
+
+const paintGlass = (ctx, world, x, y) => {
+  const px = x * BLOCK
+  const py = y * BLOCK
+  const pane = (dx, dy) => matAt(world, x + dx, y + dy) === M.GLASS
+  ctx.fillStyle = GLASS_FILL
+  ctx.fillRect(px, py, BLOCK, BLOCK)
+  ctx.fillStyle = GLASS_FRAME
+  if (!pane(0, -1)) ctx.fillRect(px, py, BLOCK, 1)
+  if (!pane(0, 1)) ctx.fillRect(px, py + BLOCK - 1, BLOCK, 1)
+  if (!pane(-1, 0)) ctx.fillRect(px, py, 1, BLOCK)
+  if (!pane(1, 0)) ctx.fillRect(px + BLOCK - 1, py, 1, BLOCK)
+  if ((x + y) % 2) return
+  ctx.fillStyle = GLASS_GLINT
+  for (let k = 0; k < 3; k++) ctx.fillRect(px + 2 + k, py + 5 - k, 1, 1)
+}
+
+const paintMudTop = (ctx, world, x, y) => {
+  if (matAt(world, x, y - 1) === M.MUD) return
+  ctx.fillStyle = '#7a5c3a'
+  const h = hash(x, y)
+  for (let k = 0; k < BLOCK; k++) if ((h >> k) & 1) ctx.fillRect(x * BLOCK + k, y * BLOCK, 1, 1)
+}
+
 const paintFixture = (ctx, x, y, [r, g, b]) => {
   const px = x * BLOCK + 3
   const py = y * BLOCK
@@ -165,6 +193,10 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
       if (m === M.ASH) ctx.drawImage(SPRITES.ash, x * BLOCK, y * BLOCK)
+      if (m === M.GLASS) {
+        paintGlass(ctx, world, x, y)
+        continue
+      }
       const name = TILE[m]
       if (!name) continue
       const tile = tileFor(name, x, y, theme, look)
@@ -179,7 +211,8 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
           ctx.fillStyle = `rgba(255, 255, 255, ${look.raised})`
           ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
         }
-        paintEdges(ctx, world, x, y)
+        if (m === M.MUD) paintMudTop(ctx, world, x, y)
+        else paintEdges(ctx, world, x, y)
       }
     }
   }
@@ -189,7 +222,7 @@ const paintTerrain = (ctx, world, theme, look, seed) => {
 
 const terrain = { canvas: blank(ROOM_PX, ROOM_PX), drawn: new Uint8Array(ROOM * ROOM), world: null, key: '', version: 0 }
 
-const drawnMat = m => (props(m).solid || m === M.ASH ? m : 0)
+const drawnMat = m => (props(m).solid || props(m).thick || m === M.ASH ? m : 0)
 
 export const terrainLayer = (world, theme, look, seed) => {
   const key = `${theme}|${look.row}|${seed}|${world.scorches?.length ?? 0}|${world.scorches?.at(-1)?.x}`
@@ -204,7 +237,7 @@ export const terrainLayer = (world, theme, look, seed) => {
   return terrain
 }
 
-const LIQUID_TINT = { [M.WATER]: 'rgba(14, 70, 88, 0.3)', [M.OIL]: 'rgba(40, 22, 48, 0.42)', [M.ACID]: 'rgba(84, 186, 36, 0.3)' }
+const LIQUID_TINT = { [M.WATER]: 'rgba(14, 70, 88, 0.3)', [M.OIL]: 'rgba(40, 22, 48, 0.42)', [M.ACID]: 'rgba(84, 186, 36, 0.3)', [M.MUD]: 'rgba(58, 38, 20, 0.62)' }
 
 export const drawSubmergedTint = (ctx, world) => {
   ctx.globalCompositeOperation = 'source-atop'
@@ -276,7 +309,7 @@ const drawOverlays = (ctx, world, time) => {
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
-      if (m === M.VOLATILE || m === M.ICE) drawGlint(ctx, x, y, time, m)
+      if (m === M.VOLATILE || m === M.ICE || m === M.GLASS) drawGlint(ctx, x, y, time, m)
       if (burningAt(world, x, y)) drawBurning(ctx, world, x, y, time)
       if (chargedAt(world, x, y)) {
         if (!busy || hash(x, y) % 3 === 0) drawArc(ctx, x, y)
@@ -358,8 +391,24 @@ const drawEffects = (ctx, time, effects, player) => {
   }
 }
 
+const FLUNG_TILE = { ...TILE, [M.FLOE]: 'ice' }
+
+const drawShard = (ctx, f) => {
+  const x = Math.round(f.x)
+  const y = Math.round(f.y)
+  const tilt = Math.floor(f.age * 18) % 2
+  ctx.fillStyle = GLASS_FRAME
+  ctx.fillRect(x + 1, y, 2, 4)
+  ctx.fillRect(x, y + 1 + tilt, 4, 2 - tilt)
+  ctx.fillStyle = GLASS_GLINT
+  ctx.fillRect(x + 1 + tilt, y + 1, 1, 1)
+}
+
 const drawFlung = (ctx, flung) => {
-  for (const f of flung) ctx.drawImage(SPRITES.tiles.scrap[0], Math.round(f.x), Math.round(f.y))
+  for (const f of flung) {
+    if (f.shard) drawShard(ctx, f)
+    else ctx.drawImage((SPRITES.tiles[FLUNG_TILE[f.mat]] ?? SPRITES.tiles.scrap)[0], Math.round(f.x), Math.round(f.y))
+  }
 }
 
 const DOOR_BARS = {

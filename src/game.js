@@ -5,7 +5,8 @@ import { STARTERS, TITLE_ROOM } from './room.js'
 import { beginMoment, stepMoment } from './moment.js'
 import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
-import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
+import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, miredAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
+import { LOOSE_EVENTS, stepMagnets } from './loose.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
@@ -259,6 +260,7 @@ const buildRoom = (g, x, y) => {
       })
   const world = createWorld(definition.map, ring === CORE_RING || hasKeystone(g.player, 'overload'))
   world.drains = definition.drains ?? []
+  world.cold = THEMES[themeIndex]?.cold === true
   return {
     x, y, ring, links,
     theme: themeIndex,
@@ -278,11 +280,12 @@ const buildRoom = (g, x, y) => {
 }
 
 const settleFlung = (g, f) => {
-  const x = cell(f.x + 4)
-  const y = cell(f.y + 4)
-  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
+  if (f.shard) return
+  const x = cell(f.x + f.w / 2)
+  const y = cell(f.y + f.h / 2)
+  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => [M.EMPTY, M.SMOKE, M.STEAM, M.METHANE].includes(matAt(g.world, x + dx, y + dy)))
   if (!spot) return
-  setCell(g.world, x + spot[0], y + spot[1], M.SCRAP)
+  setCell(g.world, x + spot[0], y + spot[1], f.mat ?? M.SCRAP)
   if (f.shrapnel) {
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2
@@ -415,11 +418,11 @@ const packRoom = room => ({
   drains: room.world.drains, world: encodeWorld(room.world),
 })
 
-const unpackRoom = (packed, map, overloaded) => ({
-  ...packed,
-  links: map.links[keyOf(packed.x, packed.y)] ?? {},
-  world: restoreWorld(packed.world, packed.ring === CORE_RING || overloaded, packed.drains),
-})
+const unpackRoom = (packed, map, overloaded) => {
+  const world = restoreWorld(packed.world, packed.ring === CORE_RING || overloaded, packed.drains)
+  world.cold = THEMES[packed.theme]?.cold === true
+  return { ...packed, links: map.links[keyOf(packed.x, packed.y)] ?? {}, world }
+}
 
 const storeRun = g => {
   if (g.phase !== 'playing') return
@@ -1712,6 +1715,7 @@ const stepPlayer = (g, input, dt) => {
   const middle = p.x + p.w / 2
   const swimming = liquidAtPx(world, middle, p.y + p.h / 2)
   const wading = liquidAtPx(world, middle, p.y + p.h - 1)
+  const mired = miredAtPx(world, middle, p.y + p.h - 1)
   const headUnder = liquidAtPx(world, middle, p.y - 4)
   applyCrush(g, p)
   const stunned = p.stun > 0
@@ -1757,6 +1761,9 @@ const stepPlayer = (g, input, dt) => {
       p.jumpHeld = true
       p.sinceJump = 1
       p.sinceGround = 1
+    } else if (mired) {
+      p.vy = -P.swimStroke
+      p.sinceJump = 1
     } else if (p.clinging > 0) {
       p.vy = -P.jump
       p.vx = -p.facing * R.wallKick
@@ -2040,19 +2047,21 @@ const stepFireballs = (g, dt) => {
 
 const stepFlung = (g, dt) => {
   const F = TUNING.flung
+  stepMagnets(g, dt)
   for (const f of g.flung) {
     f.age += dt
     f.vy += F.gravity * dt
     const blocked = moveAxis(g.world, f, 'x', f.vx * dt) || moveAxis(g.world, f, 'y', f.vy * dt)
     const victim = g.enemies.find(e => e !== f.thrower && !e.stowed && !e.intangible && !(f.thrower?.warden && e.partOf) && overlap(f, e))
     if (victim) {
-      hurt(g, victim, F.damage)
+      hurt(g, victim, f.damage ?? F.damage, 'world', f.cause)
       victim.stun = Math.max(victim.stun, F.stun)
+      if (f.shard) f.life = 0
     }
-    if (!f.safe && f.age > F.friendlyAfter && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
-    if (blocked) {
+    if (!f.safe && f.age > (f.armed ?? F.friendlyAfter) && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
+    if (blocked || f.life <= f.age) {
       settleFlung(g, f)
-      chipsAt(g, f.x + 4, f.y + 4, M.SCRAP, 5)
+      chipsAt(g, f.x + f.w / 2, f.y + f.h / 2, f.mat ?? M.SCRAP, f.shard ? 2 : 5)
       f.age = -1
     }
   }
@@ -2099,6 +2108,10 @@ const stepEffects = (g, dt) => {
 
 const handleWorldEvents = g => {
   for (const event of g.world.events) {
+    if (LOOSE_EVENTS[event.type]) {
+      LOOSE_EVENTS[event.type](g, event)
+      continue
+    }
     g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.12 + event.reach * 0.1 : 1)
     if (event.type === 'blast') {
       blastFx(g, event)

@@ -11,7 +11,7 @@ const ART = {
 const ANCHORS = {
   fish: 'free', spore: 'free', bat: 'free', jelly: 'free', emberbat: 'free', gasbag: 'free', puffer: 'free', lantern: 'free',
   urchin: 'free', shade: 'free', gnat: 'free', core: 'free', eel: 'free', eelseg: 'free', orbit: 'free',
-  snapweed: 'hang', dripper: 'hang', brood: 'hang', crucible: 'hang', lamp: 'hang', battery: 'hang', tank: 'hang', carboy: 'hang', ladle: 'hang', turret: 'wall',
+  snapweed: 'hang', dripper: 'hang', brood: 'hang', crucible: 'hang', lamp: 'hang', battery: 'hang', tank: 'hang', carboy: 'hang', ladle: 'hang', sandbag: 'hang', turret: 'wall',
 }
 
 const ART_ALIAS = { eel: 'eelhead', eelseg: 'eelbody' }

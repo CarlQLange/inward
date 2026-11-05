@@ -3,7 +3,7 @@ import { M, props } from './materials.js'
 import { matAt } from './world.js'
 
 const solid = (w, x, y) => x < 0 || y < 0 || x >= ROOM || y >= ROOM || props(matAt(w, x, y)).solid === true
-const swimmable = (w, x, y) => [M.WATER, M.OIL].includes(matAt(w, x, y))
+const swimmable = (w, x, y) => [M.WATER, M.OIL, M.MUD].includes(matAt(w, x, y))
 
 export const keyAt = (x, y) => y * ROOM + x
 export const cellOf = key => ({ x: key % ROOM, y: Math.floor(key / ROOM) })

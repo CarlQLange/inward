@@ -46,6 +46,7 @@ export const ENEMY_DEFS = {
   tank: { size: [12, 9], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
   carboy: { size: [8, 10], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
   ladle: { size: [10, 9], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
+  sandbag: { size: [8, 10], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
   mole: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [10] },
   hermit: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [11] },
   miner: { size: [14, 20], hp: 3, value: 0, friendly: true, sprite: [12] },
@@ -725,7 +726,7 @@ export const STEPPERS = {
   crawler: walker(E.crawler.speed), spitter, fish, jelly, bat, spore, slug, worm,
   turret, bomber, imp, emberbat, slime, crab, nest, mimic, gasbag,
   tick, pillbug, gnat, stilt, snapweed, scrapper, dripper, shade, coil, puffer, lantern,
-  lamp, battery: lamp, tank: lamp, carboy: lamp, ladle: lamp,
+  lamp, battery: lamp, tank: lamp, carboy: lamp, ladle: lamp, sandbag: lamp,
   urchin: walker(E.urchin.speed),
   mole: idle, hermit: idle, miner: idle, cartographer: idle, tinker: idle, bloodletter: idle,
 }
@@ -772,12 +773,13 @@ const discharge = (g, e, c) => {
   g.pulse = Math.max(g.pulse, 0.5)
 }
 
-const VATS = { tank: [M.WATER, '#6fd0e0'], carboy: [M.ACID, '#c8ff5a'], ladle: [M.LAVA, '#ff9a2e'] }
+const VATS = { tank: [M.WATER, '#6fd0e0'], carboy: [M.ACID, '#c8ff5a'], ladle: [M.LAVA, '#ff9a2e'], sandbag: [M.SAND, '#e2d28c'] }
 
 const spill = (g, e, c) => {
-  const [liquid, colour] = VATS[e.kind]
-  pour(g.world, cell(c.x), cell(e.y + e.h + 1), liquid, E.vat[e.kind])
-  splash(g, c.x, e.y + e.h, 60, colour)
+  const [matter, colour] = VATS[e.kind]
+  pour(g.world, cell(c.x), cell(e.y + e.h + 1), matter, E.vat[e.kind])
+  if (props(matter).liquid) splash(g, c.x, e.y + e.h, 60, colour)
+  else chipsAt(g, c.x, e.y + e.h, matter, 8)
 }
 
 export const onDeath = (g, e) => {
