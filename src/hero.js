@@ -523,6 +523,7 @@ const drawFlash = (ctx, tip, h, angle) => {
   ctx.fillStyle = '#fff3b4'
   for (let i = 1; i <= size; i++) {
     ctx.fillRect(Math.round(x + Math.cos(angle) * (i + 1)), Math.round(y + Math.sin(angle) * (i + 1)), 1, 1)
+    if (i > 2) continue
     ctx.fillRect(Math.round(x + Math.cos(angle + 1.57) * i), Math.round(y + Math.sin(angle + 1.57) * i), 1, 1)
     ctx.fillRect(Math.round(x + Math.cos(angle - 1.57) * i), Math.round(y + Math.sin(angle - 1.57) * i), 1, 1)
   }

@@ -1266,7 +1266,7 @@ const stepEffects = (g, dt) => {
 
 const handleWorldEvents = g => {
   for (const event of g.world.events) {
-    g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.5 + event.reach * 0.25 : 1)
+    g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.12 + event.reach * 0.1 : 1)
     if (event.type === 'blast') blastFx(g, event)
   }
   g.world.events.length = 0

@@ -89,7 +89,7 @@ void main() {
   float spot = max(step(distance(centre, SPOT), 0.012), step(distance(centre, SPOT_DEEP), 0.012));
 
   vec2 fromCentre = p - 0.5;
-  float spread = (depth * depth * 1.3 + pulse * 2.2 + aberration * 2.6) / view.x;
+  float spread = (depth * depth * 1.3 + pulse * 2.2 + aberration * 1.7) / view.x;
   vec3 colour = vec3(
     texture2D(screen, p + fromCentre * spread * 2.0).r,
     centre.g,
@@ -111,7 +111,8 @@ void main() {
     vec2 lightUv = (p - room.xy) / (room.zw - room.xy);
     vec3 light = texture2D(lightMap, lightUv).rgb;
     light = floor(light * 7.0 + 0.5) / 7.0;
-    vec3 lit = colour * (lighting.x + light * 1.5) + light * light * 0.32;
+    float already = luma(colour);
+    vec3 lit = colour * (lighting.x + light * (1.5 - already * 1.3)) + light * light * 0.16 * (1.0 - already);
     colour = mix(colour, lit, lighting.y);
   }
 
@@ -144,7 +145,7 @@ void main() {
     colour = mix(colour, paper, flash);
     vec2 edge = min(uv - room.xy, room.zw - uv) / (room.zw - room.xy);
     float rim = 1.0 - smoothstep(0.0, 0.22, min(edge.x, edge.y));
-    colour = mix(colour, SPOT, clamp(hurt * (0.12 + rim * 0.75), 0.0, 1.0));
+    colour = mix(colour, SPOT, clamp(hurt * (0.07 + rim * 0.62), 0.0, 1.0));
   }
 
   float dull = luma(colour);

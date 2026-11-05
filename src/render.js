@@ -201,9 +201,11 @@ const drawReticle = (ctx, pointer) => {
   for (const [dx, dy] of [[-4, 0], [-3, 0], [3, 0], [4, 0], [0, -4], [0, -3], [0, 3], [0, 4]]) ctx.fillRect(x + dx, y + dy, 1, 1)
 }
 
+const DOOR_VECTORS = { right: [-1, 0], left: [1, 0], up: [0, 1], down: [0, -1] }
+
 const drawChain = (ctx, g) => {
   if (g.chain < 2) return
-  const scale = Math.min(6, 2 + Math.floor(g.chain / 3)) + (g.chainPunch > 0.4 ? 1 : 0)
+  const scale = Math.min(5, 2 + Math.floor(g.chain / 4)) + (g.chainPunch > 0.4 ? 1 : 0)
   const text = `${g.chain}`
   const width = (textWidth(text) + 4) * scale
   const x = ROOM_PX - width - 8
@@ -233,9 +235,23 @@ const drawSubmerged = (ctx, g, p) => {
   }
 }
 
+const carryOffset = g => {
+  if (!g.door) return { x: 0, y: 0 }
+  const fade = 1 - doorOffset(g).t
+  const [ux, uy] = DOOR_VECTORS[g.door.dir]
+  const { x, y } = g.door.heroFrom
+  return {
+    x: Math.round((x - (g.player.x - ux * ROOM_PX)) * fade),
+    y: Math.round((y - (g.player.y - uy * ROOM_PX)) * fade),
+  }
+}
+
 const drawHeroLayer = (ctx, g) => {
   const p = g.player
+  const carry = carryOffset(g)
+  ctx.translate(carry.x, carry.y)
   drawHero(ctx, g, p)
+  ctx.translate(-carry.x, -carry.y)
   drawSubmerged(ctx, g, p)
   const choking = (p.smoked ?? 0) / TUNING.player.smokeTolerance
   if (choking > 0.1 && g.phase === 'playing') {
@@ -247,8 +263,6 @@ const drawHeroLayer = (ctx, g) => {
     ctx.fillRect(x, y - 4, Math.round(8 * Math.min(1, choking)), 1)
   }
 }
-
-const DOOR_VECTORS = { right: [-1, 0], left: [1, 0], up: [0, 1], down: [0, -1] }
 
 const oldRoom = document.createElement('canvas')
 oldRoom.width = oldRoom.height = ROOM_PX
@@ -271,7 +285,7 @@ const drawRoom = (ctx, g, pointer) => {
     ctx.drawImage(oldRoom, Math.round(ux * slide.t * ROOM_PX), Math.round(uy * slide.t * ROOM_PX))
     ctx.translate(Math.round(-ux * (1 - slide.t) * ROOM_PX), Math.round(-uy * (1 - slide.t) * ROOM_PX))
   }
-  drawScene(ctx, g, room, true)
+  drawScene(ctx, g, { ...room, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
   drawChain(ctx, g)
   if (g.phase !== 'title') drawHeroLayer(ctx, g)
   drawProjectiles(ctx, g)

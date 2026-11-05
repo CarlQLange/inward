@@ -1,7 +1,7 @@
 import { BLOCK, HUD_ANCHORS, ORIGIN, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { matAt } from './world.js'
-import { cell, centre, liquidAtPx, solidAt } from './physics.js'
+import { centre, liquidAtPx, solidAt } from './physics.js'
 import { SCARF_RED, heroFired, heroOf, stepHero } from './hero.js'
 
 const MAX_PARTICLES = 420
@@ -240,7 +240,7 @@ export const killFx = (g, e) => {
 export const roomClearFx = g => {
   const at = g.lastKill ?? centre(g.player)
   slowMo(g, 0.55, 0.22)
-  zoomPunch(g, at.x, at.y, 0.2)
+  zoomPunch(g, at.x, at.y, 0.2, 0.3)
   g.doorPulse = 1.8
   addRing(g, at.x, at.y, 240, 3.5, 0.5, 9)
   rumble(g, 0.5)
@@ -610,7 +610,7 @@ export const drawMotes = (ctx, g) => {
 }
 
 export const beginDoor = (g, dir, from) => {
-  g.door = { dir, from, t: 0, time: F.doorTime }
+  g.door = { dir, from, t: 0, time: F.doorTime, heroFrom: { x: g.player.x, y: g.player.y } }
 }
 
 export const doorOffset = g => {
@@ -618,5 +618,3 @@ export const doorOffset = g => {
   const t = Math.min(1, g.door.t / g.door.time)
   return { t: t * t * (3 - 2 * t), dir: g.door.dir }
 }
-
-export const particleCell = (x, y) => [cell(x), cell(y)]

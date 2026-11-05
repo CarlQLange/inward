@@ -283,7 +283,7 @@ const drawLiquids = (ctx, world, time, ripples) => {
 
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 const GAS_COLOURS = { [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#b07cd8' }
-const GAS_LEVELS = [2, 4, 6, 9]
+const GAS_LEVELS = [1, 3, 5, 7]
 const GAS_TILE = 16
 
 const makeGasTile = (colour, level) => {
@@ -309,7 +309,8 @@ const drawGas = (ctx, world, time) => {
       if (!tiles) continue
       const around = isGas(world, x - 1, y) + isGas(world, x + 1, y) + isGas(world, x, y - 1) + isGas(world, x, y + 1)
       const life = world.life[y * ROOM + x]
-      const level = Math.max(0, Math.min(3, Math.floor(around / 2) + (life > 1.5 ? 1 : 0) + (life > 4 ? 1 : 0) - (life < 0.6 ? 1 : 0)))
+      const swell = Math.round(Math.sin(x * 0.8 + time * 0.7) + Math.cos(y * 1.1 - time * 0.5))
+      const level = Math.max(0, Math.min(3, Math.floor(around / 2) + (life > 1.5 ? 1 : 0) - (life < 0.6 ? 1 : 0) + swell))
       const drift = Math.floor(time * GAS_DRIFT[m])
       const sway = Math.floor(Math.sin(time * 0.8 + y * 0.5) * 2)
       const sx = (x * BLOCK + sway + 64) % BLOCK

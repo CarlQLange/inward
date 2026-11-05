@@ -1,6 +1,5 @@
 import { BLOCK, ROOM } from './config.js'
 import { M } from './materials.js'
-import { keyOf } from './map.js'
 import { heroOf } from './hero.js'
 
 export const LIGHT_SIZE = 56
@@ -132,5 +131,3 @@ export const buildLight = (g, time) => {
   }
   return bytes
 }
-
-export const roomKey = g => keyOf(g.x, g.y)
