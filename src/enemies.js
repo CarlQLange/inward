@@ -5,7 +5,7 @@ import { cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt, W
 import { burst, hurt } from './combat.js'
 import { chipsAt, splash } from './fx.js'
 import { decoyFor } from './effects.js'
-import { zap } from './skills.js'
+import { aimSpot, zap } from './skills.js'
 import { anchorOf } from './cast.js'
 
 const P = TUNING.player
@@ -102,10 +102,25 @@ export const foeOf = (g, e) => {
   }
   const decoy = decoyFor(g)
   if (decoy) {
-    const reach = decoy.loud ? 400 : TUNING.skills.decoy.range
+    const reach = decoy.loud ? 400 : TUNING.skills.blink.ghostRange
     if (Math.hypot(decoy.x - e.x, decoy.y - e.y) < reach) return { x: decoy.x + 4, y: decoy.y + 8 }
   }
   return centre(g.player)
+}
+
+export const puppeted = e => e.puppet && e.ally > 0 && !(e.shoved > 0) && ['ground', 'free'].includes(anchorOf(e.kind))
+
+export const steerPuppet = (g, e, dt) => {
+  const C = TUNING.skills.charm
+  const to = aimSpot(g, g.player, C.puppetReach)
+  const c = centre(e)
+  const free = anchorOf(e.kind) === 'free'
+  const dx = to.x - c.x
+  if (Math.abs(dx) > 2) e.facing = Math.sign(dx)
+  e.vx = Math.abs(dx) > 3 ? Math.sign(dx) * C.puppetSpeed : 0
+  e.vy = free ? (Math.abs(to.y - c.y) > 3 ? Math.sign(to.y - c.y) * C.puppetSpeed : 0) : Math.min(P.maxFall, e.vy + E.gravity * dt)
+  move(g.world, e, dt)
+  if (!free && e.hitWall && e.grounded) e.vy = -C.puppetJump
 }
 
 const shoved = (g, e, dt) => {
@@ -801,7 +816,6 @@ export const onDeath = (g, e) => {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) < 4) puff(g.world, x + dx, y + dy, M.METHANE, [8, 12])
   }
   if (e.kind === 'bomber') explode(g.world, x, y, 2)
-  if (e.shatters) explode(g.world, x, y, 1)
   if (e.kind === 'snapweed') for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ignite(g.world, x + dx, y + dy)
   if (e.kind === 'dripper') for (const dx of [-1, 0, 1, -2, 2]) puff(g.world, x + dx, y + 1, e.drips ?? M.OIL, [1, 1])
   if (e.kind === 'scrapper' && e.loaded) puff(g.world, x, y, M.SCRAP, [0, 0])

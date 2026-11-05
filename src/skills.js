@@ -30,11 +30,11 @@ const TIE = '#ff9ad8'
 export const FORKS = {
   bolt: [
     [form('bolt.globe', 'GLOBE', 'A BALL OF LIGHTNING THAT DRIFTS', MAGNET), form('bolt.nail', 'NAIL', 'STICKS, LIGHTNING STRIKES IT', WHITE)],
-    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE BOLTS, RELEASE TO FIRE ALL', CHARGE), form('bolt.split', 'SPLIT', 'TURNS WATER TO GAS', GAS)],
+    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE BOLTS, RELEASE TO FIRE ALL', CHARGE), form('bolt.fence', 'FENCE', 'LIGHTNING JOINS ITS LAST TWO STRIKES', FIRE)],
   ],
   repel: [
     [form('repel.orbit', 'ORBIT', 'SCRAP CIRCLES YOU', STONE), form('repel.lode', 'LODE', 'PULLS INSTEAD OF PUSHING', BLOOD)],
-    [form('repel.salvage', 'SALVAGE', 'KILLS LEAVE SCRAP', MAGNET), form('repel.shrapnel', 'SHRAPNEL', 'THROWN SCRAP EXPLODES', FIRE)],
+    [form('repel.salvage', 'SALVAGE', 'KILLS LEAVE SCRAP', MAGNET), form('repel.current', 'CURRENT', 'THROWN SCRAP CARRIES CHARGE', CHARGE)],
   ],
   ember: [
     [form('ember.napalm', 'NAPALM', 'SPILLS BURNING OIL', GAS), form('ember.wisp', 'WISP', 'CRAWLS TOWARDS THINGS THAT BURN', MAGNET)],
@@ -42,11 +42,11 @@ export const FORKS = {
   ],
   frost: [
     [form('frost.floe', 'FLOE', 'AN ICE BLOCK THAT FALLS AND FLOATS', MAGNET), form('frost.glide', 'GLIDE', 'ICE FORMS UNDERFOOT', WHITE)],
-    [form('frost.shatter', 'SHATTER', 'FROZEN FOES BLOW UP', FIRE), form('frost.brittle', 'BRITTLE', 'FROZEN ROCK CRUMBLES', STONE)],
+    [form('frost.snow', 'SNOWFALL', 'WATER TURNS TO SNOW, NOT ICE', WHITE), form('frost.brittle', 'BRITTLE', 'FROZEN ROCK CRUMBLES', STONE)],
   ],
   hammer: [
     [form('hammer.hurl', 'HURL', 'THROW IT, IT COMES BACK', MAGNET), form('hammer.slam', 'SLAM', 'PRESS DOWN IN THE AIR TO SLAM', BLOOD)],
-    [form('hammer.tremor', 'TREMOR', 'BLOCKS ABOVE FALL', STONE), form('hammer.fuse', 'FUSE', 'HITS LEAVE A BOMB', FIRE)],
+    [form('hammer.tremor', 'TREMOR', 'BLOCKS ABOVE FALL', STONE), form('hammer.tamp', 'TAMP', 'PACKS SAND, SNOW AND MUD SOLID', WHITE)],
   ],
   gust: [
     [form('gust.siphon', 'SIPHON', 'PULLS IN, THEN BLOWS OUT', GAS), form('gust.twister', 'TWISTER', 'A WHIRLWIND THAT MOVES ALONG', WHITE)],
@@ -57,7 +57,7 @@ export const FORKS = {
     [form('blink.lance', 'LANCE', 'HURTS FOES ALONG THE PATH', CHARGE), form('blink.ghost', 'GHOST', 'LEAVES A DECOY', MAGNET)],
   ],
   grapple: [
-    [form('grapple.yank', 'YANK', 'TEARS OUT BLOCKS', STONE), form('grapple.tether', 'TETHER', 'TIES TWO THINGS TOGETHER', GAS)],
+    [form('grapple.yank', 'YANK', 'TEARS OUT BLOCKS', STONE), form('grapple.piton', 'PITON', 'LEAVES A VINE ALONG THE LINE', ACID)],
     [form('grapple.sling', 'SLING', 'HOLD TO SWING, RELEASE TO LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS A FOE. PRESS AGAIN TO THROW IT', BLOOD)],
   ],
   dash: [
@@ -66,15 +66,15 @@ export const FORKS = {
   ],
   rewind: [
     [form('rewind.epoch', 'EPOCH', 'THE ROOM GOES BACK TOO', GAS), form('rewind.wraith', 'WRAITH', 'A COPY OF YOU REPEATS YOUR MOVES', MAGNET)],
-    [form('rewind.undo', 'UNDO', 'ALSO RESTORES LOST HEARTS', BLOOD), form('rewind.relive', 'RELIVE', 'RECHARGES YOUR OTHER SKILLS', WHITE)],
+    [form('rewind.return', 'RETURN', 'SHOTS FLY BACK THE WAY THEY CAME', COLD), form('rewind.undertow', 'UNDERTOW', 'FOES NEAR YOU GO BACK WITH YOU', BLOOD)],
   ],
   mason: [
-    [form('mason.cage', 'CAGE', 'WALLS IN A FOE', BLOOD), form('mason.span', 'SPAN', 'BUILDS UNTIL IT HITS A WALL', WHITE)],
+    [form('mason.cage', 'CAGE', 'WALLS IN A FOE', BLOOD), form('mason.pillar', 'PILLAR', 'RAISES A PILLAR UNDER WHAT YOU AIM AT', WHITE)],
     [form('mason.iron', 'IRON', 'BUILDS METAL', MAGNET), form('mason.rubble', 'RUBBLE', 'BLOCKS FALL AND CRUSH', STONE)],
   ],
   seed: [
     [form('seed.bough', 'BOUGH', 'GROWS A WOODEN BRIDGE', FIRE), form('seed.flytrap', 'FLYTRAP', 'EATS FOES AND SPITS THEM OUT', BLOOD)],
-    [form('seed.thorns', 'THORNS', 'VINES HURT FOES', STONE), form('seed.tinder', 'TINDER', 'BURNING VINES EXPLODE', CHARGE)],
+    [form('seed.thorns', 'THORNS', 'VINES HURT FOES', STONE), form('seed.roots', 'ROOTS', 'VINES TURN SAND AND ASH TO MOSS', ACID)],
   ],
   spring: [
     [form('spring.geyser', 'GEYSER', 'A WATER JET THAT LIFTS YOU', WHITE), form('spring.font', 'FONT', 'LEAVES A SPRING THAT KEEPS FLOWING', STONE)],
@@ -82,7 +82,7 @@ export const FORKS = {
   ],
   acid: [
     [form('acid.bore', 'BORE', 'EATS A STRAIGHT TUNNEL', WHITE), form('acid.rain', 'RAIN', 'A CLOUD THAT RAINS', GAS)],
-    [form('acid.rust', 'RUST', 'METAL ROTS TO SCRAP', FIRE), form('acid.ferment', 'FERMENT', 'DISSOLVED BLOCKS TURN TO GAS', CHARGE)],
+    [form('acid.rust', 'RUST', 'METAL ROTS TO SCRAP', FIRE), form('acid.sour', 'SOUR', 'ACID TURNS WATER TO ACID', CHARGE)],
   ],
   melt: [
     [form('melt.slag', 'SLAG', 'LOBS LAVA THAT SETS', STONE), form('melt.fissure', 'FISSURE', 'SPLITS THE FLOOR', BLOOD)],
@@ -90,7 +90,7 @@ export const FORKS = {
   ],
   alchemy: [
     [form('alchemy.transmute', 'TRANSMUTE', 'CHANGES SOLIDS TOO', STONE), form('alchemy.render', 'RENDER', 'TURNS WEAK FOES INTO MATERIAL', BLOOD)],
-    [form('alchemy.vapour', 'VAPOUR', 'SMOKE BECOMES MARSH GAS', GAS), form('alchemy.contagion', 'CONTAGION', 'CHANGES SPREAD TO TOUCHING CELLS', ACID)],
+    [form('alchemy.cascade', 'CASCADE', 'LIQUIDS KEEP CHANGING INTO ROCK', FIRE), form('alchemy.contagion', 'CONTAGION', 'CHANGES SPREAD TO TOUCHING CELLS', ACID)],
   ],
   well: [
     [form('well.rogue', 'ROGUE', 'A DRIFTING BLACK HOLE', BLOOD), form('well.nova', 'NOVA', 'PUSHES EVERYTHING AWAY', WHITE)],
@@ -106,31 +106,19 @@ export const FORKS = {
   ],
   charm: [
     [form('charm.plague', 'PLAGUE', 'CHARM SPREADS TO FOES IT TOUCHES', ACID), form('charm.lure', 'LURE', 'ALL FOES CHASE IT', BLOOD)],
-    [form('charm.pact', 'PACT', 'KILLS RESET ITS CHARM TIME', WHITE), form('charm.bond', 'BOND', 'CHARMED FOE TAKES YOUR HITS', MAGNET)],
-  ],
-  decoy: [
-    [form('decoy.clone', 'CLONE', 'COPIES YOUR GUN', MAGNET), form('decoy.runner', 'RUNNER', 'RUNS OFF, FOES FOLLOW IT', WHITE)],
-    [form('decoy.double', 'DOUBLE', 'PRESS AGAIN TO SWAP WITH THE DECOY', STONE), form('decoy.gas', 'GASBAG', 'LEAKS MARSH GAS', GAS)],
+    [form('charm.puppet', 'PUPPET', 'IT GOES WHERE YOU AIM', WHITE), form('charm.bond', 'BOND', 'CHARMED FOE TAKES YOUR HITS', MAGNET)],
   ],
   drone: [
-    [form('drone.sapper', 'SAPPER', 'CHASES A FOE, THEN EXPLODES', BLOOD), form('drone.mole', 'MOLE', 'CHEWS THROUGH ROCK', STONE)],
+    [form('drone.gull', 'GULL', 'DROPS SAND AND SCRAP ON FOES', SKY), form('drone.mole', 'MOLE', 'CHEWS THROUGH ROCK', STONE)],
     [form('drone.magpie', 'MAGPIE', 'BRINGS YOU COINS', CHARGE), form('drone.sentry', 'SENTRY', 'STAYS IN PLACE, SHOOTS FAST', MAGNET)],
-  ],
-  rod: [
-    [form('rod.magnet', 'MAGNET', 'DRAWS METAL AND FOES', BLOOD), form('rod.fence', 'FENCE', 'CHARGE ARCS BETWEEN TWO RODS', CHARGE)],
-    [form('rod.arcs', 'ARCS', 'ZAPS NEARBY FOES', WHITE), form('rod.earth', 'EARTH', 'CHARGES THE FLOOR', STONE)],
   ],
   mine: [
     [form('mine.limpet', 'LIMPET', 'STICKS TO FOES', BLOOD), form('mine.wire', 'TRIPWIRE', 'A TRIPWIRE ACROSS A GAP', WHITE)],
-    [form('mine.gas', 'GASMINE', 'BURSTS INTO MARSH GAS', GAS), form('mine.cryo', 'CRYO', 'FREEZES INSTEAD OF EXPLODING', COLD)],
+    [form('mine.launch', 'CATAPULT', 'LAUNCHES WHAT STEPS ON IT. NO BLAST', SKY), form('mine.cryo', 'CRYO', 'FREEZES INSTEAD OF EXPLODING', COLD)],
   ],
   roar: [
     [form('roar.shout', 'SHOUT', 'SENDS A SHOCKWAVE FORWARD', WHITE), form('roar.crack', 'CRACK', 'SHATTERS ROCK', STONE)],
     [form('roar.swell', 'SWELL', 'HOLD FOR A BIGGER ROAR', BLOOD), form('roar.rime', 'RIME', 'ALSO FREEZES WHAT IT HITS', COLD)],
-  ],
-  mirror: [
-    [form('mirror.pane', 'PANE', 'LEAVES A MIRROR STANDING', COLD), form('mirror.maw', 'MAW', 'TAKES IN SHOTS, THEN FIRES THEM BACK', BLOOD)],
-    [form('mirror.parry', 'PARRY', 'SHORTER. EACH RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
   flask: [
     [form('flask.hose', 'HOSE', 'HOLD TO POUR IT OUT IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'THE FLASK LANDS WHOLE. SHOOT IT TO BREAK IT', WHITE)],
@@ -262,6 +250,17 @@ const ray = (g, from, aim, reach, stopAtLiquid = false) => {
   return { x, y, last, m: matAt(g.world, cell(x), cell(y)) }
 }
 
+export const aimSpot = (g, p, reach) => {
+  const from = muzzle(p)
+  let spot = from
+  for (let d = 2; d <= reach; d += 2) {
+    const next = { x: from.x + p.aim.x * d, y: from.y + p.aim.y * d }
+    if (props(matAt(g.world, cell(next.x), cell(next.y))).solid) return spot
+    spot = next
+  }
+  return spot
+}
+
 const addEffect = (g, effect) => g.effects.push({ age: 0, ...effect })
 
 const lineCells = (from, to, visit) => {
@@ -294,32 +293,13 @@ const jagged = (from, to) => {
 
 export const zap = (g, from, to, colour = 'charge') => g.bolts.push({ points: jagged(from, to), life: 0.2, colour })
 
-const FLOW = [[0, -1], [1, 0], [0, 1], [-1, 0]]
-
-const floodFrom = (w, x, y, mat, most) => {
-  const seen = new Set()
-  const queue = [[x, y]]
-  const found = []
-  while (queue.length && found.length < most) {
-    const [cx, cy] = queue.shift()
-    const key = cy * ROOM + cx
-    if (seen.has(key) || matAt(w, cx, cy) !== mat) continue
-    seen.add(key)
-    found.push([cx, cy])
-    FLOW.forEach(([dx, dy]) => queue.push([cx + dx, cy + dy]))
-  }
-  return found
-}
-
-const splitWater = (g, x, y) => floodFrom(g.world, x, y, M.WATER, S.bolt.splitCells).forEach(([cx, cy]) => setCell(g.world, cx, cy, M.METHANE, TUNING.world.offgasLife))
-
 export const strike = (g, from, to) => {
   const p = g.player
   const colour = hue(p, 'bolt', 'charge')
   const energy = S.bolt.energy * (1 + g.depth / 2)
   zap(g, from, to, colour)
   const [x, y] = [cell(to.x), cell(to.y)]
-  if (owns(p, 'bolt.split')) splitWater(g, x, y)
+  if (owns(p, 'bolt.fence')) joinStrikes(g, to)
   const earth = [0, 1, 2, 3].find(down => props(matAt(g.world, x, y + down)).conductance) ?? 0
   energize(g.world, x, y + earth, energy)
   ignite(g.world, x, y)
@@ -344,6 +324,14 @@ const looseStored = (g, start, first, count) => {
   g.shake = Math.max(g.shake, count)
 }
 
+const joinStrikes = (g, at) => {
+  const last = held(g, 'fence')
+  const post = last?.b ?? last?.a
+  if (last) Object.assign(last, { life: 0, done: true })
+  const near = post && distance(post, at) <= S.bolt.fenceMost && distance(post, at) > BLOCK
+  addEffect(g, { kind: 'fence', a: near ? post : { x: at.x, y: at.y }, b: near ? { x: at.x, y: at.y } : null, life: S.bolt.fenceLife, clock: 0 })
+}
+
 const bolt = (g, p) => {
   const start = muzzle(p)
   if (owns(p, 'bolt.globe')) {
@@ -364,7 +352,7 @@ const bolt = (g, p) => {
 
 const flungFrom = (p, extra) => ({
   w: 8, h: 8, age: 0,
-  shrapnel: owns(p, 'repel.shrapnel'),
+  ...(owns(p, 'repel.current') ? { live: true, charged: true } : {}),
   ...extra,
 })
 
@@ -514,19 +502,23 @@ const ember = (g, p) => {
 const freezeFoe = (g, p, e) => {
   e.stun = Math.max(e.stun, S.frost.freeze)
   e.frozen = S.frost.freeze
-  e.shatters = owns(p, 'frost.shatter')
 }
 
-const chill = (g, p, x, y, freezesWater = true) => {
+export const snowDown = (g, x, y) => {
+  for (let row = y; row < y + S.frost.snowDepth && matAt(g.world, x, row) === M.WATER; row++) setCell(g.world, x, row, M.SNOW)
+}
+
+const chill = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
-  if (m === M.WATER && freezesWater) {
-    g.world.notes?.add(`freeze:${M.WATER}`)
-    setCell(g.world, x, y, M.ICE)
+  if (m === M.WATER) {
+    tallyRule(g.world, 'freeze', M.WATER)
+    if (owns(p, 'frost.snow')) snowDown(g, x, y)
+    else setCell(g.world, x, y, M.ICE)
   } else if (m === M.LAVA) {
-    g.world.notes?.add(`cool:${M.LAVA}`)
+    tallyRule(g.world, 'cool', M.LAVA)
     setCell(g.world, x, y, M.ROCK)
   } else if (g.world.burn[y * ROOM + x] > 0) g.world.burn[y * ROOM + x] = 0
-  else if (m === M.STEAM) setCell(g.world, x, y, M.WATER)
+  else if (m === M.STEAM) setCell(g.world, x, y, owns(p, 'frost.snow') ? M.SNOW : M.WATER)
   else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x, y, M.SAND)
 }
 
@@ -589,12 +581,22 @@ const loosenColumn = (g, x, y) => {
   g.shake = Math.max(g.shake, 5)
 }
 
-const stickFuse = (g, at) => addEffect(g, { kind: 'fuse', life: S.hammer.fuseTime, ...at })
-
 export const hammerLands = (g, p, x, y, foe) => {
   if (owns(p, 'hammer.tremor') && !foe) loosenColumn(g, x, y)
-  if (owns(p, 'hammer.fuse')) stickFuse(g, foe ? { rider: foe, x: foe.x, y: foe.y } : { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK })
 }
+
+const PACKS = { [M.SAND]: M.ROCK, [M.SNOW]: M.ICE, [M.MUD]: M.BRICK }
+
+const pack = (g, x, y) => {
+  const m = matAt(g.world, x, y)
+  if (!PACKS[m]) return false
+  setCell(g.world, x, y, PACKS[m])
+  tallyRule(g.world, 'pack', m)
+  chipsAt(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, PACKS[m], 4)
+  return true
+}
+
+export const hammerCell = (g, p, x, y) => (owns(p, 'hammer.tamp') && pack(g, x, y)) || smash(g, x, y)
 
 export const hammerStrikes = (g, p, e, aim) => {
   hurt(g, e, 2, 'player')
@@ -615,8 +617,8 @@ const hammer = (g, p) => {
   for (let reach = 1; reach <= S.hammer.reach; reach++) {
     const x = cell(from.x + p.aim.x * reach * BLOCK)
     const y = cell(from.y + p.aim.y * reach * BLOCK)
-    if (smash(g, x, y)) broke ??= [x, y]
-    if (bodyHigh && smash(g, x, y + 1)) broke ??= [x, y + 1]
+    if (hammerCell(g, p, x, y)) broke ??= [x, y]
+    if (bodyHigh && hammerCell(g, p, x, y + 1)) broke ??= [x, y + 1]
   }
   const covered = inCone(from, p.aim, (S.hammer.reach + 1) * BLOCK, BLOCK)
   const struck = g.enemies.filter(e => covered(centre(e)))
@@ -631,9 +633,9 @@ const hammer = (g, p) => {
 
 export const landSlam = (g, p) => {
   const [x, y] = [cell(p.x + 3), cell(p.y + p.h + 2)]
+  if (owns(p, 'hammer.tamp')) [-2, -1, 0, 1, 2].forEach(dx => [0, 1].forEach(dy => pack(g, x + dx, y + dy)))
   explode(g.world, x, y, 1)
   if (owns(p, 'hammer.tremor')) [-2, -1, 0, 1, 2].forEach(dx => loosenColumn(g, x + dx, y))
-  if (owns(p, 'hammer.fuse')) stickFuse(g, { x: x * BLOCK, y: (y - 1) * BLOCK })
   ring(g, p.x + 3, p.y + p.h, BLOOD, 22, 110)
   p.iframes = Math.max(p.iframes, 0.3)
 }
@@ -809,7 +811,7 @@ const arrive = (g, p, origin) => {
     energize(g.world, cell(origin.x), cell(origin.y + 10), S.bolt.energy / 2)
     energize(g.world, cell(arrival.x), cell(arrival.y + 10), S.bolt.energy / 2)
   }
-  if (owns(p, 'blink.ghost')) addEffect(g, { kind: 'decoy', x: origin.x - 4, y: origin.y - 8, life: 3 })
+  if (owns(p, 'blink.ghost')) addEffect(g, { kind: 'ghost', x: origin.x - 4, y: origin.y - 8, life: S.blink.ghostLife })
   g.pulse = Math.max(g.pulse, 0.5)
 }
 
@@ -843,10 +845,6 @@ const blink = (g, p) => {
 
 const grappleFoe = (g, p, from, hit) => {
   const e = hit.struck
-  if (owns(p, 'grapple.tether')) {
-    tetherFoe(g, e)
-    return
-  }
   const c = centre(p)
   const d = Math.max(1, distance(c, hit))
   if (!e.heavy) {
@@ -855,18 +853,6 @@ const grappleFoe = (g, p, from, hit) => {
     e.shoved = 0.35
   }
   if (owns(p, 'grapple.catch') && !e.heavy) addEffect(g, { kind: 'caught', foe: e, life: S.grapple.catchHold })
-}
-
-const tetherFoe = (g, e) => {
-  const loose = g.effects.find(f => f.kind === 'tether' && !f.b && !f.point)
-  if (loose && loose.a === e) return
-  if (loose) {
-    loose.b = e
-    loose.life = S.grapple.tetherLife
-    return
-  }
-  addEffect(g, { kind: 'tether', a: e, life: S.grapple.tetherLife })
-  e.stun = Math.max(e.stun, 0.5)
 }
 
 const throwCaught = (g, p, caught) => {
@@ -881,6 +867,10 @@ const throwCaught = (g, p, caught) => {
   addEffect(g, { kind: 'hurled', foe: e, life: 0.7 })
   g.shake = Math.max(g.shake, 3)
 }
+
+const hangVine = (g, from, to) => lineCells(from, to, (x, y) => {
+  if (inPlay(x, y) && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.VINE, 0)
+})
 
 const grapple = (g, p) => {
   const from = muzzle(p)
@@ -898,12 +888,7 @@ const grapple = (g, p) => {
   if (!hit.solid) return
   const x = cell(hit.x)
   const y = cell(hit.y)
-  const loose = owns(p, 'grapple.tether') && g.effects.find(f => f.kind === 'tether' && !f.b && !f.point)
-  if (loose) {
-    loose.point = { x: hit.last.x, y: hit.last.y }
-    loose.life = S.grapple.tetherLife
-    return
-  }
+  if (owns(p, 'grapple.piton')) hangVine(g, from, hit.last)
   if (owns(p, 'grapple.yank') && BREAKS.has(hit.m)) {
     if (!shatterFrom(g, x, y)) setCell(g.world, x, y, M.EMPTY)
     if (hit.m === M.SCRAP || hit.m === M.ROCK) g.flung.push(flungFrom(p, { x: hit.last.x - 4 - p.aim.x * 6, y: hit.last.y - 4 - p.aim.y * 6, vx: -p.aim.x * 200, vy: -p.aim.y * 200 - 30 }))
@@ -992,7 +977,7 @@ export const recordTrail = (p, dt) => {
   p.trailClock = (p.trailClock ?? 0) + dt
   if (p.trailClock < 0.1) return
   p.trailClock = 0
-  p.trail = [...(p.trail ?? []), { x: p.x, y: p.y, hp: p.hp }].slice(-S.rewind.keep)
+  p.trail = [...(p.trail ?? []), { x: p.x, y: p.y }].slice(-S.rewind.keep)
 }
 
 export const recordPast = (g, dt) => {
@@ -1024,17 +1009,30 @@ const restorePast = g => {
   return true
 }
 
+const sendShotsBack = g => g.fireballs.filter(b => !b.friendly).forEach(b => {
+  Object.assign(b, { vx: -b.vx * S.rewind.returnSpeed, vy: -b.vy * S.rewind.returnSpeed, friendly: true, age: 0 })
+  burst(g, centre(b).x, centre(b).y, COLD, 3)
+})
+
+const dragBack = (g, p, foes, from, past) => foes.forEach(e => {
+  const spot = [{ x: e.x + past.x - from.x, y: e.y + past.y - from.y }, { x: past.x + p.w / 2 - e.w / 2, y: past.y + p.h - e.h }]
+    .find(at => !hitsSolid(g.world, { ...at, w: e.w, h: e.h }))
+  if (!spot) return
+  ring(g, centre(e).x, centre(e).y, BLOOD, 8, 40)
+  Object.assign(e, spot, { vx: 0, vy: 0, stun: Math.max(e.stun, S.rewind.undertowStun) })
+  ring(g, centre(e).x, centre(e).y, BLOOD, 8, 40)
+})
+
 const rewind = (g, p) => {
   const trail = p.trail ?? []
   if (trail.length === 0) return
   const past = trail[Math.max(0, trail.length - S.rewind.steps)]
   const here = centre(p)
+  const from = { x: p.x, y: p.y }
   const colour = hue(p, 'rewind', 'magnet')
   ring(g, here.x, here.y, colour, 18, 70)
-  if (owns(p, 'rewind.relive')) {
-    p.skills.filter(s => s.kind !== 'rewind').forEach(s => { s.ready = 0; s.gulp = 1 })
-    ring(g, here.x, here.y, WHITE, 26, 130)
-  }
+  if (owns(p, 'rewind.return')) sendShotsBack(g)
+  const dragged = owns(p, 'rewind.undertow') ? hostile(g).filter(e => !e.heavy && !e.prop && !e.warden && !e.partOf && distance(centre(e), here) < S.rewind.undertowReach) : []
   if (owns(p, 'rewind.epoch')) {
     if (restorePast(g)) ring(g, here.x, here.y, colour, 34, 180)
   } else {
@@ -1046,7 +1044,7 @@ const rewind = (g, p) => {
     p.vx = 0
     p.vy = 0
   }
-  p.hp = owns(p, 'rewind.undo') ? Math.max(p.hp, past.hp) : p.hp
+  dragBack(g, p, dragged, from, past)
   p.iframes = Math.max(p.iframes, 0.4)
   g.pulse = 1
 }
@@ -1091,12 +1089,22 @@ const walkway = (g, p) => {
   return { x: c.x, y: ledge ? below : p.y + p.h - 4 }
 }
 
+const floorUnder = (g, x, y) => {
+  let row = Math.max(1, y)
+  while (row < ROOM - 1 && !props(matAt(g.world, x, row)).solid) row++
+  return row
+}
+
+const raisePillar = (g, p) => {
+  const hit = ray(g, muzzle(p), p.aim, S.mason.pillarReach)
+  const at = hit.struck ? { x: centre(hit.struck).x, y: hit.struck.y + hit.struck.h - 1 } : hit.solid ? hit.last : hit
+  const x = cell(at.x)
+  if (!inPlay(x, cell(at.y))) return FREE
+  addEffect(g, { kind: 'pillar', x, floor: floorUnder(g, x, cell(at.y)), laid: 0, clock: 0, life: 999, material: masonry(p) })
+}
+
 const mason = (g, p) => {
-  if (owns(p, 'mason.span')) {
-    const from = walkway(g, p)
-    addEffect(g, { kind: 'span', x: from.x + p.aim.x * BLOCK, y: from.y + p.aim.y * BLOCK, dx: p.aim.x, dy: p.aim.y, life: 999, clock: 0, laid: 0, skipped: 0, material: masonry(p), step: S.mason.spanStep, most: S.mason.spanMost })
-    return
-  }
+  if (owns(p, 'mason.pillar')) return raisePillar(g, p)
   if (owns(p, 'mason.cage')) {
     const covered = inCone(muzzle(p), p.aim, S.mason.cageReach, S.mason.cageWidth)
     const foe = nearestTo(hostile(g).filter(e => !e.heavy && covered(centre(e))), centre(p))
@@ -1108,15 +1116,41 @@ const mason = (g, p) => {
   wallAt(g, p)
 }
 
+const ROOTS_IN = new Set([M.SAND, M.ASH])
+const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
+
+const takeRoot = (g, p, x, y) => {
+  if (owns(p, 'seed.roots')) addEffect(g, { kind: 'roots', frontier: [[x, y]], laid: 0, clock: 0, life: 999 })
+}
+
+export const stepRoots = (g, f, dt) => {
+  f.clock -= dt
+  if (f.clock > 0) return
+  f.clock = S.seed.rootStep
+  const next = []
+  for (const [x, y] of f.frontier) {
+    for (const [dx, dy] of AROUND) {
+      if (f.laid >= S.seed.rootMost || !ROOTS_IN.has(matAt(g.world, x + dx, y + dy))) continue
+      setCell(g.world, x + dx, y + dy, M.MOSS)
+      tallyRule(g.world, 'regrow', M.MOSS)
+      burst(g, (x + dx + 0.5) * BLOCK, (y + dy + 0.5) * BLOCK, ACID, 2)
+      f.laid += 1
+      next.push([x + dx, y + dy])
+    }
+  }
+  f.frontier = next
+  if (!next.length) Object.assign(f, { life: 0, done: true })
+}
+
 const seed = (g, p) => {
   const here = muzzle(p)
   g.world.thorns = g.world.thorns || owns(p, 'seed.thorns')
-  g.world.tinder = g.world.tinder || owns(p, 'seed.tinder')
   sparkle(g, here, p.aim, hue(p, 'seed', 'pale'), 8)
   if (owns(p, 'seed.bough')) {
     const from = walkway(g, p)
     const dir = p.aim.x < 0 ? -1 : p.aim.x > 0 ? 1 : p.facing
     addEffect(g, { kind: 'span', x: from.x + dir * BLOCK, y: from.y, dx: dir, dy: 0, life: 999, clock: 0, laid: 0, skipped: 0, material: M.WOOD, step: S.seed.boughStep, most: S.seed.boughMost, vines: true })
+    takeRoot(g, p, cell(from.x), cell(from.y))
     return
   }
   const straightUp = p.aim.y < -0.5 && Math.abs(p.aim.x) < 0.8
@@ -1126,9 +1160,11 @@ const seed = (g, p) => {
     while (row < ROOM - 2 && !props(matAt(g.world, x, row + 1)).solid) row++
     setCell(g.world, x, row, M.VINE, 0)
     addEffect(g, { kind: 'flytrap', cx: x, cy: row, x: (x + 0.5) * BLOCK, y: (row + 0.5) * BLOCK, life: S.seed.trapLife, reload: 0, held: null, chew: 0 })
+    takeRoot(g, p, x, row)
     return
   }
   setCell(g.world, x, y, M.VINE, S.seed.length)
+  takeRoot(g, p, x, y)
 }
 
 const pourLiquid = p => (owns(p, 'spring.oil') ? M.OIL : M.WATER)
@@ -1168,7 +1204,7 @@ export const freezeWaterAround = (g, x, y, radius) => {
 
 const acid = (g, p) => {
   g.world.rusting = g.world.rusting || owns(p, 'acid.rust')
-  g.world.offgas = g.world.offgas || owns(p, 'acid.ferment')
+  g.world.souring = g.world.souring || owns(p, 'acid.sour')
   if (owns(p, 'acid.bore')) thrown(g, p, p.aim, 'bore', { speed: S.acid.boreFlight, gravity: 0, colour: ACID })
   else if (owns(p, 'acid.rain')) thrown(g, p, p.aim, 'cloud', { speed: S.ember.speed, lift: S.ember.lift, colour: ACID })
   else lob(g, p, p.aim, { acid: S.acid.small })
@@ -1188,8 +1224,7 @@ export const boreCell = (g, x, y) => {
   const m = matAt(g.world, x, y)
   if (!BORES.has(m)) return m !== M.BEDROCK
   const metal = m === M.METAL || m === M.GATE
-  const left = g.world.rusting && metal ? M.SCRAP : g.world.offgas ? M.METHANE : M.EMPTY
-  setCell(g.world, x, y, left, left === M.METHANE ? TUNING.world.offgasLife : 0)
+  setCell(g.world, x, y, g.world.rusting && metal ? M.SCRAP : M.EMPTY)
   burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, ACID, 3)
   return true
 }
@@ -1265,6 +1300,31 @@ const renderFoes = (g, p, covered) => {
   }
 }
 
+const middleOf = cells => cells.reduce(([sx, sy], [cx, cy]) => [sx + cx / cells.length, sy + cy / cells.length], [0, 0])
+
+const STEP_TINT = { [M.OIL]: GAS, [M.ACID]: ACID, [M.LAVA]: FIRE, [M.ROCK]: STONE }
+
+const keepChanging = (g, cells) => {
+  if (!cells.length) return
+  const [x, y] = middleOf(cells)
+  addEffect(g, { kind: 'cascade', x, y, clock: S.alchemy.cascadeEvery, life: 999 })
+}
+
+export const stepCascade = (g, f, dt) => {
+  f.clock -= dt
+  if (f.clock > 0) return
+  f.clock = S.alchemy.cascadeEvery
+  const r = S.alchemy.cascadeRadius
+  const cells = []
+  forEachCell((x, y) => { if (TRANSMUTE[matAt(g.world, x, y)] !== undefined && Math.hypot(x - f.x, y - f.y) <= r) cells.push([x, y, matAt(g.world, x, y)]) })
+  cells.forEach(([x, y, m]) => {
+    setCell(g.world, x, y, TRANSMUTE[m])
+    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, STEP_TINT[TRANSMUTE[m]], 1)
+  })
+  if (cells.length) tallyRule(g.world, 'cascade', M.ROCK)
+  if (cells.every(([, , m]) => TRANSMUTE[m] === M.ROCK)) Object.assign(f, { life: 0, done: true })
+}
+
 const alchemy = (g, p) => {
   const from = muzzle(p)
   const covered = inCone(from, p.aim, S.alchemy.reach, S.alchemy.width)
@@ -1277,10 +1337,10 @@ const alchemy = (g, p) => {
       setCell(g.world, x, y, next)
       changed.set(`${m}>${next}`, { from: m, to: next, frontier: [...(changed.get(`${m}>${next}`)?.frontier ?? []), [x, y]] })
     }
-    if (owns(p, 'alchemy.vapour') && (m === M.SMOKE || m === M.STEAM)) setCell(g.world, x, y, M.METHANE, 10)
   })
   if (owns(p, 'alchemy.render')) renderFoes(g, p, covered)
   if (owns(p, 'alchemy.contagion')) changed.forEach(change => addEffect(g, { kind: 'contagion', ...change, most: props(change.from).solid ? S.alchemy.spreadSolid : S.alchemy.spreadMost, life: 999, clock: 0, laid: 0 }))
+  if (owns(p, 'alchemy.cascade')) keepChanging(g, [...changed.values()].filter(c => props(c.to).liquid).flatMap(c => c.frontier))
   sparkle(g, from, p.aim, hue(p, 'alchemy', 'gas'), 20)
   g.pulse = Math.max(g.pulse, 0.5)
 }
@@ -1418,7 +1478,7 @@ export const crackWorld = g => {
 export const charmOne = (g, e, p) => {
   e.ally = S.charm.time
   e.plague = owns(p, 'charm.plague')
-  e.pact = owns(p, 'charm.pact')
+  e.puppet = owns(p, 'charm.puppet')
   e.bond = owns(p, 'charm.bond')
   if (owns(p, 'charm.lure')) addEffect(g, { kind: 'lure', loud: true, follow: e, x: e.x, y: e.y, life: S.charm.time })
   const c = centre(e)
@@ -1431,42 +1491,8 @@ const charm = (g, p) => {
   if (target) charmOne(g, target, p)
 }
 
-const tradeWithDecoy = (g, p, standing) => {
-  const spot = [0, 2, 4, 6, 8, 10, 12, 14, 16].map(up => ({ x: standing.x + 4 - p.w / 2, y: standing.y + 16 - p.h - up }))
-    .find(at => !hitsSolid(g.world, { ...at, w: p.w, h: p.h }))
-  if (!spot) return false
-  const origin = centre(p)
-  standing.x = p.x + p.w / 2 - 4
-  standing.y = p.y + p.h - 16
-  standing.traded = true
-  Object.assign(p, spot)
-  p.vy = Math.min(p.vy, 0)
-  p.iframes = Math.max(p.iframes, 0.3)
-  ring(g, origin.x, origin.y, STONE, 12, 60)
-  ring(g, centre(p).x, centre(p).y, STONE, 12, 60)
-  return true
-}
-
-const decoy = (g, p) => {
-  const standing = owns(p, 'decoy.double') && g.effects.find(f => f.kind === 'decoy' && !f.done)
-  if (standing) return tradeWithDecoy(g, p, standing) ? undefined : FREE
-  const hit = ray(g, muzzle(p), p.aim, S.decoy.reach)
-  const clone = owns(p, 'decoy.clone')
-  addEffect(g, {
-    kind: 'decoy', x: hit.last.x - 4, y: hit.last.y - 8,
-    life: clone ? S.decoy.cloneLife : S.decoy.life,
-    clone,
-    runner: owns(p, 'decoy.runner'),
-    dir: p.aim.x < 0 ? -1 : p.aim.x > 0 ? 1 : p.facing,
-    vy: 0,
-    double: owns(p, 'decoy.double'),
-    gas: owns(p, 'decoy.gas'),
-  })
-  if (owns(p, 'decoy.double')) return FREE
-}
-
 const drone = (g, p) => {
-  const sapper = owns(p, 'drone.sapper')
+  const gull = owns(p, 'drone.gull')
   const mole = owns(p, 'drone.mole')
   const sentry = owns(p, 'drone.sentry')
   const flying = g.effects.filter(f => f.kind === 'drone')
@@ -1474,21 +1500,8 @@ const drone = (g, p) => {
   const spot = sentry ? ray(g, muzzle(p), p.aim, S.drone.sentryReach).last : { x: p.x, y: p.y - 10 }
   addEffect(g, {
     kind: 'drone', phase: flying.length * 2.1, x: spot.x, y: spot.y, reload: 0.2,
-    life: sapper ? S.drone.sapperLife : mole ? S.drone.moleLife : sentry ? S.drone.sentryLife : S.drone.life,
-    sapper, mole, sentry, aim: p.aim, magpie: owns(p, 'drone.magpie'),
-  })
-}
-
-const rod = (g, p) => {
-  const hit = ray(g, muzzle(p), { x: p.aim.x || p.facing, y: 1 }, S.rod.reach)
-  const fence = owns(p, 'rod.fence')
-  if (fence) {
-    const rods = g.effects.filter(f => f.kind === 'rod')
-    if (rods.length >= 2) Object.assign(rods[0], { life: 0, done: true })
-  }
-  addEffect(g, {
-    kind: 'rod', x: hit.last.x - 4, y: hit.last.y - 16, cx: cell(hit.x), cy: cell(hit.y), life: S.rod.life, reload: 0.3,
-    arcs: owns(p, 'rod.arcs'), grounded: owns(p, 'rod.earth'), magnet: owns(p, 'rod.magnet'), fence,
+    life: gull ? S.drone.gullLife : mole ? S.drone.moleLife : sentry ? S.drone.sentryLife : S.drone.life,
+    gull, mole, sentry, aim: p.aim, magpie: owns(p, 'drone.magpie'), home: { x: spot.x, y: spot.y },
   })
 }
 
@@ -1508,17 +1521,14 @@ const mine = (g, p) => {
   addEffect(g, {
     kind: 'mine', x: hit.last.x - 3, y: hit.last.y - 3, life: rider ? S.mine.limpetFuse + 0.2 : S.mine.life, arm: rider ? S.mine.limpetFuse : 0.5,
     rider, limpet, wire: owns(p, 'mine.wire') && hit.solid ? wireEnd(g, hit.last) : null, anchor: { x: hit.last.x, y: hit.last.y },
-    gas: owns(p, 'mine.gas'), cryo: owns(p, 'mine.cryo'),
+    launch: owns(p, 'mine.launch'), cryo: owns(p, 'mine.cryo'),
   })
   if (limpet) zap(g, muzzle(p), hit.last, BLOOD)
 }
 
-const SHATTERS = new Set([M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE, M.GLASS])
-
 export const roarCell = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
   if (m === M.VOLATILE) ignite(g.world, x, y)
-  else if (ICY.has(m) && !owns(p, 'roar.rime')) setCell(g.world, x, y, M.WATER)
   else if (m === M.ROCK && owns(p, 'roar.crack') && Math.random() < 0.25) setCell(g.world, x, y, M.SAND)
   if (owns(p, 'roar.rime')) {
     if (m === M.WATER) setCell(g.world, x, y, M.ICE)
@@ -1538,11 +1548,9 @@ export const roarFoe = (g, p, e, away, shove) => {
 }
 
 const shoutBreaks = (g, x, y) => {
-  const m = matAt(g.world, x, y)
-  if (SHATTERS.has(m) && m !== M.VOLATILE && !shatterFrom(g, x, y)) {
-    setCell(g.world, x, y, m === M.SAND ? M.EMPTY : M.WATER)
-    chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, m, 3)
-  }
+  if (matAt(g.world, x, y) !== M.SAND) return
+  setCell(g.world, x, y, M.EMPTY)
+  chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, M.SAND, 3)
 }
 
 export const shoutFront = (g, p, f) => {
@@ -1585,22 +1593,6 @@ const roar = (g, p) => {
   ring(g, here.x, here.y, hue(p, 'roar', 'white'), 30, reach * 1.6)
   g.shake = Math.max(g.shake, 5 * size)
   g.pulse = Math.max(g.pulse, 0.7)
-}
-
-const mirror = (g, p) => {
-  if (owns(p, 'mirror.pane')) {
-    const from = muzzle(p)
-    g.effects.filter(f => f.kind === 'pane').forEach(f => { f.life = 0 })
-    addEffect(g, { kind: 'pane', x: from.x + p.aim.x * S.mirror.paneReach, y: from.y + p.aim.y * S.mirror.paneReach, nx: p.aim.x, ny: p.aim.y, life: S.mirror.paneLife })
-    return
-  }
-  addEffect(g, { kind: 'mirror', life: owns(p, 'mirror.parry') ? S.mirror.parryLife : S.mirror.life, maw: owns(p, 'mirror.maw'), parry: owns(p, 'mirror.parry'), swallowed: 0 })
-}
-
-export const returnedShot = (g, p, b) => {
-  feedEvent(g, 'returned', centre(b).x, centre(b).y)
-  if (owns(p, 'mirror.parry')) p.skills.filter(s => s.kind === 'mirror').forEach(s => { s.ready = 0 })
-  if (owns(p, 'mirror.seek')) addEffect(g, { kind: 'seeker', shot: b, life: S.mirror.seekLife })
 }
 
 const solidShare = (g, at, r) => {
@@ -2255,7 +2247,7 @@ export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id])
 
 export const SKILLS = {
   bolt, repel, ember, frost, hammer, gust, blink, grapple, dash, rewind, mason, seed, spring, acid, melt, alchemy,
-  well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror, flask, wick, float: floatBubble, link: linkFoes,
+  well, swap, stop, charm, drone, mine, roar, flask, wick, float: floatBubble, link: linkFoes,
   clay: (g, p) => clay(g, p),
   burrow: (g, p) => burrow(g, p),
   lens, chime,
@@ -2284,12 +2276,9 @@ export const SKILL_DETAILS = {
   swap: 'TRADE PLACES WITH A FOE.',
   stop: 'STOPS TIME.',
   charm: 'A FOE FIGHTS FOR YOU.',
-  decoy: 'A DUMMY THAT FOES ATTACK.',
   drone: 'A HELPER THAT SHOOTS.',
-  rod: 'PULSES CHARGE.',
   mine: 'EXPLODES WHEN A FOE COMES NEAR.',
   roar: 'STUNS AND SCATTERS.',
-  mirror: 'THROWS SHOTS BACK.',
   flask: 'HOLD TO SOAK UP LIQUID. LET GO TO THROW IT.',
   wick: 'HOLD TO LAY A FUSE. ITS END EXPLODES.',
   float: 'THINGS IN THE BUBBLE FALL UP.',

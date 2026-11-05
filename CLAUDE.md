@@ -187,18 +187,22 @@ effects must spread across blocks visibly and be readable without text.
 He asked to be surprised, so these were agent choices. Treat them as open to change.
 
 - The world is four-shade green until the first card, then colour floods in.
-- 26 skills in three slots: movement (blink, grapple, dash, rewind), terrain (mason, seed,
-  spring, acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror) and
-  helpers (drone, rod, mine). Skills are verbs on world rules, and no synergy is written
-  anywhere.
+- 31 skills in three slots (a keystone adds a fourth): elements (bolt, repel, ember, frost, hammer, gust),
+  movement (blink, grapple, dash, rewind, float, burrow), terrain (mason, seed, spring, acid, melt, alchemy,
+  flask, wick, clay, lens), control (well, swap, stop, charm, roar, link, chime) and helpers (drone, mine).
+  Skills are verbs on world rules, and no synergy is written anywhere. Several old skills reach the newer
+  rules through a form: Frost SNOWFALL makes snow, Hammer TAMP packs sand, snow and mud
+  solid, Seed ROOTS turns sand and ash to moss, Repel CURRENT and Bolt FENCE charge metal into magnets, Drone
+  GULL drops loose blocks, Acid SOUR turns water to acid and Alchemy CASCADE keeps stepping liquids to rock.
+  Chime owns breaking glass and ice. Roar only stuns, scatters and, with CRACK, crumbles rock.
 - Each skill evolves through two forks of two exclusive forms, so two picks and four possible
   ends. Carl rejected "the same but slightly better": a form must change what the skill does,
   never only how much. Taking a form renames the skill and changes how it looks in play.
 - Every skill eats something (`src/feed.js`): a material or live state near you, foes in some state, how you
   move, or an event such as a blast kill. Eating shows as motes flying to the hero and a lit slot, and recharges the
   skill several times faster, so one skill can make what another eats and the region decides how far that goes. Skills
-  feel different in the hand too: most are a tap, some hold stock (dash, mason, mine), and some forms stream while
-  held, toggle, or swell while held.
+  feel different in the hand too: most are a tap, some hold stock (dash, mason, mine, clay), flask and wick are held then let
+  go, lens and burrow stream while held, and some forms stream, toggle, or swell while held.
 - Level-up cards show the actual skill or form, leaning towards skills that make what yours eat and what the
   region offers (`src/offers.js`). Once a run's forks are spent, the cards offer a new skill, a relic or a heal.
 - Eight random starter rooms, each teaching its own first skill, and a quickstart for any

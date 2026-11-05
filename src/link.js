@@ -119,10 +119,7 @@ const passState = (g, f, from, field) => {
   for (const e of f.members) {
     if (e === from || e.heavy || e.warden || e.hp <= 0 || (e[field] ?? 0) >= value || (field === 'ablaze' && e.fireproof)) continue
     e[field] = value
-    if (field === 'frozen') {
-      e.stun = Math.max(e.stun, value)
-      e.shatters = e.shatters || from.shatters
-    }
+    if (field === 'frozen') e.stun = Math.max(e.stun, value)
     if (field === 'ablaze') e.ablazeClock ??= 0
     pulse(g, f, from, e, STATE_COLOURS[field])
   }

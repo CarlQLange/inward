@@ -25,22 +25,23 @@ export const LADDER = [
   'event:gasworks', 'omen:deluge', 'skill:mason', 'foe:imp', 'keystone:livewire', 'relic:rubber', 'foe:gnat',
   'event:collapse', 'warden:eel', 'skill:acid', 'omen:moon', 'keystone:overload', 'relic:incendiary', 'foe:slime',
   'foe:snapweed', 'relic:shock', 'skill:melt', 'keystone:wake', 'foe:dripper', 'event:altar', 'omen:bloom',
-  'relic:frostshot', 'foe:emberbat', 'skill:rod', 'keystone:slough', 'foe:scrapper', 'relic:pierce', 'omen:rust',
-  'skill:decoy', 'foe:jelly', 'foe:coil', 'warden:conductor', 'skill:swap', 'event:nest', 'relic:plate',
+  'relic:frostshot', 'foe:emberbat', 'keystone:slough', 'foe:scrapper', 'relic:pierce', 'omen:rust',
+  'foe:jelly', 'foe:coil', 'warden:conductor', 'skill:swap', 'event:nest', 'relic:plate',
   'keystone:monomania', 'foe:stilt', 'skill:well', 'relic:chain', 'foe:puffer', 'skill:drone', 'relic:wind',
   'foe:worm', 'omen:swarm', 'skill:roar', 'relic:gem', 'keystone:breath', 'foe:mimic', 'foe:urchin', 'skill:charm',
-  'relic:crown', 'warden:brood', 'skill:alchemy', 'foe:lantern', 'omen:glass', 'relic:skull', 'skill:mirror',
+  'relic:crown', 'warden:brood', 'skill:alchemy', 'foe:lantern', 'omen:glass', 'relic:skull',
   'foe:shade', 'relic:acidskull', 'skill:stop', 'skill:rewind', 'keystone:onecut', 'relic:phoenix',
 ]
 
 const CATALOGUE = [...BASE, ...LADDER]
 
 export const isCatalogued = key => CATALOGUE.includes(key)
+const foundSoFar = () => save.found.filter(isCatalogued)
 const KINDS = ['keystone', 'skill', 'relic', 'foe', 'inhabitant', 'event', 'warden', 'omen']
 const kindOf = key => key.split(':')[0]
 const idOf = key => key.split(':')[1]
 
-export const knownFrom = secrets => new Set([...BASE, ...save.found, ...secrets])
+export const knownFrom = secrets => new Set([...BASE, ...foundSoFar(), ...secrets])
 export const isKnown = (g, kind, id) => g.known.has(`${kind}:${id}`)
 export const knownOf = (g, kind) => [...g.known].filter(key => kindOf(key) === kind).map(idOf)
 
@@ -96,7 +97,7 @@ const NAMES = {
 export const nameOf = (kind, id) => NAMES[kind]?.(id) ?? id.toUpperCase()
 
 export const almanac = (reactions = []) => {
-  const seen = new Set([...BASE, ...save.found])
+  const seen = new Set([...BASE, ...foundSoFar()])
   const groups = KINDS.map(kind => {
     const items = CATALOGUE.filter(key => kindOf(key) === kind).map(key => ({
       kind, id: idOf(key), name: nameOf(kind, idOf(key)), found: seen.has(key), base: BASE.has(key),

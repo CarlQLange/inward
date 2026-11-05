@@ -13,7 +13,6 @@ const GREEN = '#76d648'
 const WHITE = '#f4f8f2'
 const PALE = '#c9d4c0'
 const YELLOW = '#ffe84a'
-const MAGNET = '#6fd0ff'
 const GAS = '#c79ae0'
 const BACKGROUND = '#07100e'
 const ROOM_PX = ROOM * BLOCK
@@ -378,16 +377,10 @@ const drawPickups = (ctx, time, pickups) => {
   }
 }
 
-const EFFECT_SPRITE = { decoy: 28, rod: 29, mine: 30, drone: 27, well: 31 }
+const EFFECT_SPRITE = { ghost: 28, mine: 30, drone: 27, well: 31 }
 
-const drawEffects = (ctx, time, effects, player) => {
+const drawEffects = (ctx, time, effects) => {
   for (const f of effects) {
-    if (f.kind === 'mirror') {
-      ctx.strokeStyle = MAGNET
-      ctx.lineWidth = 1
-      ctx.strokeRect(Math.round(player.x) - 6.5, Math.round(player.y) - 6.5, player.w + 13, player.h + 13)
-      continue
-    }
     const sprite = EFFECT_SPRITE[f.kind]
     if (sprite === undefined) continue
     ctx.drawImage(SPRITES.creatures[sprite][0], Math.round(f.x + 4 - 14), Math.round(f.y + (f.kind === 'well' ? 14 : 16) - 28))
@@ -453,7 +446,7 @@ export const drawActors = (ctx, g, room, live) => {
   drawPickups(ctx, time, room.pickups)
   if (live) {
     drawFlung(ctx, g.flung)
-    drawEffects(ctx, time, g.effects, g.player)
+    drawEffects(ctx, time, g.effects)
   }
   drawCreatures(ctx, g, room.enemies)
   drawOverlays(ctx, world, time)

@@ -329,6 +329,10 @@ const stepAcid = (w, x, y) => {
     const nx = x + dx
     const ny = y + dy
     const other = matAt(w, nx, ny)
+    if (other === M.WATER && w.souring) {
+      if (Math.random() < T.sour) turn(w, idx(nx, ny), M.ACID, 'sour')
+      continue
+    }
     if (other === M.WATER) {
       place(w, i, M.WATER)
       return true
@@ -336,7 +340,7 @@ const stepAcid = (w, x, y) => {
     if (ACID_EATS.has(other) && Math.random() < T.acidEat) {
       note(w, 'dissolve', other)
       const metal = other === M.METAL || other === M.GATE
-      place(w, idx(nx, ny), w.rusting && metal ? M.SCRAP : w.offgas ? M.METHANE : M.EMPTY, w.offgas ? T.offgasLife : 0)
+      place(w, idx(nx, ny), w.rusting && metal ? M.SCRAP : M.EMPTY)
       if (Math.random() < T.acidSpent) {
         place(w, i, M.EMPTY)
         return true
@@ -465,8 +469,7 @@ export const explode = (w, x, y, reach) => {
 const burnOut = (w, x, y) => {
   const i = idx(x, y)
   const mat = w.mat[i]
-  const { burnsTo = M.ASH, blast: own } = props(mat)
-  const blast = own ?? (w.tinder && mat === M.VINE ? 1 : 0)
+  const { burnsTo = M.ASH, blast } = props(mat)
   place(w, i, burnsTo, burnsTo === M.ASH ? T.ashLife : 0)
   if (blast) {
     note(w, 'blast', mat)

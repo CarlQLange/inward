@@ -5,8 +5,8 @@ import { WORLD_PX, cell, centre, forEachCell, hitsSolid, moveAxis, overlap } fro
 import { burst, hurt } from './combat.js'
 import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, ripple, splash } from './fx.js'
 import {
-  BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
-  orbitFires, owns, prey, recordPast, releaseMatter, returnedShot, ring, ringBell, setAblaze, settleFuse, shardAt, shoutFront, smash, spend, spill, strike, turnToGlass, zap,
+  BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerCell, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
+  orbitFires, owns, prey, recordPast, releaseMatter, ring, ringBell, setAblaze, settleFuse, shardAt, shoutFront, smash, spend, snowDown, spill, stepCascade, stepRoots, strike, turnToGlass, zap,
 } from './skills.js'
 import { endFloat, stepFloat } from './float.js'
 import { endLink, stepLink } from './link.js'
@@ -139,6 +139,7 @@ const LANDS = {
       for (let dx = -2; dx <= 2; dx++) {
         const m = matAt(g.world, x + dx, y + dy)
         if (m === M.LAVA) setCell(g.world, x + dx, y + dy, M.ROCK)
+        else if (m === M.WATER && owns(p, 'frost.snow')) snowDown(g, x + dx, y + dy)
         else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x + dx, y + dy, M.SAND)
         else if (g.world.burn[(y + dy) * ROOM + x + dx] > 0) g.world.burn[(y + dy) * ROOM + x + dx] = 0
       }
@@ -147,7 +148,6 @@ const LANDS = {
     hostile(g).filter(e => Math.hypot(centre(e).x - c.x, centre(e).y - c.y) < 20).forEach(e => {
       e.stun = Math.max(e.stun, S.frost.freeze)
       e.frozen = S.frost.freeze
-      e.shatters = owns(p, 'frost.shatter')
     })
     burst(g, c.x, c.y, '#bff2ff', 18)
   },
@@ -351,16 +351,6 @@ const stepWick = (g, f, dt) => {
   end(f)
 }
 
-const stepFuse = (g, f) => {
-  if (f.rider) {
-    if (f.rider.hp <= 0) f.rider = null
-    else Object.assign(f, { x: centre(f.rider).x, y: centre(f.rider).y })
-  }
-  burst(g, f.x, f.y, 'fire', 1)
-}
-
-const endFuse = (g, f) => blast(g, f.x, f.y, 2)
-
 const stepHurl = (g, f, dt) => {
   const p = g.player
   const H = S.hammer
@@ -375,8 +365,8 @@ const stepHurl = (g, f, dt) => {
   f.spin = f.age * 18
   const [x, y] = [cell(f.x), cell(f.y)]
   const m = matAt(g.world, x, y)
-  if (BREAKS.has(m)) {
-    smash(g, x, y)
+  if (BREAKS.has(m) || (m === M.MUD && owns(p, 'hammer.tamp'))) {
+    hammerCell(g, p, x, y)
     if (!f.landed) hammerLands(g, p, x, y, null)
     f.landed = true
   } else if (f.out && props(m).solid) f.out = false
@@ -578,38 +568,6 @@ const grindCentre = (g, f, dt) => {
   if (held.length) g.shake = Math.max(g.shake, 1 + held.length)
 }
 
-const endDecoy = (g, f) => {
-  if (f.double && !f.traded) spend(g.player, 'decoy')
-}
-
-const copyShots = (g, f) => {
-  const here = { x: f.x + 4, y: f.y + 6 }
-  const fresh = g.shots.filter(s => s.friendly && !s.copied)
-  fresh.forEach(s => { s.copied = true })
-  if (!f.clone) return
-  g.shots.push(...fresh.map(s => ({ ...s, x: here.x, y: here.y, copied: true, passed: undefined })))
-  if (fresh.length) g.particles.push({ x: here.x, y: here.y, vx: 0, vy: 0, life: 0.1, colour: 'magnet' })
-}
-
-const runDecoy = (g, f, dt) => {
-  const box = { x: f.x, y: f.y, w: 8, h: 16 }
-  f.vy = Math.min(TUNING.player.maxFall, f.vy + TUNING.player.gravity * dt)
-  if (moveAxis(g.world, box, 'x', f.dir * S.decoy.runSpeed * dt)) f.dir *= -1
-  if (moveAxis(g.world, box, 'y', f.vy * dt)) f.vy = 0
-  f.x = Math.max(BLOCK, Math.min(WORLD_PX - BLOCK * 2, box.x))
-  f.y = box.y
-}
-
-const stepDecoy = (g, f, dt) => {
-  copyShots(g, f)
-  if (f.runner) runDecoy(g, f, dt)
-  f.tick = (f.tick ?? 0) + dt
-  if (f.gas && f.tick > 0.25) {
-    f.tick = 0
-    puff(g.world, cell(f.x + 4), cell(f.y + 4), M.METHANE, [6, 10])
-  }
-}
-
 const stepLure = (g, f) => {
   const e = f.follow
   if (!e || e.hp <= 0 || (!e.ally && !e.goat)) {
@@ -625,13 +583,6 @@ const droneFire = (g, f, target) => {
   const t = centre(target)
   const d = Math.max(1, Math.hypot(t.x - f.x, t.y - f.y))
   g.shots.push({ x: f.x, y: f.y, w: 2, h: 2, vx: ((t.x - f.x) / d) * 220, vy: ((t.y - f.y) / d) * 220, life: 0.7, friendly: true, copied: true })
-}
-
-const sapperBursts = (g, f) => {
-  const c = { x: f.x + 4, y: f.y + 4 }
-  blast(g, c.x, c.y, 2)
-  if (f.magpie) g.pickups.filter(p => p.kind === 'coin' && Math.hypot(p.x - c.x, p.y - c.y) < S.drone.magpieReach).forEach(p => Object.assign(p, { x: g.player.x, y: g.player.y, vx: 0, vy: 0, age: 1 }))
-  end(f)
 }
 
 const fetchCoin = (g, f, dt) => {
@@ -660,19 +611,8 @@ const stepSentry = (g, f, dt) => {
   droneFire(g, f, target)
 }
 
-const stepSapper = (g, f, dt) => {
-  const target = nearest(hostile(g), f.x, f.y, Infinity)
-  const p = g.player
-  const c = target ? centre(target) : { x: p.x + Math.cos(g.time * 2.4) * 16, y: p.y - 8 }
-  const d = Math.max(1, Math.hypot(c.x - f.x, c.y - f.y))
-  const speed = target ? S.drone.sapperSpeed : d * 4
-  f.x += ((c.x - f.x) / d) * speed * dt
-  f.y += ((c.y - f.y) / d) * speed * dt
-  if (target && overlap({ x: f.x, y: f.y, w: 8, h: 8 }, target)) sapperBursts(g, f)
-}
-
 const endDrone = (g, f) => {
-  if (f.sapper) sapperBursts(g, f)
+  if (f.load) dropLoad(g, f)
 }
 
 const stepMoleDrone = (g, f, dt) => {
@@ -692,17 +632,76 @@ const stepMoleDrone = (g, f, dt) => {
   droneFire(g, f, target)
 }
 
+const CARRIED = new Set([M.SAND, M.SCRAP])
+
+const flyTo = (f, to, speed, dt) => {
+  const d = Math.max(1, Math.hypot(to.x - f.x, to.y - f.y))
+  const step = Math.min(d, speed * dt)
+  f.x += ((to.x - f.x) / d) * step
+  f.y += ((to.y - f.y) / d) * step
+  return d
+}
+
+const looseNear = (g, at, reach) => {
+  const [cx, cy, span] = [cell(at.x), cell(at.y), Math.ceil(reach / BLOCK)]
+  let best = null
+  for (let y = Math.max(1, cy - span); y <= Math.min(ROOM - 2, cy + span); y++) {
+    for (let x = Math.max(1, cx - span); x <= Math.min(ROOM - 2, cx + span); x++) {
+      const d = Math.hypot(x - cx, y - cy) * BLOCK
+      if (d < reach && d < (best?.d ?? Infinity) && CARRIED.has(matAt(g.world, x, y)) && !props(matAt(g.world, x, y - 1)).solid) best = { x, y, d }
+    }
+  }
+  return best
+}
+
+const dropLoad = (g, f) => {
+  g.flung.push({ x: f.x - 4, y: f.y + 4, w: 8, h: 8, vx: 0, vy: 40, age: 0, mat: f.load, safe: true, by: 'drone', cause: 'CRUSHED' })
+  f.load = null
+}
+
+const gullFetch = (g, f, dt) => {
+  const D = S.drone
+  const from = f.sentry ? f.home : g.player
+  const spot = looseNear(g, from, f.sentry ? D.sentryReach : D.gullReach)
+  if (!spot) return false
+  const at = { x: (spot.x + 0.5) * BLOCK, y: (spot.y - 0.5) * BLOCK }
+  if (flyTo(f, at, D.gullSpeed, dt) > 3) return true
+  f.load = matAt(g.world, spot.x, spot.y)
+  setCell(g.world, spot.x, spot.y, M.EMPTY)
+  chipsAt(g, at.x, at.y + BLOCK / 2, f.load, 3)
+  return true
+}
+
+const gullCarry = (g, f, dt) => {
+  const D = S.drone
+  const foe = nearest(prey(g).filter(e => !f.sentry || Math.abs(centre(e).x - f.home.x) < D.gullDrop * 3), f.x, f.y, Infinity)
+  if (!foe) {
+    if (f.sentry) flyTo(f, f.home, D.gullSpeed, dt)
+    return Boolean(f.sentry)
+  }
+  const over = { x: centre(foe).x, y: Math.max(BLOCK * 1.5, foe.y - D.gullHover) }
+  flyTo(f, f.sentry ? f.home : over, D.gullSpeed, dt)
+  if (Math.abs(f.x - centre(foe).x) < D.gullDrop && f.y < centre(foe).y) dropLoad(g, f)
+  return true
+}
+
+const stepGull = (g, f, dt) => {
+  f.reload -= dt
+  const target = nearest(hostile(g), f.x, f.y, S.drone.range)
+  if (target && f.reload <= 0) {
+    f.reload = f.sentry ? S.drone.sentryEvery : S.drone.fireEvery
+    droneFire(g, f, target)
+  }
+  return f.load ? gullCarry(g, f, dt) : gullFetch(g, f, dt)
+}
+
 const stepDrone = (g, f, dt) => {
+  if (f.gull && stepGull(g, f, dt)) return
   if (f.sentry && !f.mole) {
     stepSentry(g, f, dt)
-    if (f.sapper && hostile(g).some(e => overlap({ x: f.x - 4, y: f.y - 4, w: 8, h: 8 }, e))) sapperBursts(g, f)
     return
   }
-  if (f.magpie && !f.sapper && fetchCoin(g, f, dt)) return
-  if (f.sapper) {
-    stepSapper(g, f, dt)
-    return
-  }
+  if (f.magpie && fetchCoin(g, f, dt)) return
   if (f.mole) {
     stepMoleDrone(g, f, dt)
     return
@@ -717,56 +716,6 @@ const stepDrone = (g, f, dt) => {
   if (!target) return
   f.reload = S.drone.fireEvery
   droneFire(g, f, target)
-}
-
-const stepRod = (g, f, dt) => {
-  const R = S.rod
-  const top = { x: f.x + 4, y: f.y + 1 }
-  const mid = { x: f.x + 4, y: f.y + 9 }
-  if (f.magnet) {
-    g.enemies.filter(e => e.magnetic && !e.heavy && Math.hypot(centre(e).x - top.x, centre(e).y - top.y) < R.pullReach).forEach(e => {
-      pullToward(e, top.x, top.y, R.pull, dt)
-      e.shoved = Math.max(e.shoved, 0.1)
-    })
-    g.fireballs.filter(b => b.pellet && Math.hypot(b.x - top.x, b.y - top.y) < R.pullReach).forEach(b => pullToward(b, top.x, top.y, R.pull, dt))
-  }
-  const partner = f.fence && g.effects.find(o => o.kind === 'rod' && o !== f && o.life > 0)
-  if (partner) {
-    const other = { x: partner.x + 4, y: partner.y + 9 }
-    f.partner = other
-    foesOnSegment(g, mid, other, 2).forEach(e => {
-      hurt(g, e, R.fenceDamage, 'player')
-      e.stun = Math.max(e.stun, 0.4)
-    })
-  } else f.partner = null
-  f.reload -= dt
-  if (f.reload > 0) return
-  f.reload = R.pulseEvery
-  energize(g.world, f.cx, f.cy, R.energy)
-  if (f.grounded) {
-    forEachCell((x, y) => {
-      if (Math.abs(y - f.cy) <= 1 && Math.abs(x - f.cx) <= 6 && props(matAt(g.world, x, y)).solid && matAt(g.world, x, y) !== M.BEDROCK && g.world.refractory[y * ROOM + x] <= 0) {
-        g.world.charge[y * ROOM + x] = 0.2
-      }
-    })
-  }
-  burst(g, top.x, top.y, f.magnet ? 'magnet' : 'charge', 4)
-  if (partner) zap(g, mid, f.partner)
-  if (f.magnet) {
-    const scrap = []
-    forEachCell((x, y) => { if (matAt(g.world, x, y) === M.SCRAP && Math.hypot((x + 0.5) * BLOCK - top.x, (y + 0.5) * BLOCK - top.y) < R.pullReach) scrap.push([x, y]) })
-    scrap.slice(0, 3).forEach(([x, y]) => {
-      const d = Math.max(1, Math.hypot((x + 0.5) * BLOCK - top.x, (y + 0.5) * BLOCK - top.y))
-      setCell(g.world, x, y, M.EMPTY)
-      g.flung.push({ x: x * BLOCK, y: y * BLOCK, w: 8, h: 8, vx: ((top.x - x * BLOCK) / d) * 180, vy: ((top.y - y * BLOCK) / d) * 180 - 20, age: 0, safe: true })
-    })
-  }
-  if (!f.arcs) return
-  const target = nearest(hostile(g), top.x, top.y, R.range)
-  if (!target) return
-  zap(g, top, centre(target))
-  hurt(g, target, 1)
-  target.stun = Math.max(target.stun, 0.5)
 }
 
 const detonateMine = (g, f, at = { x: f.x + 3, y: f.y + 3 }) => {
@@ -784,11 +733,42 @@ const detonateMine = (g, f, at = { x: f.x + 3, y: f.y + 3 }) => {
     })
     return
   }
-  near.forEach(e => hurt(g, e, S.mine.damage, 'world', 'CRUSHED'))
-  if (f.gas) {
-    for (let dy = -2; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) puff(g.world, cell(at.x) + dx, cell(at.y) + dy, M.METHANE, [2, 4])
+  if (f.launch) {
+    launchFrom(g, at, near)
+    return
   }
+  near.forEach(e => hurt(g, e, S.mine.damage, 'world', 'CRUSHED'))
   blast(g, at.x, at.y, 2)
+}
+
+const launchFrom = (g, at, foes) => {
+  const p = g.player
+  foes.filter(e => !e.heavy && !e.prop).forEach(e => {
+    Object.assign(e, { vx: (centre(e).x - at.x) * 3, vy: -S.mine.launch, shoved: 0.6, stun: Math.max(e.stun, 0.6) })
+    g.effects.push({ age: 0, kind: 'tossed', foe: e, life: 3 })
+  })
+  if (Math.hypot(centre(p).x - at.x, centre(p).y - at.y) < S.mine.radius) {
+    p.vy = -S.mine.launch
+    p.jumpHeld = false
+    p.drift = Math.max(p.drift, 0.2)
+  }
+  ring(g, at.x, at.y, '#d8ecff', 18, 110)
+  g.shake = Math.max(g.shake, 3)
+}
+
+const stepTossed = (g, f) => {
+  const e = f.foe
+  if (e.hp <= 0) {
+    end(f)
+    return
+  }
+  if (!e.grounded || f.age < S.mine.launchLanding) return
+  e.iframes = 0
+  hurt(g, e, S.mine.launchDamage, 'world', 'CRUSHED')
+  hostile(g).filter(o => o !== e && overlap(o, e)).forEach(o => hurt(g, o, S.mine.launchDamage, 'world', 'CRUSHED'))
+  ring(g, centre(e).x, e.y + e.h, '#c9d4c0', 12, 70)
+  g.shake = Math.max(g.shake, 3)
+  end(f)
 }
 
 const stepMine = (g, f, dt) => {
@@ -805,100 +785,14 @@ const stepMine = (g, f, dt) => {
   }
   const c = { x: f.x + 3, y: f.y + 3 }
   const crossed = f.wire && foesOnSegment(g, f.anchor, f.wire, 0)[0]
+  const stepped = f.launch && overlap(g.player, { x: f.x - 2, y: f.y - 2, w: 10, h: 10 })
   if (crossed) {
     detonateMine(g, f, centre(crossed))
     end(f)
-  } else if (hostile(g).some(e => Math.hypot(centre(e).x - c.x, centre(e).y - c.y) < S.mine.trigger)) {
+  } else if (stepped || hostile(g).some(e => Math.hypot(centre(e).x - c.x, centre(e).y - c.y) < S.mine.trigger)) {
     detonateMine(g, f)
     end(f)
   }
-}
-
-const bounced = (g, p, b) => {
-  b.friendly = true
-  b.age = 0
-  returnedShot(g, p, b)
-}
-
-const stepMirror = (g, f) => {
-  const p = g.player
-  p.iframes = Math.max(p.iframes, 0.05)
-  const box = { x: p.x - 8, y: p.y - 8, w: p.w + 16, h: p.h + 16 }
-  for (const b of g.fireballs) {
-    if (b.friendly || !overlap(b, box)) continue
-    if (f.maw) {
-      b.age = -1
-      f.swallowed += 1
-      burst(g, centre(p).x, centre(p).y, 'magnet', 4)
-      continue
-    }
-    b.vx *= -1.2
-    b.vy = Math.min(b.vy * -1, -40)
-    bounced(g, p, b)
-  }
-}
-
-const endMirror = (g, f) => {
-  const p = g.player
-  const c = centre(p)
-  if (!f.maw) return
-  for (let i = 0; i < f.swallowed; i++) {
-    const a = Math.atan2(p.aim.y, p.aim.x) + (i - (f.swallowed - 1) / 2) * 0.22
-    const shot = { x: c.x - 2, y: c.y - 2, w: 3, h: 3, vx: Math.cos(a) * S.mirror.shotReturn, vy: Math.sin(a) * S.mirror.shotReturn, age: 0, straight: true, pellet: true, friendly: true }
-    returnedShot(g, p, shot)
-    g.fireballs.push(shot)
-  }
-  ring(g, c.x, c.y, '#ff5a4a', 16, 90)
-}
-
-const stepSeeker = (g, f, dt) => {
-  const b = f.shot
-  if (b.age < 0 || !g.fireballs.includes(b)) {
-    end(f)
-    return
-  }
-  const c = centre(b)
-  const foe = nearest(hostile(g), c.x, c.y, Infinity)
-  if (!foe) return
-  const t = centre(foe)
-  const speed = Math.max(S.mirror.shotReturn, Math.hypot(b.vx, b.vy))
-  const d = Math.max(1, Math.hypot(t.x - c.x, t.y - c.y))
-  const turn = Math.min(1, S.mirror.seekTurn * dt)
-  b.vx += (((t.x - c.x) / d) * speed - b.vx) * turn
-  b.vy += (((t.y - c.y) / d) * speed - b.vy) * turn
-  b.straight = true
-  g.particles.push({ x: c.x, y: c.y, vx: 0, vy: 0, life: 0.14, colour: '#ff5a4a' })
-}
-
-const stepPane = (g, f) => {
-  const half = S.mirror.paneHalf
-  const across = { x: -f.ny, y: f.nx }
-  const crossing = b => {
-    const c = centre(b)
-    const [dx, dy] = [c.x - f.x, c.y - f.y]
-    const along = dx * across.x + dy * across.y
-    const depth = dx * f.nx + dy * f.ny
-    const toward = b.vx * f.nx + b.vy * f.ny
-    return Math.abs(along) < half && Math.abs(depth) < 5 && toward * depth < 0
-  }
-  const reflect = b => {
-    const v = b.vx * f.nx + b.vy * f.ny
-    b.vx -= 2 * v * f.nx
-    b.vy -= 2 * v * f.ny
-  }
-  for (const b of g.fireballs) {
-    if (!crossing(b)) continue
-    reflect(b)
-    bounced(g, g.player, b)
-  }
-  for (const s of g.shots) {
-    if (!crossing(s)) continue
-    reflect(s)
-    s.life = Math.max(s.life, TUNING.player.shotLife)
-    s.friendly = true
-    returnedShot(g, g.player, { ...s, w: s.w, h: s.h })
-  }
-  for (const b of g.flung) if (crossing(b)) reflect(b)
 }
 
 const stepSpan = (g, f, dt) => {
@@ -1122,40 +1016,6 @@ const stepContagion = (g, f, dt) => {
   if (next.length === 0) end(f)
 }
 
-const stepTether = (g, f, dt) => {
-  const G = S.grapple
-  const p = g.player
-  if (f.a.hp <= 0 || f.b?.hp <= 0) {
-    end(f)
-    return
-  }
-  const from = centre(f.a)
-  const to = f.b ? centre(f.b) : f.point
-  f.from = from
-  f.to = to ?? centre(p)
-  if (!to) return
-  const d = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y))
-  const pull = { x: (to.x - from.x) / d, y: (to.y - from.y) / d }
-  const haul = (e, dir) => {
-    if (e.heavy) return
-    moveAxis(g.world, e, 'x', dir.x * G.tetherPull * dt)
-    moveAxis(g.world, e, 'y', dir.y * G.tetherPull * dt)
-    e.stun = Math.max(e.stun, 0.2)
-    e.vy = 0
-  }
-  if (d > 6) haul(f.a, pull)
-  if (f.b && d > 6) haul(f.b, { x: -pull.x, y: -pull.y })
-  if (f.b && overlap(f.a, f.b)) {
-    f.a.iframes = 0
-    f.b.iframes = 0
-    hurt(g, f.a, G.tetherDamage, 'world')
-    hurt(g, f.b, G.tetherDamage, 'world')
-    ring(g, from.x, from.y, '#c79ae0', 16, 90)
-    g.shake = Math.max(g.shake, 4)
-    end(f)
-  }
-}
-
 const stepCaught = (g, f) => {
   const p = g.player
   const e = f.foe
@@ -1267,17 +1127,64 @@ const stepHover = (g, f) => {
 
 const dropPieces = (g, f) => f.pieces.forEach(piece => shardAt(g, { ...piece, from: { x: piece.x, y: piece.y - BLOCK } }))
 
+const stepFence = (g, f, dt) => {
+  if (!f.b) return
+  const B = S.bolt
+  f.clock -= dt
+  if (f.clock > 0) return
+  f.clock = B.fenceEvery
+  zap(g, f.a, f.b, '#ff9a2e')
+  foesOnSegment(g, f.a, f.b, 2).forEach(e => {
+    hurt(g, e, B.fenceDamage, 'player', 'CHARGE')
+    e.stun = Math.max(e.stun, B.fenceStun)
+  })
+  for (const post of [f.a, f.b]) [0, 1].forEach(down => energize(g.world, cell(post.x), cell(post.y) + down, B.energy / 2))
+}
+
+const stepPillar = (g, f, dt) => {
+  const P = S.mason
+  f.clock -= dt
+  while (f.clock <= 0 && !f.done) {
+    f.clock += P.pillarStep
+    const y = f.floor - 1 - f.laid
+    if (f.laid >= P.pillarMost || y < 1 || props(matAt(g.world, f.x, y)).solid) {
+      end(f)
+      return
+    }
+    const box = { x: f.x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK }
+    const bodies = [g.player, ...g.enemies.filter(e => !e.prop && !e.stowed)].filter(b => overlap(b, box))
+    if (bodies.some(b => b.heavy || b.warden || b.partOf)) {
+      end(f)
+      return
+    }
+    const stuck = bodies.filter(b => moveAxis(g.world, b, 'y', box.y - (b.y + b.h)))
+    bodies.forEach(b => { b.vy = Math.min(b.vy ?? 0, 0) })
+    if (stuck.length) {
+      stuck.filter(b => b !== g.player).forEach(e => {
+        e.iframes = 0
+        hurt(g, e, P.pillarDamage, 'world', 'CRUSHED')
+        e.stun = Math.max(e.stun, 0.6)
+      })
+      end(f)
+      return
+    }
+    setCell(g.world, f.x, y, f.material)
+    chipsAt(g, box.x + BLOCK / 2, box.y + BLOCK, f.material, 2)
+    f.laid += 1
+  }
+}
+
 const STEP = {
-  well: stepWell, decoy: stepDecoy, drone: stepDrone, rod: stepRod, mine: stepMine, mirror: stepMirror,
-  globe: stepGlobe, nail: stepNail, thrown: stepThrown, fuse: stepFuse, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
-  twister: stepTwister, lure: stepLure, pane: stepPane, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
-  bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
-  seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle, float: stepFloat, link: stepLink,
+  well: stepWell, drone: stepDrone, mine: stepMine, tossed: stepTossed, fence: stepFence, pillar: stepPillar,
+  globe: stepGlobe, nail: stepNail, thrown: stepThrown, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
+  twister: stepTwister, lure: stepLure, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
+  bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, cascade: (...args) => stepCascade(...args), roots: (...args) => stepRoots(...args), wraith: stepWraith, shout: stepShout,
+  caught: stepCaught, hurled: stepHurled, rope: stepRope, wick: stepWick, bottle: stepBottle, float: stepFloat, link: stepLink,
   ball: (...args) => stepBall(...args), daub: (...args) => stepDaub(...args), kiln: (...args) => stepKiln(...args),
   beam: stepBeam, peal: stepPeal, volley: stepVolley, hover: stepHover, statues: g => turnToGlass(g),
 }
 const END = {
-  decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
+  drone: endDrone, flytrap: endFlytrap,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle, float: endFloat, link: endLink,
   kiln: (...args) => endKiln(...args),
   volley: dropPieces, hover: dropPieces, bell: g => ringBell(g),
@@ -1367,7 +1274,7 @@ export const stepEffectList = (g, dt) => {
   g.effects = g.effects.filter(f => f.life > 0)
 }
 
-export const decoyFor = g => g.effects.find(f => f.kind === 'decoy' || f.kind === 'lure')
+export const decoyFor = g => g.effects.find(f => f.kind === 'ghost' || f.kind === 'lure')
 
 export const igniteAround = (g, x, y) => {
   for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ignite(g.world, x + dx, y + dy)

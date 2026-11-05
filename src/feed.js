@@ -29,7 +29,6 @@ export const TASTES = {
   scrap: { name: 'SCRAP', colours: ['#c9b48a', '#8a7a5a'], flight: 'tumble', cell: made(M.SCRAP) },
   moss: { name: 'MOSS', colours: ['#8ad05a', '#4f9c3a'], flight: 'leaf', cell: made(M.MOSS) },
   vine: { name: 'VINES', colours: ['#4f9c3a', '#8ad05a'], flight: 'leaf', cell: made(M.VINE), bite: gone },
-  metal: { name: 'METAL', colours: ['#b6c6cc', '#6fd0ff'], flight: 'streak', cell: made(M.METAL, M.GATE) },
   rubble: { name: 'SAND AND ASH', colours: ['#d8c48a', '#9a9078'], flight: 'hop', cell: made(M.SAND, M.ASH), bite: gone },
   steam: { name: 'STEAM', colours: ['#dfe8e4', '#9fb0a8'], flight: 'puff', cell: made(M.STEAM), bite: gone },
   gas: { name: 'SMOKE AND GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
@@ -82,14 +81,6 @@ const OTHERS = {
       return { amount: close.length / F.full.crowd, spots: close.map(centre) }
     },
   },
-  drawn: {
-    colours: ['#f4f8f2', '#c79ae0'], flight: 'curl',
-    sense: g => {
-      const standing = g.effects.filter(f => f.kind === 'decoy')
-      const drawn = hostile(g).filter(e => !e.prop && standing.some(d => Math.hypot(d.x - e.x, d.y - e.y) < F.drawnReach))
-      return { amount: standing.length ? drawn.length / F.full.drawn : 0, spots: drawn.map(centre) }
-    },
-  },
   still: {
     colours: ['#bff2ff', '#f4f8f2'], flight: 'gather',
     sense: (g, p) => {
@@ -126,7 +117,6 @@ const EVENTS = {
   blast: { colours: ['#ff9a2e', '#f4f8f2'], flight: 'rise', motes: 5 },
   blastKill: { colours: ['#ff5a4a', '#ff9a2e'], flight: 'blob', motes: 6 },
   hit: { colours: ['#ff5a4a', '#ffb0a0'], flight: 'gather', motes: 7 },
-  returned: { colours: ['#6fd0ff', '#f4f8f2'], flight: 'streak', motes: 3 },
   allyKill: { colours: ['#c79ae0', '#ff5a4a'], flight: 'curl', motes: 5 },
   dashHit: { colours: ['#ffe84a', '#f4f8f2'], flight: 'zig', motes: 3 },
   smashed: { colours: ['#c9d4c0', '#9a9078'], flight: 'hop', motes: 2 },
@@ -136,9 +126,9 @@ const EVENTS = {
 }
 
 export const DIETS = {
-  ember: ['fire'], bolt: ['charge'], frost: ['water', 'ice'], melt: ['lava'], repel: ['scrap'], seed: ['moss', 'vine'], rod: ['metal'], mason: ['rubble'],
-  spring: ['steam', 'ice'], gust: ['gas'], acid: ['acid'], hammer: ['smashed', 'falling'], alchemy: ['variety'], swap: ['stun'], roar: ['crowd'], decoy: ['drawn'],
-  stop: ['still'], grapple: ['air'], mine: ['blastKill'], well: ['blast'], rewind: ['hit'], mirror: ['returned'], charm: ['allyKill'], dash: ['dashHit'],
+  ember: ['fire'], bolt: ['charge'], frost: ['water', 'ice'], melt: ['lava'], repel: ['scrap'], seed: ['moss', 'vine'], mason: ['rubble'],
+  spring: ['steam', 'ice'], gust: ['gas'], acid: ['acid'], hammer: ['smashed', 'falling'], alchemy: ['variety'], swap: ['stun'], roar: ['crowd'],
+  stop: ['still'], grapple: ['air'], mine: ['blastKill'], well: ['blast'], rewind: ['hit'], charm: ['allyKill'], dash: ['dashHit'],
   blink: ['crossed'], drone: ['coin'], flask: ['pouring'], wick: ['fuel'],
   float: ['airborne'],
   link: ['worldKill'],
@@ -151,8 +141,8 @@ const foodOf = (_, kind) => DIETS[kind]
 export const dietOf = foodOf
 
 const EATS = {
-  variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', drawn: 'FOES NEAR THE DECOY', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
-  flying: 'FLYING BLOCKS AND SHARDS', hit: 'TAKING HITS', returned: 'RETURNED SHOTS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
+  variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
+  flying: 'FLYING BLOCKS AND SHARDS', hit: 'TAKING HITS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
   airborne: 'FOES IN THE AIR', worldKill: 'WORLD KILLS',
 }
 
