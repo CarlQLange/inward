@@ -206,10 +206,10 @@ const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, ra
 
 export const THEMES = [
   { name: 'THE MOSS CAVES', top: 'm', ledge: 'w', skin: null, pits: 0, peat: 0.4, puddles: 0.5, props: { lamp: 0.6, tank: 0.2 }, flourish: 'roots', foes: ['crawler', 'spitter', 'bat', 'slug', 'tick', 'snapweed', 'gnat', 'pillbug', 'spore', 'mimic'] },
-  { name: 'THE DROWNED HALLS', top: 'R', ledge: 'R', bridge: 'B', skin: 'brick', pits: 0.3, oil: 0.1, mud: 0.45, sand: 0.35, hopper: { strut: 'G', load: 's', rail: true }, props: { battery: 0.7, tank: 0.35, sandbag: 0.45, lamp: 0.1 }, flourish: 'seepage', foes: ['crawler', 'slug', 'bat', 'imp', 'gasbag', 'dripper', 'pillbug', 'coil', 'tick'] },
+  { name: 'THE DROWNED HALLS', top: 'R', ledge: 'R', bridge: 'B', skin: 'brick', pits: 0.3, oil: 0.1, mud: 0.7, sand: 0.35, hopper: { strut: 'G', load: 's', rail: true }, props: { battery: 0.7, tank: 0.35, sandbag: 0.45, lamp: 0.1 }, flourish: 'seepage', foes: ['crawler', 'slug', 'bat', 'imp', 'gasbag', 'dripper', 'pillbug', 'coil', 'tick'] },
   { name: 'THE PEAT BOG', top: 'p', ledge: 'w', skin: 'fungus', pits: 0.1, oil: 0.3, peat: 0.6, mud: 0.6, puddles: 0.3, props: { lamp: 0.6, tank: 0.15 }, flourish: 'bog', foes: ['spitter', 'spore', 'slug', 'gasbag', 'emberbat', 'gnat', 'snapweed', 'dripper', 'tick'] },
   { name: 'THE OLD WORKINGS', top: 'M', ledge: 'M', bridge: 'M', skin: 'brick', pits: -0.1, gas: 0.3, scrap: 0.4, sand: 0.3, hopper: { strut: 'G', load: 'S', rail: true }, props: { battery: 0.8, carboy: 0.25, sandbag: 0.25, lamp: 0.1 }, flourish: 'struts', foes: ['turret', 'crawler', 'bomber', 'crab', 'gasbag', 'scrapper', 'coil', 'stilt', 'pillbug'] },
-  { name: 'THE FOUNDRY', top: 'M', ledge: 'M', bridge: 'M', skin: 'charred', pits: 0.15, lava: 0.7, scrap: 0.3, sand: 0.5, hopper: { strut: 'G', load: 'S', rail: true }, props: { ladle: 0.5, tank: 0.5, sandbag: 0.35, battery: 0.3 }, flourish: 'forge', foes: ['turret', 'bomber', 'crab', 'slime', 'scrapper', 'coil', 'stilt', 'crawler'] },
+  { name: 'THE FOUNDRY', top: 'M', ledge: 'M', bridge: 'M', skin: 'charred', pits: 0.15, lava: 0.7, scrap: 0.3, sand: 0.8, hopper: { strut: 'G', load: 'S', rail: true }, props: { ladle: 0.5, tank: 0.5, sandbag: 0.35, battery: 0.3 }, flourish: 'forge', foes: ['turret', 'bomber', 'crab', 'slime', 'scrapper', 'coil', 'stilt', 'crawler'] },
   { name: 'THE ICE SHAFTS', top: 'I', ledge: 'I', bridge: 'I', skin: 'ice', pits: 0.2, snow: 0.6, cold: true, hopper: { strut: 'I', load: 's' }, props: { carboy: 0.3, tank: 0.2, ladle: 0.3, lamp: 0.1 }, flourish: 'icicles', foes: ['imp', 'crab', 'slime', 'bat', 'urchin', 'stilt', 'shade', 'tick', 'crawler'] },
   { name: 'THE CRYSTAL HOLLOW', top: 'R', ledge: 'V', bridge: 'R', skin: 'crystal', pits: 0.1, gas: 0.4, volatile: 0.2, sand: 0.3, panes: 0.12, hopper: { strut: 'V', load: 'S' }, props: { battery: 0.35, carboy: 0.3, sandbag: 0.3, lamp: 0.25 }, flourish: 'crystals', foes: ['spore', 'emberbat', 'bomber', 'turret', 'slime', 'shade', 'urchin', 'gnat', 'bat'] },
   { name: 'THE CORE', top: 'R', ledge: 'R', skin: 'charred', pits: 0, lava: 0.5, volatile: 0.1, foes: [] },
@@ -327,11 +327,21 @@ const hangPanes = (grid, ceilings, range, rand, chance) => {
   }
 }
 
+const dust = (grid, rand, tile, chance) => {
+  for (let y = 2; y < ROOM - 2; y++) {
+    for (let x = 4; x < ROOM - 4; x++) {
+      if (grid[y][x] !== '.' || !SOLID.has(grid[y + 1][x]) || grid[y + 1][x] === tile || rand() > chance || !calm(grid, x, y, tile)) continue
+      grid[y][x] = tile
+    }
+  }
+}
+
 const deposit = ({ grid, layout, ceilings, range, rand, theme }) => {
   if (theme.mud) sink(grid, layout, range, rand, 'u', theme.mud, [2, 4])
   for (let n = 0; n < 2; n++) if (theme.puddles) sink(grid, layout, range, rand, '~', theme.puddles, [1, 1])
   if (theme.sand) drift(grid, layout, range, rand, 's', theme.sand)
   if (theme.snow) drift(grid, layout, range, rand, 'n', theme.snow)
+  if (theme.snow) dust(grid, rand, 'n', theme.snow * 0.3)
   if (theme.panes) hangPanes(grid, ceilings, range, rand, theme.panes)
 }
 
