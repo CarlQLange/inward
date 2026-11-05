@@ -139,6 +139,7 @@ const LANDS = {
       for (let dx = -2; dx <= 2; dx++) {
         const m = matAt(g.world, x + dx, y + dy)
         if (m === M.LAVA) setCell(g.world, x + dx, y + dy, M.ROCK)
+        else if (m === M.WATER && owns(p, 'frost.snow')) setCell(g.world, x + dx, y + dy, M.SNOW)
         else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x + dx, y + dy, M.SAND)
         else if (g.world.burn[(y + dy) * ROOM + x + dx] > 0) g.world.burn[(y + dy) * ROOM + x + dx] = 0
       }
@@ -364,7 +365,7 @@ const stepHurl = (g, f, dt) => {
   f.spin = f.age * 18
   const [x, y] = [cell(f.x), cell(f.y)]
   const m = matAt(g.world, x, y)
-  if (BREAKS.has(m) || m === M.MUD) {
+  if (BREAKS.has(m) || (m === M.MUD && owns(p, 'hammer.tamp'))) {
     hammerCell(g, p, x, y)
     if (!f.landed) hammerLands(g, p, x, y, null)
     f.landed = true

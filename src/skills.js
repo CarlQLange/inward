@@ -299,6 +299,7 @@ export const strike = (g, from, to) => {
   const energy = S.bolt.energy * (1 + g.depth / 2)
   zap(g, from, to, colour)
   const [x, y] = [cell(to.x), cell(to.y)]
+  if (owns(p, 'bolt.fence')) joinStrikes(g, to)
   const earth = [0, 1, 2, 3].find(down => props(matAt(g.world, x, y + down)).conductance) ?? 0
   energize(g.world, x, y + earth, energy)
   ignite(g.world, x, y)
@@ -345,7 +346,6 @@ const bolt = (g, p) => {
     hit.struck.stun = Math.max(hit.struck.stun, 1)
   }
   if (owns(p, 'bolt.nail')) addEffect(g, { kind: 'nail', x: hit.last.x, y: hit.last.y, target: hit.struck, life: S.bolt.nailLife, clock: S.bolt.nailEvery })
-  if (owns(p, 'bolt.fence')) joinStrikes(g, hit.last)
   looseStored(g, start, hit, strikesHeld(p))
   g.pulse = 1
 }
@@ -504,7 +504,7 @@ const freezeFoe = (g, p, e) => {
   e.frozen = S.frost.freeze
 }
 
-export const frozenWater = p => (owns(p, 'frost.snow') ? M.SNOW : M.ICE)
+const frozenWater = p => (owns(p, 'frost.snow') ? M.SNOW : M.ICE)
 
 const chill = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
