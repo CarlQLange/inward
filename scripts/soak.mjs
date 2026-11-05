@@ -403,7 +403,6 @@ const worker = async ({ opts, from, to }) => {
     const count = opts.found === 'rand' ? Math.floor(Math.random() * (LADDER.length + 1)) : opts.found === 'all' ? LADDER.length : Number(opts.found) || 0
     save.found = LADDER.slice(0, count)
     if (opts.omen) save.found = [...new Set([...save.found, `omen:${opts.omen}`])]
-    save.ghost = null
   }
 
   const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {}, loops: {}, noRoute: [] })

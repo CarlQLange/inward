@@ -8,8 +8,8 @@ const FIRE = '#ff9a2e'
 const CHARGE = '#ffe84a'
 const FROST = '#a0e6ff'
 const GAS = '#c79ae0'
-const PALE = '#c9d4c0'
-const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, armoured: PALE }
+const MAGNET = '#6fd0ff'
+const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, magnetic: MAGNET }
 
 const LAMP = paintFrames(['..c...', '..c...', '.cccc.', 'cyyyyc', 'cyyyyc', '.cccc.'], { c: '#5a5a52', y: '#ffd24a' })
 const ORBIT = paintFrames(['..ss..', '.sSSs.', 'sSSSSs', 'sSSSds', '.sdds.', '..ss..'], { s: '#7a2a34', S: '#d94a5a', d: '#a03040' })

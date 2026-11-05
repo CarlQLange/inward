@@ -721,15 +721,13 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   if (special.event === 'arena') {
     for (const s of layout.segments.slice(1)) placeFoe(pickFoe(theme, rand, enemies), s, grid, ceilings, range, enemies)
   }
-  const spare = mark(last, 1)
-
   const ok = passes(grid, anchors, goals)
   applyLocks(grid, links, doors, layout, enemies, ceilings)
 
   const drains = []
   grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
   grid[ROOM - 1].forEach((c, x) => { if (c !== '#') drains.push((ROOM - 1) * ROOM + x) })
-  return { ok, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies, drains, layout: layoutName, spare: { x: spare * BLOCK, y: (last.floor - 1) * BLOCK } } }
+  return { ok, definition: { map: grid.map(row => row.join('')), doors, cards, wares, enemies, drains, layout: layoutName } }
 }
 
 const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }

@@ -249,7 +249,7 @@ const worker = async () => {
     p.skills = loadout.map(({ kind }) => ({ kind, ready: 0 }))
     p.upgrades = new Set(loadout.flatMap(l => l.forms))
     p.relics = new Set()
-    p.fireproof = p.insulated = p.smokeproof = false
+    p.fireproof = p.insulated = false
     jumpTo(g, x, y)
     g.reveal = null
     g.menus.length = 0

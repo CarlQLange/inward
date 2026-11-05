@@ -1,10 +1,10 @@
 import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { LAYOUT, isTouchLayout } from './layout.js'
-import { LIGHT_SIZE, ambientOf, buildLight } from './light.js'
+import { LIGHT_SIZE, buildLight } from './light.js'
 import { save } from './store.js'
 import { createCellLayers, refreshCells } from './cells.js'
-import { ERA_KEYS, depthAmount, eraAt } from './era.js'
-import { MASK_SIZE, airOf, masksFor } from './backdrop.js'
+import { depthAmount, eraAt } from './era.js'
+import { airOf, masksFor } from './backdrop.js'
 import { DISPLAY, FRAME, FRAME_UNIFORMS, OPTICS, OPTICS_UNIFORMS, QUAD, QUAD_VERTEX, RING_SLOTS, RIPPLE_SLOTS, VERTEX, WORLD, WORLD_UNIFORMS } from './shaders.js'
 
 const POWER = { full: 1, soft: 0.6, off: 0 }
@@ -120,7 +120,7 @@ export const createPresenter = canvas => {
   const frameExtras = ['view', 'origin', 'shake', 'slideNew', 'slideOld', 'mapPos', 'zoom', 'pitColour', 'rings', 'loopTint']
   const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks', 'front'], WORLD_UNIFORMS, ['frontOrigin', 'frontScale', 'vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide'])
   const opticsProgram = programOf(gl, OPTICS, ['worldLayer', 'cells', 'fields', 'lightMap', 'noise', 'front'], OPTICS_UNIFORMS, ['frontOrigin', 'frontScale', 'ripples', 'fogColour', 'beamColour'])
-  const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'lightMap', 'noise'], FRAME_UNIFORMS, frameExtras)
+  const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'noise'], FRAME_UNIFORMS, frameExtras)
   const displayProgram = programOf(gl, DISPLAY, ['scene'], ['lcd', 'scanline'], ['view', 'room'])
   const quadProgram = programOf(gl, QUAD, ['roomNow', 'front'], ['actors', 'opacity', 'worldOn'], ['transform', 'actorRect'], QUAD_VERTEX)
 
@@ -307,9 +307,9 @@ export const createPresenter = canvas => {
     }
   }
 
-  const drawFrame = (state, era, lighting, roomNow, roomOld, target, history, shake, power) => {
+  const drawFrame = (state, era, roomNow, roomOld, target, history, shake, power) => {
     passInto(target, frameProgram, {
-      roomNow: roomNow.tex, roomOld: roomOld.tex, front: textures.front, history: history.tex, lightMap: textures.light, noise: textures.noise,
+      roomNow: roomNow.tex, roomOld: roomOld.tex, front: textures.front, history: history.tex, noise: textures.noise,
     }, {
       ...era,
       time: state.time,
@@ -319,7 +319,6 @@ export const createPresenter = canvas => {
       flash: Math.min(0.42, state.white ?? 0) * Math.max(power, 0.25),
       desaturate: state.desat ?? 0,
       hurt: Math.max(state.hurtFlash ?? 0, state.danger ?? 0),
-      forced: state.menus?.length ? 0 : lighting.forced,
       doorOn: slides(state).on,
       halo: Math.min(0.5, era.bloom * 0.55 + era.fog * 0.2 + (era.far + era.near) * 0.08),
       calm: isTouchLayout() ? 0.65 : 1,
@@ -354,11 +353,7 @@ export const createPresenter = canvas => {
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 
-  const lightingOf = (state, era) => {
-    const dark = ambientOf(state)
-    if (dark !== null) return { ambient: dark, amount: 1, front: dark, forced: 1 }
-    return { ambient: era.ambient, amount: era.light, front: 0.55 + era.ambient * 0.25, forced: 0 }
-  }
+  const lightingOf = era => ({ ambient: era.ambient, amount: era.light, front: 0.55 + era.ambient * 0.25 })
 
   const drawQuad = (roomNow, transform, rect, values) => {
     gl.useProgram(quadProgram.program)
@@ -390,7 +385,7 @@ export const createPresenter = canvas => {
   const present = (layers, state, shake = { x: 0, y: 0 }) => {
     const power = POWER[save.settings.shaders] ?? 1
     const era = eraAt(state.depth, power)
-    const lighting = lightingOf(state, era)
+    const lighting = lightingOf(era)
     if (state.door !== shown.door) {
       if (state.door) shown.room = 1 - shown.room
       shown.door = state.door ?? null
@@ -404,7 +399,7 @@ export const createPresenter = canvas => {
     shown.frame = 1 - shown.frame
     const frame = frameTargets[shown.frame]
     const history = frameTargets[1 - shown.frame]
-    const composed = () => drawFrame(state, era, lighting, roomNow, roomOld, frame, history, shake, power)
+    const composed = () => drawFrame(state, era, roomNow, roomOld, frame, history, shake, power)
     if (stageHook) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, frame.fbo)
       gl.viewport(0, 0, frame.w, frame.h)

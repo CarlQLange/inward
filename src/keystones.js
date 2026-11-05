@@ -24,9 +24,6 @@ export const KEYSTONES = [
   keystone('salamander', 'SALAMANDER', 'FIRE AND LAVA HEAL YOU', 'WATER HURTS YOU', '#ff9a2e', [
     '....#....', '...##....', '..###.#..', '..#####..', '.#######.', '.###.###.', '.##...##.', '.###.###.', '..#####..',
   ]),
-  keystone('unbroken', 'UNBROKEN', 'CHAINS NEVER BREAK', 'LOSE A HEART WHEN A CHAIN RUNS OUT', '#ffe84a', [
-    '###......', '#.#......', '#.###....', '###.#....', '..#.###..', '..###.#..', '....#.###', '....###.#', '......###',
-  ]),
   keystone('glutton', 'GLUTTON', 'ANY MATERIAL NEAR YOU RECHARGES SKILLS', 'SKILLS DO NOT RECHARGE WITHOUT IT', '#8ae04a', [
     '..####...', '.######..', '#####....', '####..#.#', '####.....', '#####....', '.######..', '..####...', '.........',
   ]),
@@ -41,9 +38,6 @@ export const KEYSTONES = [
   ]),
   keystone('livewire', 'LIVE WIRE', 'YOU SHOCK FOES YOU TOUCH', 'YOU SET FIRE TO WHAT YOU STAND ON', '#ffe84a', [
     '.....##..', '....##...', '...##....', '..#####..', '....##...', '...##....', '..##.....', '.##......', '.#.......',
-  ]),
-  keystone('bounty', 'BOUNTY', 'ELITES PAY THREE TIMES AS MUCH', 'ALL FOES ARE ELITE', '#ffe84a', [
-    '...###...', '..#.#.#..', '.#..#..#.', '#...#...#', '#########', '#...#...#', '.#..#..#.', '..#.#.#..', '...###...',
   ]),
   keystone('wake', 'THE WAKE', 'KILLED FOES FIGHT FOR YOU', 'CLEARING A ROOM GIVES NOTHING', '#c79ae0', [
     '..#####..', '.#######.', '.#..#..#.', '.#######.', '..#.#.#..', '.........', '....#....', '...###...', '..#.#.#..',

@@ -367,7 +367,7 @@ void main() {
 }`
 
 export const FRAME_ERA = ['green', 'shades', 'posterise', 'ghost', 'bloom', 'saturate', 'unmoor', 'pit', 'bend']
-export const FRAME_UNIFORMS = ['time', 'pulse', 'stop', 'aberration', 'flash', 'desaturate', 'hurt', 'forced', 'doorOn', 'halo', 'calm', 'coreGlow', 'loopOn', ...FRAME_ERA]
+export const FRAME_UNIFORMS = ['time', 'pulse', 'stop', 'aberration', 'flash', 'desaturate', 'hurt', 'doorOn', 'halo', 'calm', 'coreGlow', 'loopOn', ...FRAME_ERA]
 
 export const FRAME = `
 precision highp float;
@@ -376,7 +376,6 @@ uniform sampler2D roomNow;
 uniform sampler2D roomOld;
 uniform sampler2D front;
 uniform sampler2D history;
-uniform sampler2D lightMap;
 uniform sampler2D noise;
 uniform vec2 view;
 uniform vec2 origin;
@@ -583,10 +582,6 @@ void main() {
     vec3 plain = actor / f.a;
     spot = f.a > 0.98 ? max(step(distance(plain, SPOT), 0.012), step(distance(plain, SPOT_DEEP), 0.012)) : 0.0;
     actor = handheld(plain) * f.a;
-    if (forced > 0.001 && inRoom) {
-      vec3 l = texture2D(lightMap, zoomed / SIZE).rgb;
-      actor *= mix(vec3(1.0), clamp(l * 2.4 + 0.1, 0.0, 1.0), forced);
-    }
   }
   vec3 colour = actor + world * (1.0 - f.a);
 

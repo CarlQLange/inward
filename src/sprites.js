@@ -47,14 +47,14 @@ const TILE_INDEX = {
 const ICON_INDEX = {
   icons: { bolt: 0, repel: 1, ember: 2, spring: 3, seed: 4, hammer: 5, gust: 6, frost: 7, acid: 8, bomb: 9, coin: 10, heart: 11, rift: 15 },
   icons2: { blink: 0, grapple: 1, dash: 2, rewind: 3, mason: 4, melt: 5, alchemy: 6, well: 7, swap: 8, stop: 9, charm: 10, decoy: 11, drone: 12, rod: 13, mine: 14, roar: 15 },
-  icons3: { mirror: 0, echo: 1, pact: 2, fireboots: 3, rubber: 4, gills: 5, springs: 6, claws: 7, feather: 8, coinmagnet: 9, sack: 10, hands: 11, battery: 12, plate: 13, phoenix: 14, incendiary: 15 },
-  icons4: { shock: 0, frostshot: 1, pierce: 2, spread: 3, ricochet: 4, stomp: 5, chest: 6, altar: 7, gem: 8, skull: 9, crown: 10, acidskull: 11, wind: 12, dice: 13, eye: 14, chain: 15 },
+  icons3: { mirror: 0, echo: 1, pact: 2, fireboots: 3, rubber: 4, gills: 5, springs: 6, claws: 7, feather: 8, sack: 10, plate: 13, phoenix: 14, incendiary: 15 },
+  icons4: { shock: 0, frostshot: 1, pierce: 2, spread: 3, ricochet: 4, stomp: 5, chest: 6, altar: 7, gem: 8, skull: 9, crown: 10, acidskull: 11, wind: 12, eye: 14, chain: 15 },
   icons5: { flask: 0, wick: 1, float: 2, link: 3, lens: 4, chime: 5, clay: 6, burrow: 7, snowflake: 8, shard: 9, boot: 10, horseshoe: 11, sprout: 12, hoop: 13, icecube: 14, snail: 15 },
 }
 
 const SIGN_NAMES = [
   'cause_fire', 'cause_lava', 'cause_acid', 'cause_charge', 'cause_smoke', 'cause_crushed', 'cause_bitten', 'cause_shot',
-  'omen_tinder', 'omen_deluge', 'omen_blackout', 'omen_rust', 'omen_bloom', 'omen_swarm', 'omen_moon', 'omen_midas', 'omen_glass',
+  'omen_tinder', 'omen_deluge', null, 'omen_rust', 'omen_bloom', 'omen_swarm', 'omen_moon', null, 'omen_glass',
   'map_skull', 'seal', 'seal_broken', 'map_core', 'almanac', 'discovery',
 ]
 
@@ -149,13 +149,6 @@ export const creatureFrames = kind => {
   return clips ? Object.values(clips)[0].frames : []
 }
 
-export const creatureAnchor = kind => castEntry(kind)?.anchor ?? 'ground'
-
-export const creatureSize = kind => {
-  const [first] = creatureFrames(kind)
-  return first ? { w: first[0].width, h: first[0].height } : { w: 0, h: 0 }
-}
-
 export const regionTiles = region => SPRITES.regions[typeof region === 'number' ? REGION_NAMES[region] : region] ?? []
 
 const assetUrl = file => globalThis.INLINE_ASSETS?.[file] ?? `assets/${file}`
@@ -198,7 +191,7 @@ export const loadSprites = async () => {
   for (const [sheet, names] of Object.entries(ICON_INDEX)) {
     for (const [name, index] of Object.entries(names)) SPRITES.icons[name] = cutTile(loaded[sheet], index, 16)
   }
-  SIGN_NAMES.forEach((name, index) => { SPRITES.icons[name] = cutTile(loaded.signs, index, 16) })
+  SIGN_NAMES.forEach((name, index) => { if (name) SPRITES.icons[name] = cutTile(loaded.signs, index, 16) })
   REGION_NAMES.forEach((name, index) => {
     SPRITES.regions[name] = [cutTile(loaded.tiles2, index * 2, 8), cutTile(loaded.tiles2, index * 2 + 1, 8)]
   })

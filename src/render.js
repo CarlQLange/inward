@@ -3,12 +3,10 @@ import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
 import { pausedOverPit } from './moment.js'
 import { drawBossBar, drawReveal } from './overlay.js'
-import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMenus, drawToast } from './screens.js'
 import { drawHud, drawTouchControls } from './hud.js'
 import { save } from './store.js'
-import { RELIC_BY_ID } from './relics.js'
 import { keyOf } from './map.js'
 import { drawHero } from './hero.js'
 import { cameraOffset, doorOffset, drawMotes, drawParticles } from './fx.js'
@@ -18,8 +16,6 @@ import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
 import { drawSkillEffects } from './skillart.js'
 import { drawBolt, drawFireball, drawShot } from './projectiles.js'
 
-const GREEN = '#76d648'
-const DIM = '#26542a'
 const COLOURS = {
   hurt: '#ff5a4a', heal: '#7dff8a',
   white: '#f4f8f2', pale: '#c9d4c0', fire: '#ff9a2e', charge: '#ffe84a',
@@ -34,22 +30,12 @@ const drawProjectiles = (ctx, g) => {
   g.bolts.forEach(b => drawBolt(ctx, b, g))
 }
 
-const drawIcon = (ctx, name, x, y, size) => {
-  ctx.imageSmoothingEnabled = false
-  ctx.drawImage(SPRITES.icons[name], x, y, size, size)
-}
 
 const drawPopups = (ctx, g) => {
   for (const p of g.popups) {
     if (p.icon) drawPictogram(ctx, CAUSE_ICONS[p.icon] ?? CAUSE_ICONS.DEFAULT, p.x, p.y, COLOURS[p.colour], p.scale ?? 1)
     else drawText(ctx, p.text, p.x - textWidth(String(p.text)) / 2, p.y, COLOURS[p.colour])
   }
-}
-
-const box = (ctx, x, y, w, h, colour = GREEN) => {
-  ctx.strokeStyle = colour
-  ctx.lineWidth = 1
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
 }
 
 const drawLook = (ctx, g) => {

@@ -195,8 +195,8 @@ const drawRelicRow = (ctx, g, x, top) => {
   ], x, top)
 }
 
-const drawLoopFactor = (ctx, g, x, y) => {
-  if (g.loop > 0) drawText(ctx, `X${g.loop + 1}`, x, y, YELLOW)
+const drawLoops = (ctx, g, x, y) => {
+  for (let i = 0; i < g.loop; i++) ctx.drawImage(SPRITES.icons.map_core, x + i * 8, y, 7, 7)
 }
 
 const drawXp = (ctx, g, x, top) => {
@@ -222,11 +222,10 @@ const drawRight = (ctx, g) => {
   y += 13
   if (g.bestBeaten) numberRight(ctx, 'BEST', x + SPAN, y, Math.floor(g.time * 3) % 2 ? YELLOW : WHITE)
   else numberRight(ctx, g.best, x + SPAN, y, DIM)
-  drawLoopFactor(ctx, g, x, y)
+  drawLoops(ctx, g, x, y - 1)
   y += 9
   drawXp(ctx, g, x, y)
-  drawText(ctx, g.level, x, y + 6, GREEN)
-  y += 14
+  y += 8
   drawSeals(ctx, g, x, y)
   y += 13
   drawRelicRow(ctx, g, x, y)
@@ -385,7 +384,7 @@ const drawTallHud = (ctx, g) => {
   ctx.drawImage(SPRITES.icons.coin, left + 52, top, 7, 7)
   drawText(ctx, g.gold, left + 61, top + 1, YELLOW)
   numberRight(ctx, rollScore(g), VIEW.w - inset.right - 4, top + 1, g.bestBeaten ? YELLOW : WHITE)
-  drawLoopFactor(ctx, g, VIEW.w - inset.right - 4 - textWidth(String(rollScore(g))) - 14, top + 1)
+  drawLoops(ctx, g, VIEW.w - inset.right - 8 - textWidth(String(rollScore(g))) - g.loop * 8, top)
   const xpTop = ORIGIN.y - 4
   const width = VIEW.w - inset.left - inset.right - 8
   ctx.fillStyle = DIM
@@ -397,7 +396,6 @@ const drawTallHud = (ctx, g) => {
   drawMapGrid(ctx, g, inset.left + 4, below, pitch)
   for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 52 + i * 11, below, 9, 9)
   if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 52, below + 12, 10, 10)
-  drawText(ctx, g.level, inset.left + 68, below + 14, GREEN)
   drawChainCount(ctx, g, inset.left + 90, below + 2)
   drawHitNote(ctx, g, VIEW.w - inset.right - 16, below + 12)
   drawMarks(ctx, [...[...g.player.keystones].map(id => `glyph_${id}`), ...deepMarks(g)], inset.left + 52, below + 25, 12)
@@ -415,16 +413,15 @@ const drawWideHud = (ctx, g) => {
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(SPRITES.icons.coin, inset.left + 6, top + 14, 8, 8)
   drawText(ctx, g.gold, inset.left + 16, top + 16, YELLOW)
-  drawLoopFactor(ctx, g, inset.left + 50, top + 16)
+  drawLoops(ctx, g, inset.left + 50, top + 15)
   drawText(ctx, rollScore(g), inset.left + 6, top + 26, g.bestBeaten ? YELLOW : WHITE, 2)
   const col = Math.max(40, ORIGIN.x - inset.left - 14)
   ctx.fillStyle = DIM
   ctx.fillRect(inset.left + 6, top + 40, col, 3)
   ctx.fillStyle = GREEN
   ctx.fillRect(inset.left + 6, top + 40, Math.round((col * g.xp) / g.nextLevel), 3)
-  drawText(ctx, g.level, inset.left + 6, top + 46, GREEN)
-  for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 18 + i * 11, top + 44, 9, 9)
-  if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 54, top + 44, 10, 10)
+  for (let i = 0; i < 3; i++) ctx.drawImage(SPRITES.icons[i < g.seals ? 'seal_broken' : 'seal'], inset.left + 6 + i * 11, top + 44, 9, 9)
+  if (g.omen) ctx.drawImage(SPRITES.icons[`omen_${g.omen}`], inset.left + 42, top + 44, 10, 10)
   drawRelicRow(ctx, g, inset.left + 6, top + 58)
   drawChainCount(ctx, g, inset.left + 6, top + 82)
   drawHitNote(ctx, g, inset.left + 74, top + 88)

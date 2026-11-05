@@ -4,6 +4,7 @@ import { SKILL_NAMES } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
 import { KEYSTONE_BY_ID } from './keystones.js'
 import { MUTATION_BY_ID } from './deep.js'
+import { OMENS } from './omens.js'
 
 const keyed = (kind, ids) => ids.map(id => `${kind}:${id}`)
 
@@ -12,29 +13,31 @@ export const BASE = new Set([
   ...keyed('foe', ['crawler', 'spitter', 'fish', 'bat', 'turret', 'slug', 'tick']),
   ...keyed('inhabitant', ['mole', 'hermit']),
   ...keyed('warden', ['bellows', 'colossus', 'crucible']),
-  ...keyed('relic', ['springs', 'feather', 'sack', 'hands', 'spread', 'ricochet', 'gills', 'coinmagnet']),
+  ...keyed('relic', ['springs', 'feather', 'sack', 'spread', 'ricochet']),
   ...keyed('event', ['arena', 'chest']),
-  ...keyed('keystone', ['echo', 'fists', 'stain', 'fourth', 'salamander', 'unbroken', 'glutton', 'powder']),
+  ...keyed('keystone', ['echo', 'fists', 'stain', 'fourth', 'salamander', 'glutton', 'powder']),
 ])
 
 export const LADDER = [
   'foe:bomber', 'event:vault', 'relic:claws', 'skill:dash', 'foe:spore', 'inhabitant:miner',
-  'keystone:bounty', 'omen:tinder', 'relic:fireboots', 'foe:crab', 'event:flood', 'skill:spring', 'foe:pillbug',
+  'omen:tinder', 'relic:fireboots', 'foe:crab', 'event:flood', 'skill:spring', 'foe:pillbug',
   'keystone:quarry', 'relic:stomp', 'foe:gasbag', 'skill:wick', 'event:gasworks', 'omen:deluge', 'skill:mason', 'foe:imp',
-  'keystone:livewire', 'relic:rubber', 'foe:gnat', 'inhabitant:cartographer', 'event:collapse', 'warden:eel', 'skill:acid',
+  'keystone:livewire', 'relic:rubber', 'foe:gnat', 'event:collapse', 'warden:eel', 'skill:acid',
   'omen:moon', 'keystone:overload', 'relic:incendiary', 'foe:slime', 'foe:snapweed', 'relic:shock', 'skill:melt',
   'keystone:wake', 'foe:dripper', 'skill:flask', 'event:altar', 'omen:bloom', 'relic:frostshot', 'foe:emberbat', 'skill:rod',
-  'keystone:slough', 'foe:scrapper', 'inhabitant:tinker', 'relic:pierce', 'omen:rust', 'skill:decoy', 'foe:jelly',
-  'relic:battery', 'foe:coil', 'warden:conductor', 'skill:swap', 'event:nest', 'relic:plate',
-  'keystone:monomania', 'omen:midas', 'foe:stilt', 'skill:well', 'relic:chain', 'foe:puffer', 'inhabitant:bloodletter',
+  'keystone:slough', 'foe:scrapper', 'relic:pierce', 'omen:rust', 'skill:decoy', 'foe:jelly',
+  'foe:coil', 'warden:conductor', 'skill:swap', 'event:nest', 'relic:plate',
+  'keystone:monomania', 'foe:stilt', 'skill:well', 'relic:chain', 'foe:puffer',
   'skill:drone', 'relic:wind', 'foe:worm', 'omen:swarm', 'skill:roar', 'relic:gem',
   'keystone:breath', 'foe:mimic', 'foe:urchin', 'skill:charm', 'relic:crown', 'warden:brood', 'skill:alchemy',
   'foe:lantern', 'omen:glass', 'relic:skull', 'skill:mirror', 'foe:shade', 'relic:acidskull',
-  'skill:stop', 'relic:dice', 'omen:blackout', 'skill:rewind', 'relic:eye',
+  'skill:stop', 'skill:rewind',
   'keystone:onecut', 'relic:phoenix',
 ]
 
 const CATALOGUE = [...BASE, ...LADDER]
+
+export const isCatalogued = key => CATALOGUE.includes(key)
 const KINDS = ['keystone', 'skill', 'relic', 'foe', 'inhabitant', 'event', 'warden', 'omen']
 const kindOf = key => key.split(':')[0]
 const idOf = key => key.split(':')[1]
@@ -61,7 +64,7 @@ export const rollOmen = secrets => {
   const fresh = secrets.find(key => kindOf(key) === 'omen')
   if (fresh) return idOf(fresh)
   const R = TUNING.run
-  const owned = save.found.filter(key => kindOf(key) === 'omen').map(idOf)
+  const owned = save.found.filter(key => kindOf(key) === 'omen').map(idOf).filter(id => OMENS[id])
   if (owned.length === 0 || Math.random() > R.omenBase + owned.length * R.omenPerFound) return null
   return owned[Math.floor(Math.random() * owned.length)]
 }
@@ -89,6 +92,7 @@ const NAMES = {
   relic: id => RELIC_BY_ID[id]?.name,
   keystone: id => KEYSTONE_BY_ID[id]?.name,
   mutation: id => MUTATION_BY_ID[id]?.name,
+  omen: id => OMENS[id]?.name,
 }
 
 export const nameOf = (kind, id) => NAMES[kind]?.(id) ?? id.toUpperCase()

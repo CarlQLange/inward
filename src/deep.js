@@ -4,16 +4,12 @@ import { matAt } from './world.js'
 import { WORLD_PX, cell, centre } from './physics.js'
 import { burstSparks } from './fx.js'
 import { createEnemy } from './enemies.js'
-import { favourite } from './wards.js'
 
 const mutation = (id, name, tint, glyph) => ({ id, name, tint, glyph })
 
 export const MUTATIONS = [
   mutation('spite', 'SPITE', '#ff5a4a', [
     '....#....', '.#..#..#.', '..#.#.#..', '...###...', '####.####', '...###...', '..#.#.#..', '.#..#..#.', '....#....',
-  ]),
-  mutation('restless', 'RESTLESS', '#c9d4c0', [
-    '...###...', '..#####..', '..#.#.#..', '..#####..', '...#.#...', '.........', '.#.#.#.#.', '#.#.#.#.#', '.........',
   ]),
   mutation('hatch', 'HATCH', '#c8ff5a', [
     '...###...', '..#####..', '.#######.', '.###.###.', '.##...##.', '.........', '#..#.#..#', '.##...##.', '#..#.#..#',
@@ -23,9 +19,6 @@ export const MUTATIONS = [
   ]),
   mutation('stalker', 'STALKER', '#c79ae0', [
     '.........', '..#####..', '.#.....#.', '#..###..#', '#..###..#', '#..###..#', '.#.....#.', '..#####..', '.........',
-  ]),
-  mutation('warded', 'WARDED', '#6fd0ff', [
-    '#########', '#.......#', '#.#####.#', '#.#####.#', '#.#####.#', '.#.###.#.', '..#.#.#..', '...#.#...', '....#....',
   ]),
 ]
 
@@ -51,16 +44,6 @@ const spitAt = (g, e) => {
   })
 }
 
-const riseAgain = (g, e) => {
-  const risen = createEnemy({ kind: e.kind, x: e.x, y: e.y })
-  Object.assign(risen, {
-    risen: true, hp: Math.max(1, Math.ceil(e.maxRise ?? 1)), stun: D().riseStun, flash: D().riseStun,
-    friendly: false, facing: e.facing, ward: e.ward,
-  })
-  g.spawns.push(risen)
-  burstSparks(g, centre(e).x, centre(e).y, '#c9d4c0', 10)
-}
-
 const hatch = (g, e) => {
   const c = centre(e)
   for (const side of [-1, 1]) {
@@ -70,11 +53,10 @@ const hatch = (g, e) => {
   }
 }
 
-export const deepKill = (g, e, environmental) => {
+export const deepKill = (g, e) => {
   if (!g.mutations?.length || e.warden || e.partOf || e.ally) return
   if (hasMutation(g, 'spite')) spitAt(g, e)
-  if (hasMutation(g, 'restless') && !environmental && !e.risen && !e.spawned && !e.heavy) riseAgain(g, e)
-  if (hasMutation(g, 'hatch') && !e.hatched && !e.risen && e.w >= D().hatchFrom) hatch(g, e)
+  if (hasMutation(g, 'hatch') && !e.hatched && e.w >= D().hatchFrom) hatch(g, e)
 }
 
 const STILL_KINDS = new Set(['turret', 'nest', 'snapweed', 'dripper', 'mimic', 'worm', 'fish', 'jelly'])
@@ -113,9 +95,6 @@ export const stepMutations = (g, e, dt) => {
 
 export const mutateFoe = (g, e, theme) => {
   if (!g.mutations?.length || e.friendly || e.heavy || e.prop || e.warden) return e
-  const kindled = hasMutation(g, 'kindled') && !e.elite
-    ? { elite: D().kindledFire.includes(theme) ? 'burning' : 'charged', fireproof: true, insulated: true }
-    : {}
-  const warded = hasMutation(g, 'warded') && Math.random() < D().wardedChance ? { ward: favourite(g) } : {}
-  return { ...e, ...kindled, ...warded, maxRise: Math.max(1, e.hp * D().riseHp) }
+  if (!hasMutation(g, 'kindled') || e.elite) return e
+  return { ...e, elite: D().kindledFire.includes(theme) ? 'burning' : 'charged', fireproof: true, insulated: true }
 }

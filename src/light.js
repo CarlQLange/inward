@@ -25,7 +25,6 @@ const HOT_SHOT = [1, 0.5, 0.2]
 const CORE = [0.45, 0.85, 1]
 const ACID = [0.55, 1, 0.25]
 const VOLATILE = [1, 0.45, 0.95]
-const FOE_GLOW = [1, 0.5, 0.45]
 
 const cellOf = (x, y) => (x < 0 || y < 0 || x >= ROOM_PX || y >= ROOM_PX ? 1 : solid[((y / BLOCK) | 0) * ROOM + ((x / BLOCK) | 0)])
 
@@ -248,29 +247,21 @@ const stillBeams = (w, seed) => {
   }
 }
 
-const omenOf = g => String(g.omen?.id ?? g.omen ?? '').toLowerCase()
-
-export const ambientOf = g => {
-  if (g.ambient !== undefined && g.ambient < 1) return g.ambient
-  return omenOf(g) === 'blackout' ? 0.12 : null
-}
-
-const actorLights = (g, dark) => {
+const actorLights = g => {
   const p = g.player
   const dead = g.phase === 'dead'
   if (p && g.phase !== 'title' && !dead) {
     const h = heroOf(p)
     const tip = h.tip
     const dir = { x: Math.cos(h.angle), y: Math.sin(h.angle) }
-    splat(live, p.x + 3, p.y + p.h / 2, dark ? 46 : 34, LAMP, dark ? 0.8 : 0.34)
-    cone(live, tip.x, tip.y, dir, dark ? 120 : 68, 0.82, LAMP, dark ? 1.3 : 0.38)
+    splat(live, p.x + 3, p.y + p.h / 2, 34, LAMP, 0.34)
+    cone(live, tip.x, tip.y, dir, 68, 0.82, LAMP, 0.38)
     if (h.flash > 0) splat(live, tip.x, tip.y, 30, LAMP, 1.1)
   }
   for (const s of g.shots) splat(live, s.x, s.y, 12, SHOT, 0.5)
   for (const f of g.fireballs) splat(live, f.x + 2, f.y + 2, 18, f.pellet ? SHOT : f.acid ? ACID : HOT_SHOT, 0.65)
   for (const b of g.bolts) for (const point of b.points) splat(live, point.x, point.y, 14, CHARGE, 0.4)
   for (const e of g.enemies) {
-    if (dark && !e.friendly && !e.prop) splat(live, e.x + e.w / 2, e.y + e.h / 2, 18 + e.w / 2, FOE_GLOW, 0.5)
     if (e.light) splat(live, e.x + e.w / 2, e.y + e.h / 2, e.light.radius ?? 24, e.light.colour ?? FIRE, e.light.power ?? 0.6)
     else if (e.kind === 'emberbat' || e.elite === 'burning') splat(live, e.x + e.w / 2, e.y + e.h / 2, 22, FIRE, 0.5)
     else if (e.elite === 'charged') splat(live, e.x + e.w / 2, e.y + e.h / 2, 18, CHARGE, 0.35)
@@ -292,7 +283,6 @@ const stillChanged = w => {
 }
 
 export const buildLight = (g, time, { fixture, seed, shafts }) => {
-  const dark = ambientOf(g) !== null
   const w = g.world
   if (w) {
     const changed = stillChanged(w)
@@ -309,7 +299,7 @@ export const buildLight = (g, time, { fixture, seed, shafts }) => {
   }
   for (let c = 0; c < 3; c++) live[c].set(still[c])
   if (w) fireLights(w, time)
-  actorLights(g, dark)
+  actorLights(g)
   const [red, green, blue] = live
   for (let i = 0; i < AREA; i++) {
     bytes[i * 4] = Math.min(255, red[i] * 255)

@@ -155,11 +155,4 @@ export const drawWardenMarks = (ctx, g, left, top, pitch) => {
       ctx.fillRect(left + x * pitch + 2, top + y * pitch + 2, pitch - 5, pitch - 5)
     }
   }
-  if (!g.charted) return
-  ctx.fillStyle = '#3f7a4f'
-  for (const key of Object.keys(g.map.links)) {
-    if (g.rooms[key]?.visited) continue
-    const [x, y] = key.split(',').map(Number)
-    ctx.fillRect(left + x * pitch + 2, top + y * pitch + 2, pitch - 5, pitch - 5)
-  }
 }

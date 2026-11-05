@@ -34,8 +34,6 @@ export const noteKill = (g, e) => {
 
 const ranked = counts => Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([s]) => s)
 
-export const favourite = g => ranked(g.recent)[0] ?? 'SHOT'
-
 const shareFor = g => {
   const base = W().byRing[g.ring] ?? 1
   return Math.max(W().floor, base - (g.loop ?? 0) * W().perLoop)

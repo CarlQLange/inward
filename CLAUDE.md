@@ -21,7 +21,7 @@ In the page, `window.game` drives it without playing: `game.sim(seconds, input)`
 steps and draws, `game.tick(input)` steps without drawing (use this in long loops,
 since drawing thousands of frames crashes the pane), `game.state` reads it, and
 `game.restart()` starts a new run. Long scripted loops also need a time limit, or the
-browser tool gives up. Testing writes to the save, including records, field notes and
+browser tool gives up. Testing writes to the save, including best scores, field notes and
 options, so snapshot localStorage in sessionStorage first and restore it afterwards. A
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
@@ -200,9 +200,9 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   feel different in the hand too: most are a tap, some hold stock (dash, mason, mine), and some forms stream while
   held, toggle, or swell while held.
 - Level-up cards show the actual skill or form, leaning towards skills that make what yours eat and what the
-  region offers (`src/offers.js`). Once a run's forks are spent, picks widen what a skill eats or change a form taken.
+  region offers (`src/offers.js`). Once a run's forks are spent, the cards offer a new skill, a relic or a heal.
 - Eight random starter rooms, each teaching its own first skill, and a quickstart for any
-  ring with a matching random loadout. Quickstarts don't count towards records.
+  ring with a matching random loadout. Quickstarts don't count towards the best scores.
 - Each room has one of eight layouts, such as tunnels, chasm or chimney, and regions have
   their own tinted tiles and backdrop.
 - Keyboard, mouse and controller all work at once, with no option to pick between them, and
@@ -213,11 +213,11 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Eight hearts, and each hit costs one. The hero's red scarf is health and hits tear it. A hit shows a
   cause pictogram. Holding Shift or LT shows what hurts, burns, conducts or explodes, without labels.
 - Foes warn before attacking. Clearing a room heals one heart.
-- 27 relics, from chests, altars, mimics and the shop. They change rules rather than numbers:
+- 21 relics, from chests, altars, mimics and the shop. They change rules rather than numbers:
   your gun, your movement, what can hurt you, and what pays (fire immunity makes fire a toy,
   the odd gem only rewards world kills, gas lifts you).
 - Eight region themes change materials, tiles and foes. Room events: arena, flood,
-  gasworks, collapse, vault, nest, altar and chests. Elite foes can burn, shock or be armoured.
+  gasworks, collapse, vault, nest, altar and chests. Elite foes can burn, shock or be magnetic.
 - Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, lava, acid,
   vine, brick, smoke, steam, methane, volatile crystal, glass, mud and snow.
 - Lava or charge glazes sand into glass, which lets light through and shatters into flying shards under a blast,
@@ -262,7 +262,7 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   reach an exit, a bomb drops, and if that can't help a vine and a path get carved.
 
 - Each Warden's seal offers one of three keystones, big rule changes with a cost (`src/keystones.js`). A run gets
-  three, plus one per descent. They sit in the found set, eight from the start and nine on the ladder. Set
+  three, plus one per descent. They sit in the found set, seven from the start and eight on the ladder. Set
   `sealHold` on the game to make the keystone offer wait, which is the seam for anything played when a seal breaks.
 - Wardens from ring 3 and the Core wear a ward against whatever has been doing the killing (`src/wards.js`): that
   school does a fraction of its damage, the Warden doesn't flinch, its pictogram sits above it and on the boss bar,

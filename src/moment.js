@@ -48,7 +48,6 @@ export const stepMoment = (g, dt, wantsSkip) => {
   return true
 }
 
-export const momentHolds = g => Boolean(g.moment && g.moment.delay <= 0)
 export const stagedMoment = g => (g.moment && g.moment.delay <= 0 && !g.moment.landed ? g.moment : null)
 
 export const pausedOverPit = g => g.menus?.at(-1)?.page === 'pause' && (g.seals > 0 || g.loop > 0)
