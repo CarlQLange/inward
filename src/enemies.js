@@ -1,9 +1,10 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
-import { M } from './materials.js'
-import { burningAt, energize, explode, ignite, matAt, puff, setCell } from './world.js'
+import { M, props } from './materials.js'
+import { burningAt, energize, explode, ignite, matAt, pour, puff, setCell } from './world.js'
 import { cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt, WORLD_PX } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { decoyFor } from './effects.js'
+import { zap } from './skills.js'
 import { anchorOf } from './cast.js'
 
 const P = TUNING.player
@@ -40,6 +41,10 @@ export const ENEMY_DEFS = {
   puffer: { size: [14, 10], hp: 2, value: 30, sprite: [4] },
   lantern: { size: [18, 16], hp: 4, value: 40, sprite: [5] },
   lamp: { size: [6, 8], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
+  battery: { size: [8, 10], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
+  tank: { size: [12, 9], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
+  carboy: { size: [8, 10], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
+  ladle: { size: [10, 9], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
   mole: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [10] },
   hermit: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [11] },
   miner: { size: [14, 20], hp: 3, value: 0, friendly: true, sprite: [12] },
@@ -718,9 +723,60 @@ const idle = (g, e, dt) => {
 export const STEPPERS = {
   crawler: walker(E.crawler.speed), spitter, fish, jelly, bat, spore, slug, worm,
   turret, bomber, imp, emberbat, slime, crab, nest, mimic, gasbag,
-  tick, pillbug, gnat, stilt, snapweed, scrapper, dripper, shade, coil, puffer, lantern, lamp,
+  tick, pillbug, gnat, stilt, snapweed, scrapper, dripper, shade, coil, puffer, lantern,
+  lamp, battery: lamp, tank: lamp, carboy: lamp, ladle: lamp,
   urchin: walker(E.urchin.speed),
   mole: idle, hermit: idle, miner: idle, cartographer: idle, tinker: idle, bloodletter: idle,
+}
+
+const exposed = (world, x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => !props(matAt(world, x + dx, y + dy)).solid)
+
+const conductorsNear = (world, x, y, reach) => {
+  const found = []
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const d = Math.hypot(dx, dy)
+      if (d <= reach && props(matAt(world, x + dx, y + dy)).conductance && exposed(world, x + dx, y + dy)) found.push({ x: x + dx, y: y + dy, d })
+    }
+  }
+  return found.sort((a, b) => a.d - b.d)
+}
+
+const inSight = (world, from, x, y) => {
+  const to = { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK }
+  const d = Math.max(1, Math.hypot(from.x - to.x, from.y - to.y))
+  return lineClear(world, from, { x: to.x + ((from.x - to.x) / d) * BLOCK, y: to.y + ((from.y - to.y) / d) * BLOCK })
+}
+
+const discharge = (g, e, c) => {
+  const B = E.battery
+  const here = { x: cell(c.x), y: cell(c.y) }
+  const arcs = conductorsNear(g.world, here.x, here.y, B.reach)
+    .filter(spot => inSight(g.world, c, spot.x, spot.y))
+    .reduce((picked, spot) => (picked.length < B.arcs && picked.every(o => Math.hypot(o.x - spot.x, o.y - spot.y) >= B.gap) ? [...picked, spot] : picked), [])
+  for (const { x, y } of arcs) {
+    zap(g, c, { x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK })
+    energize(g.world, x, y, B.energy)
+  }
+  const foe = g.enemies
+    .filter(o => !o.friendly && !o.ally && !o.intangible && o.hp > 0 && lineClear(g.world, c, centre(o)))
+    .map(o => [Math.hypot(centre(o).x - c.x, centre(o).y - c.y), o])
+    .filter(([d]) => d < B.reach * BLOCK)
+    .sort((a, b) => a[0] - b[0])[0]?.[1]
+  if (foe) {
+    zap(g, c, centre(foe))
+    hurt(g, foe, B.foeDamage, 'world', 'CHARGE')
+  }
+  burst(g, c.x, c.y, 'charge', 12)
+  g.pulse = Math.max(g.pulse, 0.5)
+}
+
+const VATS = { tank: [M.WATER, 'frost'], carboy: [M.ACID, 'heal'], ladle: [M.LAVA, 'fire'] }
+
+const spill = (g, e, c) => {
+  const [liquid, colour] = VATS[e.kind]
+  pour(g.world, cell(c.x), cell(e.y + e.h + 1), liquid, E.vat[e.kind])
+  burst(g, c.x, e.y + e.h, colour, 8)
 }
 
 export const onDeath = (g, e) => {
@@ -753,6 +809,8 @@ export const onDeath = (g, e) => {
   if (e.kind === 'snapweed') for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ignite(g.world, x + dx, y + dy)
   if (e.kind === 'dripper') for (const dx of [-1, 0, 1, -2, 2]) puff(g.world, x + dx, y + 1, e.drips ?? M.OIL, [1, 1])
   if (e.kind === 'scrapper' && e.loaded) puff(g.world, x, y, M.SCRAP, [0, 0])
+  if (e.kind === 'battery') discharge(g, e, c)
+  if (VATS[e.kind]) spill(g, e, c)
   if (e.kind === 'lamp') {
     g.fireballs.push({ x: e.x + 1, y: e.y + e.h, w: 4, h: 4, vx: 0, vy: 20, age: 0, friendly: true, fromWorld: true, napalm: true })
     burst(g, c.x, c.y, 'fire', 8)

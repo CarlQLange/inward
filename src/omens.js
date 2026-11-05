@@ -6,7 +6,7 @@ export const OMENS = {
   tinder: {
     name: 'TINDER', icon: 'ember',
     tuning: { world: { excite: 2.4 } },
-    gen: theme => ({ ...theme, top: 'p', ledge: 'w', oil: (theme.oil ?? 0) + 0.4 }),
+    gen: theme => ({ ...theme, top: 'p', ledge: 'w', peat: 0.7, props: { ...theme.props, lamp: 0.8 }, oil: (theme.oil ?? 0) + 0.4 }),
   },
   deluge: {
     name: 'DELUGE', icon: 'gills',

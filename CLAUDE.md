@@ -26,7 +26,7 @@ options, so snapshot localStorage in sessionStorage first and restore it afterwa
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
-`node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
+`node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
 lists the flags, such as `--god`, `--found rand`, `--career` and `--warden bellows --gun`. The bot
 walks badly, so read its time-per-run numbers as an upper bound and its deaths as pessimistic.
@@ -78,6 +78,9 @@ effects must spread across blocks visibly and be readable without text.
 - He wants to play on his phone, from an artifact. Touch devices get their own layout, portrait with
   controls under the room or landscape with controls beside it, and the canvas fills the screen at a
   whole number of device pixels. Foes in reach are shot automatically, which can be turned off.
+- He found the world mostly read as fire and left the fix to agent judgement. Fire now belongs to the Moss Caves
+  and Peat Bog, and every other region has its own system: charge, collapse, lava and water, falling ice, or blasts.
+  Peat ceilings and lamps are per region, and each region hangs props the gun can set off, so no skill is needed.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
@@ -204,7 +207,10 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Each run shuffles regions into bands (rings 0-1, 2-3, 4-5, 6), with the outer band set by the starter
   room. Three Wardens at rings 1, 3 and 5 break seals that open the Core, a three-phase final boss. One
   omen per run once found. Everything nameable is gated by a persistent found set, with one or two secrets
-  planted per run and a brief reveal when met. Hanging lamps give the gun a way to set things off.
+  planted per run and a brief reveal when met. Hanging props give the gun a way to set things off: a lamp drops fire, a battery arcs charge into nearby metal,
+  water and foes, a tank pours water, a carboy pours acid, and a ladle pours lava, which crusts over when thin. Ceiling
+  loads are held by a strut that suits the region, and metal rails carry charge to the gates that hold them. Shooting a
+  hanging icicle drops it.
 
 - Winning makes the room crumble and drains the colour back to four-shade green. If nothing can
   reach an exit, a bomb drops, and if that can't help a vine and a path get carved.

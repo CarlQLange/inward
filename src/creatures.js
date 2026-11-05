@@ -13,8 +13,17 @@ const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, armoured: PALE }
 
 const LAMP = paintFrames(['..c...', '..c...', '.cccc.', 'cyyyyc', 'cyyyyc', '.cccc.'], { c: '#5a5a52', y: '#ffd24a' })
 const ORBIT = paintFrames(['..ss..', '.sSSs.', 'sSSSSs', 'sSSSds', '.sdds.', '..ss..'], { s: '#7a2a34', S: '#d94a5a', d: '#a03040' })
+const IRON = { c: '#5a5a52', d: '#3a4650' }
+const batteryFrame = lit => paintFrames(['...c....', '...c....', '.dddddd.', 'dyyyyyyd', 'dkkkkkkd', 'dyyyyyyd', 'dkkkkkkd', 'dyyyyyyd', '.dddddd.', '.c....c.'], { ...IRON, y: lit, k: '#7a6c18' })
+const BATTERY = [batteryFrame('#ffe84a'), batteryFrame('#c8b42c')]
+const TANK = paintFrames(['.....cc.....', '.dddddddddd.', 'dbbbbbbbbbbd', 'dwwwwwwwwwwd', 'dwWwwwwwwwwd', 'dwwwwwwwWwwd', 'dwwwwwwwwwwd', 'dbbbbbbbbbbd', '.dddddddddd.'], { ...IRON, b: '#6a7a80', w: '#2f8fa8', W: '#7fdce6' })
+const CARBOY = paintFrames(['...cc...', '...cc...', '..gggg..', '...gg...', '.gGGGGg.', 'gGAAAAGg', 'gAaAAAAg', 'gAAAAaAg', 'gAAAAAAg', '.gggggg.'], { c: IRON.c, g: '#3a6a30', G: '#6a9a50', A: '#84d024', a: '#d8ff7a' })
+const LADLE = paintFrames(['....cc....', '...c..c...', '..c....c..', 'dddddddddd', 'dYYYYYYYYd', '.dOOOOOOd.', '.dOOOOOOd.', '..dddddd..', '...dddd...'], { c: IRON.c, d: '#3a3230', Y: '#ffd24a', O: '#d9481c' })
 const still = frame => ({ idle: { fps: 0, loop: true, frames: [frame] } })
-const LOCAL_ART = { lamp: still(LAMP), orbit: still(ORBIT) }
+const LOCAL_ART = {
+  lamp: still(LAMP), orbit: still(ORBIT), tank: still(TANK), carboy: still(CARBOY), ladle: still(LADLE),
+  battery: { idle: { fps: 5, loop: true, frames: BATTERY } },
+}
 
 const clipOf = (kind, name) => LOCAL_ART[kind]?.[name] ?? creatureClip(artKind(kind), name)
 

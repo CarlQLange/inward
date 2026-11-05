@@ -54,6 +54,7 @@ export const createWorld = (rows, overloaded = false) => {
     charged: 0,
     events: [],
     drains: [],
+    pours: [],
     overloaded,
   }
 }
@@ -85,6 +86,16 @@ export const puff = (w, x, y, mat, range) => {
 
 export const setCell = (w, x, y, mat, life = 0) => {
   if (inside(x, y)) place(w, idx(x, y), mat, life)
+}
+
+export const pour = (w, x, y, mat, cells) => {
+  if (inside(x, y)) w.pours.push({ x, y, mat, left: cells, blocked: 0 })
+}
+
+export const loosen = (w, x, y) => {
+  if (y < 2 || matAt(w, x, y) !== M.ICE || !isOpen(w, x, y + 1) || !props(matAt(w, x, y - 1)).solid) return false
+  place(w, idx(x, y), M.FLOE)
+  return true
 }
 
 const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE, M.RIME, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE])
@@ -224,6 +235,12 @@ const stepLava = (w, x, y, dt) => {
     if (props(other).melts) place(w, idx(nx, ny), M.WATER)
     if (props(other).flammability && Math.random() < T.lavaBurn * dt * 8) ignite(w, nx, ny)
   }
+  const thin = props(matAt(w, x, y + 1)).solid && matAt(w, x, y - 1) === M.EMPTY
+  if (thin && Math.random() < T.lavaCrust * dt) {
+    note(w, 'crust', M.LAVA)
+    place(w, i, M.ROCK)
+    return true
+  }
   return Math.random() > T.lavaFlow
 }
 
@@ -284,9 +301,20 @@ const tryMoss = w => {
   place(w, idx(x, y), M.MOSS)
 }
 
+const stepPours = w => {
+  w.pours = w.pours.filter(p => {
+    if (isOpen(w, p.x, p.y)) {
+      place(w, idx(p.x, p.y), p.mat)
+      p.left -= 1
+    } else p.blocked += 1
+    return p.left > 0 && p.blocked < T.pourPatience
+  })
+}
+
 const stepFluids = (w, dt) => {
   w.moved.fill(0)
   w.crushing.fill(0)
+  stepPours(w)
   for (const i of w.drains) if (!props(w.mat[i]).solid || props(w.mat[i]).falls) place(w, i, M.EMPTY)
   w.flip ^= 1
   const column = k => (w.flip ? k : ROOM - 1 - k)

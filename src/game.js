@@ -1,6 +1,6 @@
 import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
+import { burningAt, createWorld, encodeWorld, energize, explode, ignite, loosen, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
 import { STARTERS, TITLE_ROOM } from './room.js'
 import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
@@ -129,7 +129,6 @@ const regionTheme = (g, ring, index) => {
     swimmers: WATER_FOES.filter(kind => isKnown(g, 'foe', kind)).filter(fitsRing(ring)),
     worm: isKnown(g, 'foe', 'worm') && fitsRing(ring)('worm'),
     mimics: isKnown(g, 'foe', 'mimic') && fitsRing(ring)('mimic'),
-    lamps: R.lampChance,
   })
 }
 
@@ -1330,10 +1329,12 @@ const stepRoomEvents = (g, dt) => {
   }
 }
 
+const QUAKES = new Set([M.PEAT, M.GATE, M.ICE])
+
 const quakeRoom = g => {
   const candidates = []
   g.world.mat.forEach((m, i) => {
-    if (m === M.PEAT && g.world.mat[i + 28] === M.EMPTY) candidates.push(i)
+    if (QUAKES.has(m) && i >= 56 && g.world.mat[i + 28] === M.EMPTY && g.world.mat[i - 28] !== M.EMPTY) candidates.push(i)
   })
   for (let n = 0; n < 6 && candidates.length; n++) {
     const i = candidates.splice(Math.floor(Math.random() * candidates.length), 1)[0]
@@ -1651,6 +1652,7 @@ const stepShots = (g, dt) => {
     } else if (props(matAt(g.world, cell(s.x), cell(s.y))).solid && (matAt(g.world, cell(s.x), cell(s.y)) === M.BEDROCK || !hasRelic(g.player, 'pierce'))) {
       shotEffects(g, s, cell(s.x), cell(s.y))
       wallHitFx(g, s, matAt(g.world, cell(s.x), cell(s.y)))
+      if (loosen(g.world, cell(s.x), cell(s.y))) burst(g, s.x, s.y, 'pale', 5)
       if (s.bounces > 0) {
         s.bounces -= 1
         const hitX = props(matAt(g.world, cell(s.x - s.vx * dt), cell(s.y))).solid
