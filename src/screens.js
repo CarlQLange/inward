@@ -8,7 +8,8 @@ import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
 import { RELIC_BY_ID } from './relics.js'
-import { COMMON_HELP, scheme, skillKey } from './controls.js'
+import { CONTROL_ROWS, promptFor, skillAction } from './controls.js'
+import { PROMPT_HEIGHT, drawPrompt, drawPromptRow, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
 const DIM = '#3d7a3c'
@@ -51,6 +52,7 @@ const drawList = (ctx, menu, top, active = true, pitch = 11) => {
     const label = labelOf(item)
     const on = active && i === menu.selected
     const y = top + i * pitch
+    menu.hits?.push({ index: i, x: ROOM_PX / 2 - textWidth(label) / 2 - 10, y: y - ORIGIN.y - 3, w: textWidth(label) + 20, h: pitch })
     const nudge = on ? Math.round(easeOut((menu.age ?? 1) * 8) * 2) : 0
     centred(ctx, label, y, on ? YELLOW : PALE, 1, CENTRE + nudge)
     if (on) drawText(ctx, '+', CENTRE - textWidth(label) / 2 - 8, y, YELLOW)
@@ -164,13 +166,12 @@ const drawOptions = (ctx, menu) => {
 
 const drawControls = (ctx, menu) => {
   const rise = sheet(ctx, menu)
-  const lines = [...scheme().help, ...COMMON_HELP]
-  lines.forEach(([key, action], i) => {
-    const y = ORIGIN.y + 36 + rise + i * 12
-    drawText(ctx, key, ORIGIN.x + 16, y, YELLOW)
-    drawText(ctx, action, ORIGIN.x + 72, y, PALE)
+  CONTROL_ROWS.filter(([action]) => [action].flat().every(promptFor)).forEach(([action, word], i) => {
+    const y = ORIGIN.y + 34 + rise + i * 14
+    drawText(ctx, word, ORIGIN.x + 32, y + 2, PALE)
+    drawPromptRow(ctx, [action].flat(), ORIGIN.x + 150, y)
   })
-  drawList(ctx, menu, ORIGIN.y + 200 + rise)
+  drawList(ctx, menu, ORIGIN.y + 204 + rise)
 }
 
 const drawRecords = (ctx, menu) => {
@@ -278,7 +279,7 @@ const drawCard = (ctx, card, x, y, w, h, on, time) => {
   wrapText(card.text, chars).forEach((line, n) => {
     drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 32 + name.length * 7 + n * 6, PALE)
   })
-  if (card.parent) ctx.drawImage(SPRITES.icons[card.parent], x + w / 2 - 4, y + h - 11, 8, 8)
+  if (card.prompt) drawPrompt(ctx, card.prompt, x + (w - promptWidth(card.prompt)) / 2, y + h - PROMPT_HEIGHT - 3)
   else if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, DIM)
 }
 
@@ -296,6 +297,7 @@ const drawCards = (ctx, g, menu, cards) => {
     const lift = on ? 4 + Math.round(Math.sin(g.time * 5)) : 0
     const y = VIEW.h + 10 + (top - lift - VIEW.h - 10) * arrive
     drawCard(ctx, card, left + i * (w + gap), Math.round(y), w, 72, on, g.time)
+    menu.hits?.push({ index: i, x: left + i * (w + gap) - ORIGIN.x, y: top - ORIGIN.y, w, h: 72 })
   })
 }
 
@@ -371,7 +373,20 @@ const PAGES = {
 
 export const drawMenus = (ctx, g) => {
   const menu = g.menus.at(-1)
-  if (menu) PAGES[menu.page](ctx, g, menu)
+  if (!menu) return
+  menu.hits = []
+  PAGES[menu.page](ctx, g, menu)
+  drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
+}
+
+const drawToastPrompts = (ctx, prompts, y) => {
+  const widths = prompts.map(([action, word]) => promptWidth(action) + (word ? textWidth(word) + 2 : 0))
+  const total = widths.reduce((a, b) => a + b + 6, -6)
+  prompts.reduce((x, [action, word], i) => {
+    const drawn = drawPrompt(ctx, action, x, y)
+    if (word) drawText(ctx, word, x + drawn + 2, y + 2, PALE)
+    return x + widths[i] + 6
+  }, CENTRE - total / 2)
 }
 
 export const drawToast = (ctx, g) => {

@@ -3,7 +3,8 @@ import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
 import { drawMapGrid } from './screens.js'
-import { skillKey } from './controls.js'
+import { skillAction } from './controls.js'
+import { drawPrompt, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -60,7 +61,7 @@ const drawSkillSlot = (ctx, g, slot) => {
     ctx.fillStyle = `rgba(255, 255, 255, ${flash * 5})`
     ctx.fillRect(SLOT_X, top, SLOT, SLOT)
   }
-  drawText(ctx, skillKey(slot), SLOT_X - textWidth(skillKey(slot)) - 3, top + 1, waiting > 0 ? MID : GREEN)
+  drawPrompt(ctx, skillAction(slot), SLOT_X - promptWidth(skillAction(slot)) - 2, top)
 }
 
 const drawHearts = (ctx, g, top) => {

@@ -1,24 +1,30 @@
 import { TICK, TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
 import { SKILL_NAMES } from './skills.js'
-import { skillKey } from './controls.js'
+import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
 const P = TUNING.player
 
-export const openMenu = (g, menu) => g.menus.push({ selected: 0, armed: false, layout: 'list', back: true, age: 0, ...menu })
+export const openMenu = (g, menu) => g.menus.push({ selected: 0, armed: false, layout: 'list', back: true, age: 0, opened: g.time, ...menu })
+
+const settle = p => {
+  p.wasJump = true
+  p.wasBomb = true
+  p.wasSkills = SKILL_ACTIONS.map(() => true)
+}
 
 export const closeMenu = g => {
   g.menus.pop()
   if (g.menus.length === 0) {
-    g.player.wasJump = true
+    settle(g.player)
     g.player.shotReady = Math.max(g.player.shotReady, 0.15)
   }
 }
 
 const closeAll = g => {
   g.menus.length = 0
-  g.player.wasJump = true
+  settle(g.player)
 }
 
 const back = { label: 'BACK', run: closeMenu }
@@ -29,12 +35,8 @@ const cycleShaders = () => {
   save.settings.shaders = SHADER_LEVELS[(at + 1) % SHADER_LEVELS.length]
   persist()
 }
-const toggleControls = () => {
-  save.settings.controls = save.settings.controls === 'mouse' ? 'keys' : 'mouse'
-  persist()
-}
-const toggleShake = () => {
-  save.settings.shake = !save.settings.shake
+const toggleSetting = name => () => {
+  save.settings[name] = !save.settings[name]
   persist()
 }
 
@@ -42,9 +44,9 @@ const openOptions = g => openMenu(g, {
   page: 'options',
   title: 'OPTIONS',
   items: [
-    { label: () => `AIM: ${save.settings.controls === 'mouse' ? 'MOUSE' : 'KEYS'}`, run: toggleControls },
     { label: () => `SHADERS: ${save.settings.shaders.toUpperCase()}`, run: cycleShaders },
-    { label: () => `SHAKE: ${save.settings.shake ? 'ON' : 'OFF'}`, run: toggleShake },
+    { label: () => `SHAKE: ${save.settings.shake ? 'ON' : 'OFF'}`, run: toggleSetting('shake') },
+    { label: () => `RUMBLE: ${save.settings.rumble ? 'ON' : 'OFF'}`, run: toggleSetting('rumble') },
     { label: 'CONTROLS', run: g2 => openControls(g2) },
     { label: 'RECORDS', run: g2 => openRecords(g2) },
     {
@@ -139,10 +141,11 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
     page: 'swap',
     layout: 'cards',
     back: false,
+    cancel: true,
     title: SKILL_NAMES[kind],
     items: [
       ...p.skills.map((skill, slot) => ({
-        card: { icon: skill.kind, name: SKILL_NAMES[skill.kind], text: 'DROP', sub: skillKey(slot) },
+        card: { icon: skill.kind, name: SKILL_NAMES[skill.kind], text: 'DROP', prompt: skillAction(slot) },
         run: gm => {
           dropCard(gm, skill.kind)
           p.skills[slot] = { kind, ready: 0 }
@@ -171,25 +174,25 @@ const pressedFrom = (g, input) => key => input[key] && !g.menuHeld[key]
 
 const cycle = (value, by, count) => (value + by + count) % count
 
-const stepPauseFocus = (g, menu, pressed) => {
+const stepPauseFocus = (g, menu, moved) => {
   const p = g.player
   if (menu.focus === 'list') {
-    if (pressed('left') && p.skills.length > 0) menu.focus = 'skills'
-    if (pressed('right') && p.relics.size > 0) menu.focus = 'relics'
+    if (moved.left && p.skills.length > 0) menu.focus = 'skills'
+    if (moved.right && p.relics.size > 0) menu.focus = 'relics'
     return false
   }
   if (menu.focus === 'skills') {
-    if (pressed('right')) menu.focus = 'list'
-    if (pressed('up')) menu.slot = cycle(menu.slot, -1, p.skills.length)
-    if (pressed('down')) menu.slot = cycle(menu.slot, 1, p.skills.length)
+    if (moved.right) menu.focus = 'list'
+    if (moved.up) menu.slot = cycle(menu.slot, -1, p.skills.length)
+    if (moved.down) menu.slot = cycle(menu.slot, 1, p.skills.length)
     return true
   }
   const count = p.relics.size
-  if (pressed('left') && menu.relic % 5 === 0) menu.focus = 'list'
-  else if (pressed('left')) menu.relic -= 1
-  if (pressed('right')) menu.relic = Math.min(count - 1, menu.relic + 1)
-  if (pressed('up')) menu.relic = Math.max(0, menu.relic - 5)
-  if (pressed('down')) menu.relic = Math.min(count - 1, menu.relic + 5)
+  if (moved.left && menu.relic % 5 === 0) menu.focus = 'list'
+  else if (moved.left) menu.relic -= 1
+  if (moved.right) menu.relic = Math.min(count - 1, menu.relic + 1)
+  if (moved.up) menu.relic = Math.max(0, menu.relic - 5)
+  if (moved.down) menu.relic = Math.min(count - 1, menu.relic + 5)
   return true
 }
 
@@ -199,29 +202,71 @@ const stepTitlePress = (menu, confirm) => {
   return true
 }
 
+const DIRECTIONS = ['up', 'down', 'left', 'right']
+
+const stepRepeats = (g, input, armed) => {
+  const I = TUNING.input
+  const due = g.menuRepeat
+  const fired = {}
+  for (const dir of DIRECTIONS) {
+    if (!input[dir]) delete due[dir]
+    else if (!armed) due[dir] = Infinity
+    else if (due[dir] === undefined || g.time >= due[dir]) {
+      fired[dir] = true
+      due[dir] = g.time + (due[dir] === undefined ? I.repeatFirst : I.repeatEvery)
+    }
+  }
+  return fired
+}
+
+const hitUnder = (menu, { x, y }) =>
+  (menu.hits ?? []).find(h => x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h)?.index
+
+const stepPointer = (g, menu, input, pressed) => {
+  if (!input.pointer) return false
+  const over = hitUnder(menu, input.pointer)
+  if (over === undefined) return false
+  if (input.pointer !== g.menuHeld.pointer) menu.selected = over
+  return pressed('click') && menu.selected === over
+}
+
+const leave = (g, menu) => {
+  if (menu.cancel) menu.items.at(-1).run(g)
+  else if (menu.back) closeMenu(g)
+}
+
+const settled = (g, menu, input) => {
+  const waited = menu.layout !== 'cards' || g.time - menu.opened > TUNING.input.cardDelay
+  return waited && !input.jump && !input.click && !input.confirm
+}
+
 export const stepMenus = (g, input) => {
   const menu = g.menus.at(-1)
   menu.age += TICK
   const pressed = pressedFrom(g, input)
-  const confirm = pressed('jump') || pressed('shoot') || pressed('confirm')
+  const moved = stepRepeats(g, input, menu.armed)
   if (!menu.armed) {
-    menu.armed = !input.jump && !input.shoot && !input.confirm
-  } else if (!stepTitlePress(menu, confirm)) {
-    const swallowed = menu.page === 'pause' && stepPauseFocus(g, menu, pressed)
+    menu.armed = settled(g, menu, input)
+  } else if (!stepTitlePress(menu, pressed('jump') || pressed('confirm') || pressed('click'))) {
+    const swallowed = menu.page === 'pause' && stepPauseFocus(g, menu, moved)
     const [previous, next] = menu.layout === 'cards' ? ['left', 'right'] : ['up', 'down']
     const count = menu.items.length
     if (!swallowed) {
-      if (pressed(previous)) menu.selected = cycle(menu.selected, -1, count)
-      if (pressed(next)) menu.selected = cycle(menu.selected, 1, count)
+      if (moved[previous]) menu.selected = cycle(menu.selected, -1, count)
+      if (moved[next]) menu.selected = cycle(menu.selected, 1, count)
     }
     if (menu.page === 'notes') {
-      if (pressed('up')) menu.scroll = Math.max(0, menu.scroll - 1)
-      if (pressed('down')) menu.scroll += 1
+      if (moved.up) menu.scroll = Math.max(0, menu.scroll - 1)
+      if (moved.down) menu.scroll += 1
     }
+    const clicked = stepPointer(g, menu, input, pressed)
+    const confirm = pressed('jump') || pressed('confirm') || clicked
+    const toggled = menu.page === 'pause' && (pressed('skills') || pressed('map'))
     if (confirm && !swallowed) menu.items[menu.selected].run(g)
-    else if (menu.back && (pressed('pause') || pressed('back'))) closeMenu(g)
+    else if (pressed('back') || pressed('pause') || toggled) leave(g, menu)
   }
   g.menuHeld = { ...input }
+  if (g.menus.length === 0 && input.click) g.player.holdFire = true
 }
 
 export const slotsFull = p => p.skills.length >= P.skillSlots

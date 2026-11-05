@@ -1,14 +1,16 @@
-import { ORIGIN, TICK, VIEW } from './config.js'
+import { TICK, VIEW } from './config.js'
 import { createGame, depthHere, restart, step } from './game.js'
 import { draw } from './render.js'
 import { loadSprites } from './sprites.js'
 import { save } from './store.js'
 import { createPresenter } from './present.js'
-import { scheme, usesMouse } from './controls.js'
+import { device } from './controls.js'
+import { listen, readInput } from './input.js'
+import { rumble } from './pad.js'
 
 await loadSprites()
 
-const held = {}
+let held = {}
 const state = createGame(null, 'title')
 const screen = document.getElementById('screen')
 
@@ -22,42 +24,15 @@ const overrideDepth = depth => {
   state.depth = depth ?? depthHere(state)
 }
 
-window.addEventListener('keydown', e => {
-  const action = scheme().bindings[e.code]
-  if (action) {
-    held[action] = true
-    e.preventDefault()
-  }
-  const depth = depthFromDigit(e.code)
-  if (depth !== null) overrideDepth(depth)
-  if (e.code === 'Digit0') overrideDepth(null)
-})
-window.addEventListener('keyup', e => {
-  const action = scheme().bindings[e.code]
-  if (action) held[action] = false
-})
-window.addEventListener('blur', () => Object.keys(held).forEach(k => { held[k] = false }))
-
-const pointerToRoom = e => {
-  const box = screen.getBoundingClientRect()
-  return {
-    x: ((e.clientX - box.left) / box.width) * VIEW.w - ORIGIN.x,
-    y: ((e.clientY - box.top) / box.height) * VIEW.h - ORIGIN.y,
-  }
+if (new URLSearchParams(location.search).has('debug')) {
+  window.addEventListener('keydown', e => {
+    const depth = depthFromDigit(e.code)
+    if (depth !== null) overrideDepth(depth)
+    if (e.code === 'Digit0') overrideDepth(null)
+  })
 }
 
-window.addEventListener('mousemove', e => { held.pointer = pointerToRoom(e) })
-window.addEventListener('mousedown', e => {
-  if (!usesMouse()) return
-  held.pointer = pointerToRoom(e)
-  if (e.button === 0) held.shoot = true
-  if (e.button === 2) held.skill = true
-})
-window.addEventListener('mouseup', e => {
-  if (e.button === 0) held.shoot = false
-  if (e.button === 2) held.skill = false
-})
-window.addEventListener('contextmenu', e => { if (usesMouse()) e.preventDefault() })
+listen(screen)
 
 const source = document.createElement('canvas')
 source.width = VIEW.w
@@ -67,6 +42,7 @@ const present = createPresenter(screen)
 
 const render = () => {
   draw(ctx, state, held.pointer)
+  screen.style.cursor = device() === 'mouse' && state.menus.length > 0 ? 'default' : 'none'
   const { shaders } = save.settings
   const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
@@ -78,6 +54,7 @@ let owed = 0
 const frame = now => {
   owed += Math.min(0.1, (now - last) / 1000)
   last = now
+  held = readInput()
   while (owed >= TICK) {
     step(state, held, TICK)
     owed -= TICK
@@ -89,6 +66,9 @@ requestAnimationFrame(frame)
 
 window.game = {
   state,
+  device,
+  rumble,
+  input: () => held,
   render,
   restart: () => restart(state),
   tick: (input = {}) => step(state, input, TICK),

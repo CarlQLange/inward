@@ -111,7 +111,7 @@ effects must spread across blocks visibly and be readable without text.
 He asked to be surprised, so these were agent choices. Treat them as open to change.
 
 - The world is four-shade green until the first card, then colour floods in.
-- 28 skills with three upgrades each, and four slots. Carl called the first six boring, so
+- 28 skills with three upgrades each, and three slots. Carl called the first six boring, so
   they now span movement (blink, grapple, dash, rewind), terrain (mason, seed, spring,
   acid, melt, alchemy), control (well, swap, stop, charm, decoy, roar, mirror), helpers
   (drone, rod, mine) and skills acting on skills (echo, pact). Skills are verbs on world
@@ -120,10 +120,13 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   ring with a matching random loadout. Quickstarts don't count towards records.
 - Each room has one of eight layouts, such as tunnels, chasm or chimney, and regions have
   their own tinted tiles and backdrop.
-- Two control schemes: keyboard (arrows, Z, X, C V D F, hold S to aim, with aim assist) and
-  mouse (WASD, free aim). Carl called the earlier keys a nightmare.
+- Keyboard, mouse and controller all work at once, with no option to pick between them, and
+  every key means one thing always. Arrows with Z, X, C V B, or WASD with Space, mouse, Q E R.
+  Whichever device was touched last drives the on-screen glyphs and the aim. Controller: A
+  jump, RT or X shoot, B Y RB skills, LB bomb, LT look, Start, Select map, right stick free
+  aim. Carl called the earlier keys a nightmare. None of this has been tried on a real pad.
 - Eight hearts, and each hit costs one. Hurt feedback names the cause, and the first time
-  also explains it. Holding Shift or Q shows what hurts, burns, conducts or explodes.
+  also explains it. Holding Shift or LT shows what hurts, burns, conducts or explodes.
 - Foes warn before attacking. Clearing a room heals one heart.
 - 27 relics, from chests, altars, mimics and the shop. They change your gun, your movement
   and what can hurt you, such as fire immunity making fire a toy.

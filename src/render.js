@@ -10,7 +10,8 @@ import { save } from './store.js'
 import { RELIC_BY_ID } from './relics.js'
 import { THEMES } from './generate.js'
 import { keyOf } from './map.js'
-import { scheme, skillKey, usesMouse } from './controls.js'
+import { skillAction } from './controls.js'
+import { drawPrompt, promptWidth } from './glyphs.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -440,7 +441,7 @@ export const draw = (ctx, g, pointer) => {
   drawOverlays(ctx, g.world, g.time)
   drawProjectiles(ctx, g)
   drawPopups(ctx, g)
-  if (usesMouse() && pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
+  if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
   if (g.looking) drawLook(ctx, g)
   if (g.hurtFlash > 0) {
     ctx.fillStyle = `rgba(255, 40, 30, ${0.45 * g.hurtFlash})`
