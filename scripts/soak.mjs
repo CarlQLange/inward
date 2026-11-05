@@ -399,10 +399,7 @@ const worker = async ({ opts, from, to }) => {
     const wardenStart = {}
     for (let t = 0; t < limit && g.phase === 'playing'; t++) {
       stats.ticks = t
-      if (g.menus.length) {
-        answerMenu(g)
-        if (g.menus.length && g.reveal === null) { /* a further menu waits a tick */ }
-      }
+      if (g.menus.length) answerMenu(g)
       const input = g.reveal ? {} : decide(g, bot, stats)
       const sample = t % 8 === 0
       const before = sample ? performance.now() : 0

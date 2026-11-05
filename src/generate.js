@@ -637,6 +637,6 @@ const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }
 export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {}, theme = THEMES[0], themeIndex = 0 }) => {
   const tryWith = (tries, extra = {}) => attempt({ seed: seed + tries * 104729, depth, links, lean, special: { ...special, ...extra }, theme, themeIndex })
   let result = tryWith(0)
-  for (let tries = 1; tries < 90 && !result.ok; tries++) result = tryWith(tries, tries > 40 ? { ladders: true } : {})
+  for (let tries = 1; tries < 50 && !result.ok; tries++) result = tryWith(tries, tries > 25 ? { ladders: true } : {})
   return { ...result.definition, passed: result.ok }
 }

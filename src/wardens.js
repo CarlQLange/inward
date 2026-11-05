@@ -735,7 +735,7 @@ Object.assign(ENEMY_DEFS, {
   eelseg: { size: [10, 8], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
   brood: { size: [28, 22], hp: 210, value: 800, heavy: true, free: true, warden: true, sprite: [22] },
   conductor: { size: [18, 40], hp: 160, value: 800, heavy: true, insulated: true, warden: true, sprite: [16] },
-  core: { size: [26, 26], hp: 480, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
+  core: { size: [26, 26], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
   orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true, sprite: [6] },
 })
 
