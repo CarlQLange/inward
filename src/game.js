@@ -1005,7 +1005,7 @@ const openAltar = (g, altar) => {
           gainRelic(gm, altar.relic)
         },
       },
-      { card: { name: 'NOT TODAY', text: 'KEEP YOUR BLOOD', sub: '' }, run: gm => { gm.menus.pop() } },
+      { card: { name: 'NO', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
     ],
   })
 }
@@ -1026,7 +1026,7 @@ const openTinker = (g, p) => openMenu(g, {
         gainRelic(gm, next)
       },
     })),
-    { card: { name: 'NOT NOW', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
+    { card: { name: 'NO', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
   ],
 })
 
@@ -1045,7 +1045,7 @@ const openBloodletter = g => openMenu(g, {
         gm.pulse = 1
       },
     },
-    { card: { name: 'NOT NOW', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
+    { card: { name: 'NO', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
   ],
 })
 
@@ -1314,20 +1314,40 @@ const stepFirstRoom = (g, dt) => {
   knownNotes.add('met:spitter')
 }
 
+const carveEscape = (g, p, anchors) => {
+  const free = anchors.filter(a => !a.locked)
+  const from = { x: cell(p.x + p.w / 2), y: cell(p.y + p.h - 1) }
+  const goal = free.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y))[0]
+  if (!goal) return
+  const clear = (x, y, then = M.EMPTY) => { if (matAt(g.world, x, y) !== M.BEDROCK) setCell(g.world, x, y, then) }
+  for (let y = Math.min(from.y, goal.y) - 1; y <= Math.max(from.y, goal.y); y++) clear(from.x, y, M.VINE)
+  const step = Math.sign(goal.x - from.x)
+  for (let x = from.x + step; step !== 0 && x !== goal.x + step; x += step) {
+    clear(x, goal.y)
+    clear(x, goal.y - 1)
+    if (!props(matAt(g.world, x, goal.y + 1)).solid) setCell(g.world, x, goal.y + 1, M.ROCK)
+  }
+  g.shake = Math.max(g.shake, 6)
+}
+
 const stepMercy = (g, p, dt) => {
   const room = g.rooms[keyOf(g.x, g.y)]
   g.mercyClock = (g.mercyClock ?? 0) - dt
-  if (g.mercyClock > 0 || p.bombs > 0 || room.sealed || keyOf(g.x, g.y) === keyOf(...g.map.start)) return
+  if (g.mercyClock > 0 || room.sealed || !p.grounded || keyOf(g.x, g.y) === keyOf(...g.map.start)) return
   g.mercyClock = R.mercyEvery
   const from = { x: cell(p.x + p.w / 2), y: cell(p.y + p.h - 1) }
-  const { open, locked } = exitsFrom(g.world, room.doors, from)
+  const { open, locked, anchors } = exitsFrom(g.world, room.doors, from)
   if (open.length > 0) {
     room.boxedIn = 0
     return
   }
   room.boxedIn = (room.boxedIn ?? 0) + 1
-  if (room.boxedIn < 2 && locked.length === 0) return
-  if (g.pickups.some(c => c.kind === 'bomb')) return
+  if (locked.length === 0 && room.boxedIn >= R.boxedInLimit) {
+    carveEscape(g, p, anchors)
+    room.boxedIn = 0
+    return
+  }
+  if (p.bombs > 0 || (room.boxedIn < 2 && locked.length === 0) || g.pickups.some(c => c.kind === 'bomb')) return
   g.pickups.push({ kind: 'bomb', x: p.x, y: p.y - 10, w: 7, h: 7, vx: 0, vy: -60 })
   g.mercyBombs = (g.mercyBombs ?? 0) + 1
 }

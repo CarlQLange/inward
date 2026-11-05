@@ -158,7 +158,7 @@ export const openSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
         },
       })),
       {
-        card: { name: 'NO', text: 'LEAVE IT', sub: '' },
+        card: { name: 'NO', text: '', sub: '' },
         run: gm => {
           onLeave(gm)
           closeAll(gm)

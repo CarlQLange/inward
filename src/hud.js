@@ -1,5 +1,6 @@
 import { ORIGIN, TUNING, VIEW } from './config.js'
 import { SPRITES } from './sprites.js'
+import { SCARF_RED } from './hero.js'
 import { drawText, textWidth } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
 import { drawMapGrid } from './screens.js'
@@ -13,7 +14,7 @@ const DIM = '#26542a'
 const MID = '#3d7a3c'
 const WHITE = '#f4f8f2'
 const YELLOW = '#ffe84a'
-const RED = '#ff2a3c'
+const RED = `rgb(${SCARF_RED.join(',')})`
 const RED_DIM = '#4a1420'
 
 const SLOT = 32

@@ -4,7 +4,7 @@ import { burningAt, crushingAt, energize, ignite, matAt, puff, setCell } from '.
 import { WORLD_PX, cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { quake, zap } from './skills.js'
-import { ENEMY_DEFS, ENEMY_TRAITS, STEPPERS, createEnemy } from './enemies.js'
+import { ENEMY_DEFS, STEPPERS, createEnemy } from './enemies.js'
 import { blank, paint } from './room.js'
 
 const E = TUNING.enemies
@@ -752,15 +752,6 @@ Object.assign(ENEMY_DEFS, {
 
 Object.assign(STEPPERS, { bellows, colossus, crucible, eel, eelseg, brood, conductor, core, orbit })
 
-Object.assign(ENEMY_TRAITS, {
-  bellows: 'LEAKS GAS. LIGHT IT.',
-  colossus: 'ITS STOMPS BRING DOWN THE ROOF. THE ROOF HURTS IT TOO.',
-  crucible: 'POURS LAVA. FEARS WATER.',
-  eel: 'SHOCKS THE WATER. BURNS WHEN IT LEAPS THROUGH FIRE.',
-  brood: 'HANGS BY VINES. VINES BURN.',
-  conductor: 'CHARGES THE FLOOR. WATER TURNS IT ON ITSELF.',
-  core: 'THE ROCK ANSWERS TO IT.',
-})
 
 const FRAME_DOOR_ROW = floor => floor - 2
 
