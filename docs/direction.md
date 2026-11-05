@@ -115,3 +115,19 @@ the hand and has two forks of two forms that change what it does.
 | Chime | Shatters glass and ice nearby and throws the shards outward |
 | Clay | Throws mud that slows foes and puts out fire. Fire bakes it into brick |
 | Burrow | Swim through sand, mud, snow, ash and peat |
+
+## Pillar 5: less, so each thing counts
+
+Carl asked for an elegance pass that takes things out. What went, and the test each failed:
+
+- Duplicates: Decoy, Mirror and Rod (other skills already do each of their forms), Loaded Dice (the Slough keystone), the
+  Unbroken keystone (the Broken Chain relic), the cartographer and the Third Eye (both "see the map", and the relic did
+  nothing), the tinker and bloodletter (admin, and the altar's trade), Warded and Restless mutations.
+- Numbers dressed as rules: taste cards ("also recharges"), reform cards, Hot Hands, Battery, Gills, Magnet Heart, Midas,
+  Bounty, and fourteen forms that only went further, refilled, exploded at the end or made gas. Their replacements change
+  what the skill does, and many use the new world rules (snow, mud, glass, magnets, regrowth).
+- Things that hurt reading: the Blackout omen, the Records page, ghost coins left on an unrelated map, the level number,
+  and the loop shown with the same "X2" as the chain.
+
+A level-up now offers the two forms of a skill's next fork plus a new skill, a relic or a heal. Late in a run it offers new
+skills and relics. The test for adding anything from here: it must do something no existing thing does, in the world.
