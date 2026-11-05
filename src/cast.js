@@ -38,3 +38,12 @@ export const shotBox = e => {
   const top = artTop(e, art[1]) + (art[1] - h) / 2
   return { x: e.x + e.w / 2 - w / 2, y: Math.min(top, e.y), w, h: Math.max(h, e.y + e.h - Math.min(top, e.y)) }
 }
+
+const CONTACT_INSET = 0.2
+
+export const contactBox = e => ({
+  x: e.x + e.w * CONTACT_INSET,
+  y: e.y + e.h * CONTACT_INSET,
+  w: e.w * (1 - CONTACT_INSET * 2),
+  h: e.h * (1 - CONTACT_INSET * 2),
+})

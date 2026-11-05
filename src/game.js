@@ -4,10 +4,10 @@ import { burningAt, createWorld, encodeWorld, energize, explode, ignite, matAt, 
 import { STARTERS, TITLE_ROOM } from './room.js'
 import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
-import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid, unbury } from './physics.js'
+import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
-import { shotBox } from './cast.js'
-import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
+import { contactBox, shotBox } from './cast.js'
+import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath, seatEnemy, settleFooting } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { dust } from './feel.js'
 import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
@@ -46,7 +46,7 @@ const createCard = g => ({ kind, x, row, relic }) => {
 }
 
 const createWare = g => ({ kind, x, row }) => ({
-  kind, x, y: row * BLOCK - 13, w: 12, h: 12, price: TUNING.prices[kind],
+  kind, x, y: row * BLOCK - 12, w: 12, h: 12, price: TUNING.prices[kind],
   relic: kind === 'relic' ? nextRelic(g) : undefined,
 })
 
@@ -242,7 +242,7 @@ const buildRoom = (g, x, y) => {
     doors: definition.doors,
     world,
     arena: definition.arena,
-    enemies: definition.enemies.map(createEnemy).map(makeElite(ring)).map(dressEnemy(g, ring)),
+    enemies: definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean).map(makeElite(ring)).map(dressEnemy(g, ring)),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare(g)),
     pickups: ghostPickup(g, key, definition.spare ?? { x: g.starter.spawn.x + 16, y: (g.starter.spawn.row - 1) * BLOCK }),
@@ -1365,6 +1365,18 @@ const useDoors = (g, p) => {
   else if (open('up') && p.y <= 0.5) walkThrough(g, 'up')
 }
 
+const seatPlayer = (world, p, wish, dt) => {
+  if (!p.grounded || wish !== 0) return
+  const under = p.y + p.h + 1
+  const leftHeld = solidAt(world, p.x + 0.5, under)
+  const rightHeld = solidAt(world, p.x + p.w - 0.5, under)
+  if (leftHeld && rightHeld) return
+  const middleHeld = solidAt(world, p.x + p.w / 2, under)
+  if (middleHeld || (!leftHeld && !rightHeld)) return
+  const next = { ...p, x: p.x + (leftHeld ? -1 : 1) * R.ledgeSeat * dt }
+  if (!hitsSolid(world, next)) p.x = next.x
+}
+
 const stepPlayer = (g, input, dt) => {
   const p = g.player
   const world = g.world
@@ -1446,6 +1458,7 @@ const stepPlayer = (g, input, dt) => {
   pushOutOfSolid(world, p)
   if (hitsSolid(world, p)) unbury(world, p)
   stepMotionFeel(g, p, input, dt, wasGrounded, falling, swimming)
+  seatPlayer(world, p, wish, dt)
   stepDash(g, p, dt)
   if (p.slam && p.grounded) {
     p.slam = false
@@ -1543,7 +1556,7 @@ const stepEnemies = (g, dt) => {
         hurt(g, foe, 1)
         hurt(g, e, 1)
       }
-    } else if (overlap(e, g.player)) hurt(g, g.player, 1, 'world', 'BITTEN')
+    } else if (overlap(contactBox(e), g.player)) hurt(g, g.player, 1, 'world', 'BITTEN')
   }
   for (const e of g.enemies) if (e.hp <= 0) onKill(g, e)
   g.enemies = [...g.enemies.filter(e => e.hp > 0), ...g.spawns]

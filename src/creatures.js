@@ -191,7 +191,6 @@ const stepAnim = (e, a, time) => {
 
 const poseOf = (e, a, time, clip) => {
   if (e.frozen > 0) return { sx: 1, sy: 1, lean: 0, bob: 0 }
-  const moving = Math.abs(e.vx) > 2
   const flyer = !a.walked
   const phase = time * 8 + (e.wander ?? 0)
   const windup = e.windup && e.stun <= 0 && !e.friendly
@@ -203,7 +202,7 @@ const poseOf = (e, a, time, clip) => {
     sx: 1 + swell - stretch * 0.75,
     sy: 1 + swell + stretch,
     lean: Math.round(Math.max(-2, Math.min(2, (e.vx ?? 0) / 22))),
-    bob: drifting ? Math.round(Math.sin(phase) * 1.2) : moving && e.grounded && !clip.walk ? -Math.round(Math.abs(Math.sin(phase))) : 0,
+    bob: drifting ? Math.round(Math.sin(phase) * 1.2) : 0,
   }
 }
 

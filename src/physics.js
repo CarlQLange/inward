@@ -64,6 +64,18 @@ export const unbury = (world, e) => {
   return false
 }
 
+export const nudgeOutOfSolid = (world, e) => {
+  if (!hitsSolid(world, e)) return
+  for (let r = 1; r <= 32; r++) {
+    for (const [dx, dy] of [[0, -r], [-r, 0], [r, 0], [0, r]]) {
+      if (hitsSolid(world, { x: e.x + dx, y: e.y + dy, w: e.w, h: e.h })) continue
+      e.x += dx
+      e.y += dy
+      return
+    }
+  }
+}
+
 export const inWater = (world, e) => {
   const c = centre(e)
   return matAt(world, cell(c.x), cell(c.y)) === M.WATER

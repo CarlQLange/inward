@@ -4,47 +4,48 @@ import { burningAt, energize, explode, ignite, matAt, puff, setCell } from './wo
 import { cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt, WORLD_PX } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { decoyFor } from './effects.js'
+import { anchorOf } from './cast.js'
 
 const P = TUNING.player
 const E = TUNING.enemies
 
 export const ENEMY_DEFS = {
-  crawler: { size: [12, 9], hp: 2, value: 10, magnetic: true, sprite: [0, 1] },
-  spitter: { size: [14, 12], hp: 4, value: 25, fireproof: false, sprite: [2, 3] },
-  fish: { size: [12, 7], hp: 2, value: 10, sprite: [4, 5] },
-  spore: { size: [10, 10], hp: 1, value: 15, sprite: [6] },
-  bat: { size: [12, 8], hp: 1, value: 15, sprite: [7, 8] },
-  slug: { size: [14, 8], hp: 3, value: 20, magnetic: true, sprite: [9] },
-  jelly: { size: [12, 12], hp: 2, value: 30, insulated: true, sprite: [14] },
-  worm: { size: [14, 14], hp: 5, value: 50, sprite: [15] },
-  turret: { size: [12, 12], hp: 3, value: 30, magnetic: true, heavy: true, sprite: [16] },
-  bomber: { size: [12, 10], hp: 1, value: 20, magnetic: true, sprite: [17] },
-  imp: { size: [10, 12], hp: 2, value: 20, sprite: [18] },
-  emberbat: { size: [12, 9], hp: 1, value: 25, fireproof: true, sprite: [19] },
-  slime: { size: [12, 8], hp: 3, value: 20, sprite: [20] },
-  crab: { size: [14, 10], hp: 3, value: 30, shielded: true, magnetic: true, sprite: [21] },
-  nest: { size: [14, 12], hp: 8, value: 80, heavy: true, sprite: [22] },
-  mimic: { size: [12, 10], hp: 5, value: 60, sprite: [25] },
-  gasbag: { size: [12, 12], hp: 1, value: 15, sprite: [26] },
-  tick: { size: [6, 5], hp: 1, value: 10, sprite: [0] },
-  pillbug: { size: [12, 9], hp: 4, value: 25, magnetic: true, sprite: [21] },
+  crawler: { size: [22, 12], hp: 2, value: 10, magnetic: true, sprite: [0, 1] },
+  spitter: { size: [20, 16], hp: 4, value: 25, fireproof: false, sprite: [2, 3] },
+  fish: { size: [18, 12], hp: 2, value: 10, sprite: [4, 5] },
+  spore: { size: [14, 14], hp: 1, value: 15, sprite: [6] },
+  bat: { size: [20, 12], hp: 1, value: 15, sprite: [7, 8] },
+  slug: { size: [27, 13], hp: 3, value: 20, magnetic: true, sprite: [9] },
+  jelly: { size: [14, 16], hp: 2, value: 30, insulated: true, sprite: [14] },
+  worm: { size: [16, 18], hp: 5, value: 50, sprite: [15] },
+  turret: { size: [20, 13], hp: 3, value: 30, magnetic: true, heavy: true, sprite: [16] },
+  bomber: { size: [14, 20], hp: 1, value: 20, magnetic: true, sprite: [17] },
+  imp: { size: [12, 22], hp: 2, value: 20, sprite: [18] },
+  emberbat: { size: [20, 14], hp: 1, value: 25, fireproof: true, sprite: [19] },
+  slime: { size: [20, 13], hp: 3, value: 20, sprite: [20] },
+  crab: { size: [20, 16], hp: 3, value: 30, shielded: true, magnetic: true, sprite: [21] },
+  nest: { size: [16, 22], hp: 8, value: 80, heavy: true, sprite: [22] },
+  mimic: { size: [19, 16], hp: 5, value: 60, sprite: [25] },
+  gasbag: { size: [14, 16], hp: 1, value: 15, sprite: [26] },
+  tick: { size: [8, 6], hp: 1, value: 10, sprite: [0] },
+  pillbug: { size: [18, 11], hp: 4, value: 25, magnetic: true, sprite: [21] },
   gnat: { size: [3, 3], hp: 1, value: 5, sprite: [7] },
-  stilt: { size: [10, 24], hp: 4, value: 35, sprite: [18] },
+  stilt: { size: [24, 26], hp: 4, value: 35, sprite: [18] },
   snapweed: { size: [10, 10], hp: 3, value: 25, sprite: [22] },
-  scrapper: { size: [12, 13], hp: 4, value: 35, magnetic: true, sprite: [2] },
+  scrapper: { size: [16, 20], hp: 4, value: 35, magnetic: true, sprite: [2] },
   dripper: { size: [10, 10], hp: 2, value: 20, sprite: [6] },
-  shade: { size: [12, 14], hp: 3, value: 40, free: true, insulated: true, sprite: [14] },
-  urchin: { size: [11, 11], hp: 3, value: 30, plated: true, sprite: [6] },
-  coil: { size: [10, 12], hp: 3, value: 30, insulated: true, sprite: [16] },
-  puffer: { size: [10, 8], hp: 2, value: 30, sprite: [4] },
-  lantern: { size: [12, 10], hp: 4, value: 40, sprite: [5] },
+  shade: { size: [14, 20], hp: 3, value: 40, free: true, insulated: true, sprite: [14] },
+  urchin: { size: [16, 16], hp: 3, value: 30, plated: true, sprite: [6] },
+  coil: { size: [16, 22], hp: 3, value: 30, insulated: true, sprite: [16] },
+  puffer: { size: [14, 10], hp: 2, value: 30, sprite: [4] },
+  lantern: { size: [18, 16], hp: 4, value: 40, sprite: [5] },
   lamp: { size: [6, 8], hp: 1, value: 0, friendly: true, prop: true, free: true, sprite: [29] },
-  mole: { size: [12, 14], hp: 3, value: 0, friendly: true, sprite: [10] },
-  hermit: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [11] },
-  miner: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [12] },
-  cartographer: { size: [10, 14], hp: 3, value: 0, friendly: true, sprite: [11] },
-  tinker: { size: [12, 14], hp: 3, value: 0, friendly: true, sprite: [12] },
-  bloodletter: { size: [10, 16], hp: 3, value: 0, friendly: true, sprite: [10] },
+  mole: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [10] },
+  hermit: { size: [14, 22], hp: 3, value: 0, friendly: true, sprite: [11] },
+  miner: { size: [14, 20], hp: 3, value: 0, friendly: true, sprite: [12] },
+  cartographer: { size: [12, 20], hp: 3, value: 0, friendly: true, sprite: [11] },
+  tinker: { size: [12, 22], hp: 3, value: 0, friendly: true, sprite: [12] },
+  bloodletter: { size: [12, 22], hp: 3, value: 0, friendly: true, sprite: [10] },
 }
 
 export const ENEMY_TRAITS = {
@@ -125,11 +126,10 @@ const walker = speed => (g, e, dt) => {
     e.vx = 0
   } else {
     e.vx = e.facing * speed
-    const ahead = e.x + (e.facing > 0 ? e.w + 1 : -1)
-    const noFloor = e.grounded && !solidAt(g.world, ahead, e.y + e.h + 2)
-    if (e.hitWall || noFloor) {
+    const floorAhead = dir => solidAt(g.world, e.x + (dir > 0 ? e.w + 1 : -1), e.y + e.h + 2)
+    if (e.hitWall || (e.grounded && !floorAhead(e.facing))) {
       e.facing *= -1
-      e.vx = e.facing * speed
+      e.vx = e.grounded && !floorAhead(e.facing) ? 0 : e.facing * speed
     }
   }
   move(g.world, e, dt)
@@ -305,10 +305,9 @@ const turret = (g, e, dt) => {
   if (e.stun > 0) return
   const me = centre(e)
   const them = foeOf(g, e)
-  e.facing = them.x < me.x ? -1 : 1
   e.cooldown -= dt
   const d = Math.hypot(them.x - me.x, them.y - me.y)
-  const lined = d <= T.range && lineClear(g.world, me, them)
+  const lined = d <= T.range && (them.x - me.x) * e.facing > 0 && lineClear(g.world, me, them)
   e.aimAt = lined && e.cooldown < TUNING.feel.windup * 1.4 ? them : null
   if (e.cooldown > 0 || !lined) return
   e.cooldown = T.every
@@ -346,6 +345,7 @@ const imp = (g, e, dt) => {
       e.cooldown = I.every
     }
   } else e.vx = 0
+  holdEdge(g, e)
   move(g.world, e, dt)
   for (const [x, y] of cellsUnder({ x: e.x, y: e.y, w: e.w, h: e.h + 2 })) {
     const m = matAt(g.world, x, y)
@@ -419,6 +419,7 @@ const mimic = (g, e, dt) => {
     e.vy = -M_.hop
     e.cooldown = 0.7
   }
+  holdEdge(g, e)
   move(g.world, e, dt)
 }
 
@@ -756,6 +757,78 @@ export const onDeath = (g, e) => {
     g.fireballs.push({ x: e.x + 1, y: e.y + e.h, w: 4, h: 4, vx: 0, vy: 20, age: 0, friendly: true, fromWorld: true, napalm: true })
     burst(g, c.x, c.y, 'fire', 8)
   }
+}
+
+const supportAt = (world, e, x, y) => {
+  let held = 0
+  for (let px = 0; px < e.w; px++) if (solidAt(world, x + px, y + e.h + 1)) held += 1
+  return held / e.w
+}
+
+export const support = (world, e) => supportAt(world, e, e.x, e.y)
+
+const clearAt = (world, e, x, y) => !hitsSolid(world, { x, y, w: e.w, h: e.h })
+
+const STEPS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8]
+
+const findSeat = (world, e, wanted) => {
+  const row = Math.round((e.y + e.h) / BLOCK)
+  for (const dy of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6]) {
+    const y = (row + dy) * BLOCK - e.h
+    for (const dx of STEPS) {
+      const x = e.x + dx * BLOCK
+      if (x >= BLOCK && x + e.w <= WORLD_PX - BLOCK && clearAt(world, e, x, y) && supportAt(world, e, x, y) >= wanted) return { x, y }
+    }
+  }
+  return null
+}
+
+const mountTurret = (world, e) => {
+  const y = e.y
+  const scan = dir => {
+    let x = e.x
+    while (x > 0 && x + e.w < WORLD_PX && !hitsSolid(world, { x: x + dir, y, w: e.w, h: e.h })) x += dir
+    return x > 0 && x + e.w < WORLD_PX ? x : null
+  }
+  const left = scan(-1)
+  const right = scan(1)
+  const useLeft = left !== null && (right === null || e.x - left <= right - e.x)
+  if (left === null && right === null) return e
+  return { ...e, x: useLeft ? left : right, facing: useLeft ? 1 : -1, mounted: true }
+}
+
+export const seatEnemy = world => e => {
+  if (e.kind === 'turret') return mountTurret(world, e)
+  if (anchorOf(e.kind) !== 'ground' || e.free || e.prop || e.warden) return e
+  const spot = findSeat(world, e, 1) ?? findSeat(world, e, 0.85)
+  if (spot) return { ...e, ...spot }
+  return e.friendly ? e : null
+}
+
+const FOOTING_SLIDE = 60
+const FOOTING_MIN = 0.7
+
+export const settleFooting = (g, e, dt) => {
+  if (!e.grounded || e.free || e.prop || e.clung > 0 || anchorOf(e.kind) !== 'ground') return
+  const under = e.y + e.h + 1
+  if (Math.abs(e.vx) > 1 && solidAt(g.world, e.x + (e.vx > 0 ? e.w + 1 : -1), under)) return
+  const held = []
+  for (let px = 0; px < e.w; px++) if (solidAt(g.world, e.x + px, under)) held.push(px)
+  if (held.length === 0 || held.length >= e.w * FOOTING_MIN) return
+  const middle = (held[0] + held.at(-1)) / 2
+  const wide = held.at(-1) - held[0] + 1 >= e.w * FOOTING_MIN
+  const towardFloor = middle < e.w / 2 ? -1 : 1
+  const step = (wide ? towardFloor : -towardFloor) * FOOTING_SLIDE * dt
+  const spot = [step, -step].find(by => clearAt(g.world, e, e.x + by, e.y))
+  if (spot !== undefined) e.x += spot
+}
+
+const holdEdge = (g, e) => {
+  if (!e.grounded || e.vx === 0) return
+  const dir = Math.sign(e.vx)
+  if (solidAt(g.world, e.x + (dir > 0 ? e.w + 1 : -1), e.y + e.h + 2)) return
+  const below = centre(g.player).y > e.y + e.h + BLOCK
+  e.vx = below ? e.vx * 1.8 : 0
 }
 
 export const createEnemy = ({ kind, x, row, y }) => {

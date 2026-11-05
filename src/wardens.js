@@ -739,14 +739,14 @@ const orbit = (g, e) => {
 }
 
 Object.assign(ENEMY_DEFS, {
-  bellows: { size: [34, 26], hp: 240, value: 800, heavy: true, free: true, warden: true, sprite: [26] },
-  colossus: { size: [30, 34], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, sprite: [13] },
+  bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, sprite: [26] },
+  colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, sprite: [13] },
   crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true, sprite: [16] },
-  eel: { size: [14, 10], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [15] },
-  eelseg: { size: [10, 8], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
-  brood: { size: [28, 22], hp: 210, value: 800, heavy: true, free: true, warden: true, sprite: [22] },
-  conductor: { size: [18, 40], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [16] },
-  core: { size: [26, 26], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
+  eel: { size: [20, 16], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [15] },
+  eelseg: { size: [12, 12], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
+  brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, sprite: [22] },
+  conductor: { size: [40, 62], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [16] },
+  core: { size: [44, 44], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
   orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true, sprite: [6] },
 })
 
