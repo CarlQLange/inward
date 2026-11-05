@@ -453,7 +453,7 @@ export const draw = (ctx, g, pointer) => {
   }
   ctx.restore()
   if (g.phase !== 'title') {
-    drawHud(ctx, g)
+    if (g.menus.at(-1)?.page !== 'pause') drawHud(ctx, g)
     if (g.menus.length === 0) drawToast(ctx, g)
     if (g.looking) drawLookLegend(ctx)
   }

@@ -143,7 +143,7 @@ const relicColumn = (ctx, g, menu) => {
 }
 
 const drawPause = (ctx, g, menu) => {
-  shade(ctx, 0.78)
+  shade(ctx, 0.88)
   const pitch = 9
   drawMapGrid(ctx, g, CENTRE - (15 * pitch) / 2, ORIGIN.y + 4, pitch)
   drawList(ctx, menu, ORIGIN.y + 146, menu.focus === 'list', 10)
@@ -301,7 +301,7 @@ const drawCards = (ctx, g, menu, cards) => {
 
 const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW }
 const STEPS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }
-const MAP_RINGS = ['#0d2412', '#10291a', '#13301f', '#163624', '#1a3d29', '#1e452e', '#234e34', '#2b5a3a']
+const MAP_RINGS = ['#1c3a22', '#1e3f26', '#20442a', '#22492e', '#254f32', '#285536', '#2c5c3a', '#31643f']
 
 export const drawMapGrid = (ctx, g, left, top, pitch) => {
   const cellSize = pitch - 1
