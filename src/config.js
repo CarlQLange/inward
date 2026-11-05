@@ -124,6 +124,7 @@ export const TUNING = {
     stompBounce: 210,
     phoenixHearts: 3,
     hpPerRing: 0.15,
+    wardenHpPerRing: 0.1,
     hintReach: 32,
     chainWindow: 4,
     worldChain: 2,

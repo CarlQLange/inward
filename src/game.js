@@ -186,7 +186,7 @@ const arenaFor = (g, key, ring) => {
 
 const dressEnemy = (g, ring) => e => {
   if (e.warden) {
-    const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.hpPerRing))
+    const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.wardenHpPerRing))
     return { ...e, hp, maxHp: hp, asleep: true }
   }
   const omen = omenFoes(g.omen)
@@ -353,6 +353,8 @@ const walkThrough = (g, dir) => {
     p.x = (door.col + 1) * BLOCK - p.w / 2
     p.y = dir === 'down' ? 1 : WORLD_PX - p.h - 1
     p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
+    p.grounded = false
+    p.sinceGround = 1
   }
 }
 

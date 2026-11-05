@@ -404,10 +404,14 @@ const shaft = (grid, c, top, bottom) => {
     for (let x = c; x <= c + 3; x++) grid[y][x] = '.'
   }
   let side = 0
-  for (let y = bottom - 2; y >= top + 2; y -= 3) {
+  let last = bottom + 1
+  const ledge = y => {
     grid[y][c + side] = grid[y][c + side + 1] = 'R'
     side = side === 0 ? 2 : 0
+    last = y
   }
+  for (let y = bottom - 2; y >= top + 4; y -= 3) ledge(y)
+  if (last > top + 5 && last <= bottom) ledge(top + 4)
 }
 
 const widestSegment = (segments, rand) =>
