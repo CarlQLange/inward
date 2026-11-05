@@ -21,7 +21,7 @@ const { LADDER } = await import('../src/discover.js')
 const { anchorOf } = await import('../src/cast.js')
 const { createGame, jumpTo, step } = await import('../src/game.js')
 const { ENEMY_DEFS, support } = await import('../src/enemies.js')
-const { hitsSolid } = await import('../src/physics.js')
+const { hitsSolid, solidAt } = await import('../src/physics.js')
 await import('../src/wardens.js')
 
 save.found = [...LADDER]
@@ -40,7 +40,7 @@ const picture = (g, e) => {
   const row = Math.floor(e.y / 8)
   for (let y = row - 2; y <= row + 5; y++) {
     let line = ''
-    for (let x = col - 5; x <= col + 7; x++) line += g.world.mat[y * 28 + x] ? '#' : '.'
+    for (let x = col - 5; x <= col + 7; x++) line += solidAt(g.world, x * 8, y * 8) ? '#' : '.'
     rows.push(line)
   }
   return `${e.kind} x=${e.x.toFixed(1)} y=${e.y.toFixed(1)} w=${e.w} h=${e.h} vx=${e.vx.toFixed(0)} facing=${e.facing} col=${col}\n${rows.join('\n')}`
@@ -70,7 +70,7 @@ for (let n = 0; n < rooms; n++) {
       if (e.grounded) {
         const held = support(g.world, e)
         s.ticks += 1
-        const streak = held < 0.65 ? (streaks.get(e) ?? 0) + 1 : 0
+        const streak = held < 0.65 && Math.abs(e.vx) <= 1 ? (streaks.get(e) ?? 0) + 1 : 0
         streaks.set(e, streak)
         s.longest = Math.max(s.longest, streak)
         if (streak > SETTLE_TICKS) {

@@ -1535,7 +1535,8 @@ const stepEnemies = (g, dt) => {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
     STEPPERS[e.kind](g, e, dt)
-    if (e.kind !== 'worm' && !e.free) pushOutOfSolid(g.world, e)
+    if (e.kind !== 'worm' && !e.free) nudgeOutOfSolid(g.world, e)
+    settleFooting(g, e, dt)
     clampToRoom(e)
     e.iframes -= dt
     e.stun -= dt

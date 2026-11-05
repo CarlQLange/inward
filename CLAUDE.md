@@ -26,7 +26,7 @@ options, so snapshot localStorage in sessionStorage first and restore it afterwa
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
-`node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
+`node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
 lists the flags, such as `--god`, `--found rand`, `--career` and `--warden bellows --gun`. The bot
 walks badly, so read its time-per-run numbers as an upper bound and its deaths as pessimistic.
@@ -69,6 +69,9 @@ effects must spread across blocks visibly and be readable without text.
 - Controller support. Full animations for most creatures rather than two or three frames.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
+- Creatures must look like they're standing on the blocks they're on, with no legs floating over
+  ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
+  match the body and feet, and a smaller contact box keeps touching them forgiving.
 
 **The reveal**
 

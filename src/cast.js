@@ -21,9 +21,11 @@ const REACH = 0.82
 export const artKind = kind => ART_ALIAS[kind] ?? kind
 export const anchorOf = kind => ANCHORS[kind] ?? 'ground'
 
+const OUTLINE = 1
+
 const TOPS = {
-  ground: (e, h) => e.y + e.h - h,
-  hang: e => e.y,
+  ground: (e, h) => e.y + e.h - h + OUTLINE,
+  hang: e => e.y - OUTLINE,
   free: (e, h) => e.y + e.h / 2 - h / 2,
   wall: (e, h) => e.y + e.h / 2 - h / 2,
 }
