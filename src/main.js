@@ -1,6 +1,6 @@
 import { TICK, VIEW } from './config.js'
 import { createGame, depthHere, restart, step } from './game.js'
-import { draw } from './render.js'
+import { draw, shakeOf, worldLayers } from './render.js'
 import { loadSprites } from './sprites.js'
 import { save } from './store.js'
 import { createPresenter } from './present.js'
@@ -63,9 +63,10 @@ const render = () => {
   draw(ctx, state, held.pointer)
   document.getElementById('screen').style.cursor = device() === 'mouse' && state.menus.length > 0 ? 'default' : 'none'
   const { shaders } = save.settings
-  const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
+  const limit = { full: 1, soft: 0.6, off: 0.36 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
-  present(source, { ...state, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse, stop: state.timeStop > 0 ? 1 : 0 })
+  const depth = Math.min(state.shownDepth, limit)
+  present({ front: source, ...worldLayers(state, depth) }, { ...state, depth, pulse: state.pulse * pulse, stop: state.timeStop > 0 ? 1 : 0 }, shakeOf(state))
 }
 
 let last = performance.now()

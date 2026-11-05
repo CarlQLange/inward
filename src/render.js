@@ -11,7 +11,8 @@ import { RELIC_BY_ID } from './relics.js'
 import { keyOf } from './map.js'
 import { drawHero } from './hero.js'
 import { cameraOffset, doorOffset, drawMotes, drawParticles } from './fx.js'
-import { drawScene, liquidOverlay } from './scene.js'
+import { drawActors, drawSubmergedTint, terrainLayer } from './scene.js'
+import { tileLook } from './era.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
 import { drawSkillEffects } from './skillart.js'
 
@@ -129,19 +130,6 @@ const drawReticle = (ctx, pointer) => {
 
 const DOOR_VECTORS = { right: [-1, 0], left: [1, 0], up: [0, 1], down: [0, -1] }
 
-const drawSubmerged = (ctx, g, p) => {
-  for (let y = Math.floor((p.y - 2) / BLOCK); y <= Math.floor((p.y + p.h) / BLOCK); y++) {
-    for (let x = Math.floor((p.x - 4) / BLOCK); x <= Math.floor((p.x + p.w + 4) / BLOCK); x++) {
-      const colour = liquidOverlay(matAt(g.world, x, y))
-      if (!colour || matAt(g.world, x, y) === M.LAVA) continue
-      ctx.globalAlpha = 0.42
-      ctx.fillStyle = colour
-      ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-      ctx.globalAlpha = 1
-    }
-  }
-}
-
 const carryOffset = g => {
   if (!g.door) return { x: 0, y: 0 }
   const fade = 1 - doorOffset(g).t
@@ -159,7 +147,6 @@ const drawHeroLayer = (ctx, g) => {
   ctx.translate(carry.x, carry.y)
   drawHero(ctx, g, p)
   ctx.translate(-carry.x, -carry.y)
-  drawSubmerged(ctx, g, p)
   const choking = (p.smoked ?? 0) / TUNING.player.smokeTolerance
   if (choking > 0.1 && g.phase === 'playing') {
     const x = Math.round(p.x) - 1
@@ -171,31 +158,22 @@ const drawHeroLayer = (ctx, g) => {
   }
 }
 
-const oldRoom = document.createElement('canvas')
-oldRoom.width = oldRoom.height = ROOM_PX
-let snapped = null
-
-const snapshotDoor = (g, door) => {
-  if (snapped === door) return
-  snapped = door
-  const ctx = oldRoom.getContext('2d')
-  ctx.imageSmoothingEnabled = false
-  drawScene(ctx, g, door.from, false)
-}
-
 const drawRoom = (ctx, g, pointer) => {
   const room = g.rooms[keyOf(g.x, g.y)]
   const slide = doorOffset(g)
   if (slide) {
     const [ux, uy] = DOOR_VECTORS[slide.dir]
-    snapshotDoor(g, g.door)
-    ctx.drawImage(oldRoom, Math.round(ux * slide.t * ROOM_PX), Math.round(uy * slide.t * ROOM_PX))
+    const [ox, oy] = [Math.round(ux * slide.t * ROOM_PX), Math.round(uy * slide.t * ROOM_PX)]
+    ctx.translate(ox, oy)
+    drawActors(ctx, g, g.door.from, false)
+    ctx.translate(-ox, -oy)
     ctx.translate(Math.round(-ux * (1 - slide.t) * ROOM_PX), Math.round(-uy * (1 - slide.t) * ROOM_PX))
   }
-  drawScene(ctx, g, { ...room, theme: g.phase === 'title' ? 0 : room.theme, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
+  drawActors(ctx, g, { ...room, world: g.world, enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups }, true)
   drawSkillEffects(ctx, g)
   drawProjectiles(ctx, g)
   drawHeroLayer(ctx, g)
+  drawSubmergedTint(ctx, g.world)
   drawPopups(ctx, g)
   drawBossBar(ctx, g)
   if (pointer && g.phase === 'playing' && g.menus.length === 0) drawReticle(ctx, pointer)
@@ -203,11 +181,18 @@ const drawRoom = (ctx, g, pointer) => {
   drawReveal(ctx, g)
 }
 
+export const shakeOf = g => (save.settings.shake ? cameraOffset(g) : { x: 0, y: 0 })
+
+export const worldLayers = (g, depth) => {
+  const theme = g.phase === 'title' ? 0 : g.rooms[keyOf(g.x, g.y)]?.theme ?? 0
+  const seed = (g.x ?? 0) * 31 + (g.y ?? 0)
+  return { terrain: terrainLayer(g.world, theme, tileLook(depth), seed), theme, seed }
+}
+
 export const draw = (ctx, g, pointer) => {
   ctx.imageSmoothingEnabled = false
-  ctx.fillStyle = '#000'
-  ctx.fillRect(0, 0, VIEW.w, VIEW.h)
-  const shake = save.settings.shake ? cameraOffset(g) : { x: 0, y: 0 }
+  ctx.clearRect(0, 0, VIEW.w, VIEW.h)
+  const shake = shakeOf(g)
   ctx.save()
   ctx.translate(ORIGIN.x + shake.x, ORIGIN.y + shake.y)
   ctx.beginPath()

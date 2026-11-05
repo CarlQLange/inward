@@ -4,9 +4,10 @@ import { burningAt, chargedAt, matAt } from './world.js'
 import { SPRITES, regionTiles } from './sprites.js'
 import { drawText } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
-import { THEMES } from './generate.js'
 import { drawCreatures } from './creatures.js'
 import { drawSkillMatter } from './skillart.js'
+import { standingFixtures } from './light.js'
+import { airOf } from './backdrop.js'
 
 const GREEN = '#76d648'
 const WHITE = '#f4f8f2'
@@ -25,47 +26,10 @@ const TILE = {
 
 const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>> 16) & 0xffff
 
-const LOOKS = [
-  { bg: '#07100e', speck: '#0f2218', tint: null, pattern: 'specks' },
-  { bg: '#05101a', speck: '#0c2436', tint: 'rgba(40, 110, 170, 0.34)', pattern: 'drips' },
-  { bg: '#120d06', speck: '#241a0c', tint: 'rgba(120, 80, 20, 0.34)', pattern: 'roots' },
-  { bg: '#0b0d10', speck: '#1c2228', tint: 'rgba(120, 130, 150, 0.42)', pattern: 'grid' },
-  { bg: '#150704', speck: '#2e0f08', tint: 'rgba(190, 60, 20, 0.4)', pattern: 'embers' },
-  { bg: '#071218', speck: '#123040', tint: 'rgba(120, 210, 240, 0.4)', pattern: 'shards' },
-  { bg: '#0e0616', speck: '#26103a', tint: 'rgba(150, 70, 210, 0.38)', pattern: 'shards' },
-  { bg: '#10060c', speck: '#361026', tint: 'rgba(220, 50, 120, 0.3)', pattern: 'rings' },
+const TINTS = [
+  null, 'rgba(40, 110, 170, 0.34)', 'rgba(120, 80, 20, 0.34)', 'rgba(120, 130, 150, 0.42)',
+  'rgba(190, 60, 20, 0.4)', 'rgba(120, 210, 240, 0.4)', 'rgba(150, 70, 210, 0.38)', 'rgba(220, 50, 120, 0.3)',
 ]
-
-const PATTERNS = {
-  specks: (ctx, x, y) => {
-    if (hash(x, y) % 5 === 0) ctx.fillRect(x * BLOCK + 2, y * BLOCK + 2, 3, 1)
-    if (hash(y, x) % 7 === 0) ctx.fillRect(x * BLOCK + 5, y * BLOCK + 5, 1, 2)
-  },
-  drips: (ctx, x, y) => {
-    if (hash(x, 3) % 4 === 0 && hash(x, y) % 3 !== 0) ctx.fillRect(x * BLOCK + 3, y * BLOCK, 1, 5)
-  },
-  roots: (ctx, x, y) => {
-    if (hash(x, y) % 6 === 0) ctx.fillRect(x * BLOCK, y * BLOCK + 4, 8, 1)
-    if (hash(y, x) % 6 === 0) ctx.fillRect(x * BLOCK + 4, y * BLOCK, 1, 8)
-  },
-  grid: (ctx, x, y) => {
-    if (x % 4 === 0) ctx.fillRect(x * BLOCK, y * BLOCK, 1, 8)
-    if (y % 4 === 0) ctx.fillRect(x * BLOCK, y * BLOCK, 8, 1)
-    if (x % 4 === 0 && y % 4 === 0) ctx.fillRect(x * BLOCK - 1, y * BLOCK - 1, 3, 3)
-  },
-  embers: (ctx, x, y) => {
-    if (hash(x, y) % 9 === 0) ctx.fillRect(x * BLOCK + 3, y * BLOCK + 2, 2, 2)
-    if (y % 6 === 0) ctx.fillRect(x * BLOCK, y * BLOCK + 3, 8, 1)
-  },
-  shards: (ctx, x, y) => {
-    if (hash(x, y) % 8 !== 0) return
-    for (let i = 0; i < 5; i++) ctx.fillRect(x * BLOCK + i, y * BLOCK + 4 - i, 1, i * 2 + 1)
-  },
-  rings: (ctx, x, y) => {
-    const d = Math.round(Math.hypot(x - 13.5, y - 13.5))
-    if (d % 3 === 0) ctx.fillRect(x * BLOCK + 2, y * BLOCK + 2, 3, 3)
-  },
-}
 
 const blank = (w, h) => {
   const canvas = document.createElement('canvas')
@@ -74,29 +38,10 @@ const blank = (w, h) => {
   return canvas
 }
 
-const mixHex = (a, b, t) => {
-  const channel = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
-  const [x, y] = [channel(a), channel(b)]
-  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`
-}
-
-const BACKDROP_QUIET = 0.68
-
-const makeBackdrop = ({ bg, speck, pattern }) => {
-  const canvas = blank(ROOM_PX, ROOM_PX)
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, ROOM_PX, ROOM_PX)
-  ctx.fillStyle = mixHex(bg, speck, BACKDROP_QUIET)
-  for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) PATTERNS[pattern](ctx, x, y)
-  return canvas
-}
-
-const backdrops = LOOKS.map(makeBackdrop)
-const tinted = LOOKS.map(() => new Map())
+const tinted = TINTS.map(() => new Map())
 
 const tintTile = (theme, tile) => {
-  const { tint } = LOOKS[theme]
+  const tint = TINTS[theme]
   if (!tint) return tile
   const cache = tinted[theme]
   if (!cache.has(tile)) {
@@ -116,40 +61,55 @@ const TINTED_TILES = new Set(['bedrock', 'brick'])
 const MUTING = { rock: [0.34, 0.8], bedrock: [0.34, 0.72] }
 const LIGHT_MUTING = [0.08, 0.95]
 const LOUD = new Set(['volatile', 'gate'])
-const mutedTiles = new Map()
+const shaped = new Map()
 
-const muted = (tile, name) => {
-  if (LOUD.has(name)) return tile
-  if (mutedTiles.has(tile)) return mutedTiles.get(tile)
-  const [grey, dim] = MUTING[name] ?? LIGHT_MUTING
+const shapedTile = (tile, name, detail) => {
+  const key = Math.round(detail * 20)
+  const cache = shaped.get(tile) ?? new Map()
+  shaped.set(tile, cache)
+  if (cache.has(key)) return cache.get(key)
+  const loud = LOUD.has(name)
+  const [grey, dim] = loud ? [0, 1] : MUTING[name] ?? LIGHT_MUTING
+  const keep = loud ? Math.max(detail, 0.5) : detail
   const canvas = blank(tile.width, tile.height)
   const c = canvas.getContext('2d', { willReadFrequently: true })
   c.drawImage(tile, 0, 0)
   const image = c.getImageData(0, 0, tile.width, tile.height)
   const { data } = image
+  const count = data.length / 4
+  const mean = [0, 1, 2].map(k => {
+    let sum = 0
+    for (let i = 0; i < data.length; i += 4) sum += data[i + k]
+    return sum / count
+  })
   for (let i = 0; i < data.length; i += 4) {
     const luma = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11
-    for (let k = 0; k < 3; k++) data[i + k] = (data[i + k] + (luma - data[i + k]) * grey) * dim
+    for (let k = 0; k < 3; k++) {
+      const flat = mean[k] + (data[i + k] - mean[k]) * keep
+      data[i + k] = (flat + (luma - flat) * grey) * dim
+    }
   }
   c.putImageData(image, 0, 0)
-  mutedTiles.set(tile, canvas)
+  cache.set(key, canvas)
   return canvas
 }
 
-const tileFor = (name, x, y, theme) => {
+const tileFor = (name, x, y, theme, look) => {
   const h = hash(x, y)
   if (name === 'rock') {
-    if (h % 17 === 0) return SPRITES.extra.bones
+    if (look.variety && h % 17 === 0) return SPRITES.extra.bones
     const tiles = regionTiles(theme)
-    if (tiles.length) return tiles[h % 5 === 0 ? 1 : 0]
+    if (tiles.length) return tiles[look.variety && h % 5 === 0 ? 1 : 0]
   }
   const set = SPRITES.tiles[name]
-  return set[h % set.length]
+  return set[look.variety ? h % set.length : 0]
 }
+
+const isSolid = (world, x, y) => props(matAt(world, x, y)).solid === true
 
 const isBuried = (world, x, y) =>
   [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
-    .every(([dx, dy]) => props(matAt(world, x + dx, y + dy)).solid)
+    .every(([dx, dy]) => isSolid(world, x + dx, y + dy))
 
 const SCORCH_RADII = [7, 12, 18]
 
@@ -182,94 +142,79 @@ const paintScorch = (ctx, world) => {
   ctx.globalAlpha = 1
 }
 
-const paintSolids = (ctx, world, depth, skin, theme) => {
+const paintEdges = (ctx, world, x, y) => {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
+  if (!isSolid(world, x, y - 1)) ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, 1)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.07)'
+  if (!isSolid(world, x - 1, y)) ctx.fillRect(x * BLOCK, y * BLOCK, 1, BLOCK)
+  if (!isSolid(world, x + 1, y)) ctx.fillRect(x * BLOCK + BLOCK - 1, y * BLOCK, 1, BLOCK)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
+  if (!isSolid(world, x, y + 1)) ctx.fillRect(x * BLOCK, y * BLOCK + BLOCK - 1, BLOCK, 1)
+}
+
+const paintFixture = (ctx, x, y, [r, g, b]) => {
+  const px = x * BLOCK + 3
+  const py = y * BLOCK
+  ctx.fillStyle = '#1a1c1c'
+  ctx.fillRect(px + 1, py, 1, 3)
+  ctx.fillStyle = `rgb(${r * 255}, ${g * 255}, ${b * 255})`
+  ctx.fillRect(px, py + 3, 3, 3)
+  ctx.fillStyle = '#fffbe8'
+  ctx.fillRect(px + 1, py + 4, 1, 1)
+}
+
+const paintTerrain = (ctx, world, theme, look, seed) => {
   ctx.imageSmoothingEnabled = false
-  ctx.drawImage(backdrops[theme], 0, 0)
+  ctx.clearRect(0, 0, ROOM_PX, ROOM_PX)
   for (let y = 0; y < ROOM; y++) {
     for (let x = 0; x < ROOM; x++) {
       const m = matAt(world, x, y)
       if (m === M.ASH) ctx.drawImage(SPRITES.ash, x * BLOCK, y * BLOCK)
       const name = TILE[m]
       if (!name) continue
-      const tile = tileFor(name, x, y, theme)
-      ctx.drawImage(muted(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, name), x * BLOCK, y * BLOCK)
+      const tile = tileFor(name, x, y, theme, look)
+      ctx.drawImage(shapedTile(TINTED_TILES.has(name) ? tintTile(theme, tile) : tile, name, look.detail), x * BLOCK, y * BLOCK)
       if (isBuried(world, x, y)) {
-        ctx.fillStyle = 'rgba(5, 12, 10, 0.72)'
+        ctx.fillStyle = look.variety ? 'rgba(5, 12, 10, 0.72)' : 'rgba(5, 12, 10, 0.86)'
         ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-      }
+      } else paintEdges(ctx, world, x, y)
     }
   }
+  if (look.fixtures) for (const { x, y } of standingFixtures(world, seed)) paintFixture(ctx, x, y, airOf(theme).fixture)
   paintScorch(ctx, world)
 }
 
-const cache = { canvas: blank(ROOM_PX, ROOM_PX), mat: new Uint8Array(ROOM * ROOM), world: null, key: '' }
+const terrain = { canvas: blank(ROOM_PX, ROOM_PX), drawn: new Uint8Array(ROOM * ROOM), world: null, key: '', version: 0 }
 
-const drawSolids = (ctx, world, depth, skin, theme) => {
-  const key = `${theme}|${depth > 0.5}|${skin}|${world.scorches?.length ?? 0}|${world.scorches?.at(-1)?.x}`
-  const stale = cache.world !== world || cache.key !== key || !world.mat.every((m, i) => m === cache.mat[i])
+const drawnMat = m => (TILE[m] || m === M.ASH ? m : 0)
+
+export const terrainLayer = (world, theme, look, seed) => {
+  const key = `${theme}|${look.row}|${seed}|${world.scorches?.length ?? 0}|${world.scorches?.at(-1)?.x}`
+  const stale = terrain.world !== world || terrain.key !== key || !world.mat.every((m, i) => drawnMat(m) === terrain.drawn[i])
   if (stale) {
-    paintSolids(cache.canvas.getContext('2d'), world, depth, skin, theme)
-    cache.world = world
-    cache.key = key
-    cache.mat.set(world.mat)
+    paintTerrain(terrain.canvas.getContext('2d'), world, theme, look, seed)
+    terrain.world = world
+    terrain.key = key
+    world.mat.forEach((m, i) => { terrain.drawn[i] = drawnMat(m) })
+    terrain.version += 1
   }
-  ctx.drawImage(cache.canvas, 0, 0)
+  return terrain
 }
 
-const LIQUID = {
-  [M.WATER]: { body: 'rgba(14, 70, 88, 0.55)', deep: 'rgba(8, 40, 60, 0.25)', top: '#7fdce6', crest: '#d8f8ff' },
-  [M.OIL]: { body: 'rgba(40, 22, 48, 0.94)', deep: 'rgba(14, 6, 20, 0.5)', top: '#a06ab0', crest: '#e6b8f0' },
-  [M.LAVA]: { body: '#d9481c', deep: '#a82a10', top: '#ffd24a', crest: '#fff6c0' },
-  [M.ACID]: { body: 'rgba(84, 186, 36, 0.88)', deep: 'rgba(40, 120, 20, 0.5)', top: '#c8ff5a', crest: '#f0ffc0' },
-}
+const LIQUID_TINT = { [M.WATER]: 'rgba(14, 70, 88, 0.3)', [M.OIL]: 'rgba(40, 22, 48, 0.42)', [M.ACID]: 'rgba(84, 186, 36, 0.3)' }
 
-const rippleLift = (ripples, px, py, time) => {
-  let lift = 0
-  for (const r of ripples) {
-    if (Math.abs(r.y - py) > 12) continue
-    const d = Math.abs(px - r.x)
-    const front = r.age * 60
-    if (d > front + 4) continue
-    lift += Math.sin((d - front) * 0.9) * 2.4 * r.power * Math.exp(-r.age * 3) * Math.exp(-d * 0.03)
+export const drawSubmergedTint = (ctx, world) => {
+  ctx.globalCompositeOperation = 'source-atop'
+  for (let y = 0; y < ROOM; y++) {
+    for (let x = 0; x < ROOM; x++) {
+      const tint = LIQUID_TINT[matAt(world, x, y)]
+      if (!tint) continue
+      ctx.fillStyle = tint
+      ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
+    }
   }
-  return lift
+  ctx.globalCompositeOperation = 'source-over'
 }
-
-const paintWaterBody = (ctx, x, y, time) => {
-  const h = hash(x, y)
-  const drift = Math.floor(time * 5 + h) % 16
-  if (h % 3 === 0) {
-    ctx.fillStyle = 'rgba(127, 220, 230, 0.32)'
-    ctx.fillRect(x * BLOCK + (drift % BLOCK), y * BLOCK + (h % 7) + 1, 3, 1)
-  }
-}
-
-const paintLavaBody = (ctx, x, y, time) => {
-  const h = hash(x, y)
-  for (let i = 0; i < 3; i++) {
-    const t = time * (0.5 + i * 0.3) + h * 0.1 + i * 3
-    const blobX = Math.floor(((Math.sin(t) + 1) / 2) * 6)
-    const blobY = Math.floor(((Math.cos(t * 0.7 + h) + 1) / 2) * 6)
-    ctx.fillStyle = i === 0 ? '#8c2410' : i === 1 ? '#ff8a2e' : '#ffc23a'
-    ctx.fillRect(x * BLOCK + blobX, y * BLOCK + blobY, i === 0 ? 3 : 2, i === 0 ? 2 : 1)
-  }
-}
-
-const paintOilBody = (ctx, x, y, time) => {
-  const h = hash(x, y)
-  if (Math.sin(time * 1.4 + h) < 0.4) return
-  ctx.fillStyle = h % 2 ? '#6a4a90' : '#4a7a88'
-  ctx.fillRect(x * BLOCK + h % 6, y * BLOCK + (h >> 3) % 6, 2, 1)
-}
-
-const paintAcidBody = (ctx, x, y, time) => {
-  const h = hash(x, y)
-  const rise = Math.floor((time * 6 + h) % 8)
-  ctx.fillStyle = '#d8ff80'
-  ctx.fillRect(x * BLOCK + h % 7, y * BLOCK + 7 - rise, 1, 1)
-}
-
-const BODY_DETAIL = { [M.WATER]: paintWaterBody, [M.LAVA]: paintLavaBody, [M.OIL]: paintOilBody, [M.ACID]: paintAcidBody }
 
 const drawVine = (ctx, x, y) => {
   ctx.fillStyle = '#4f9c3a'
@@ -278,82 +223,8 @@ const drawVine = (ctx, x, y) => {
   ctx.fillRect(x * BLOCK + (hash(x, y) % 2 ? 1 : 5), y * BLOCK + hash(y, x) % 6, 2, 2)
 }
 
-const drawLiquids = (ctx, world, time, ripples) => {
-  for (let y = 0; y < ROOM; y++) {
-    for (let x = 0; x < ROOM; x++) {
-      const m = matAt(world, x, y)
-      if (m === M.VINE) {
-        drawVine(ctx, x, y)
-        continue
-      }
-      const look = LIQUID[m]
-      if (!look) continue
-      const surface = matAt(world, x, y - 1) !== m
-      ctx.fillStyle = look.body
-      ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-      if (!surface && matAt(world, x, y - 2) === m) {
-        ctx.fillStyle = look.deep
-        ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-      }
-      BODY_DETAIL[m](ctx, x, y, time)
-      if (!surface) continue
-      for (let i = 0; i < BLOCK; i++) {
-        const px = x * BLOCK + i
-        const lift = Math.sin(time * 2.4 + px * 0.55) > 0.2 ? 0 : 1
-        const extra = ripples.length ? Math.round(rippleLift(ripples, px, y * BLOCK, time)) : 0
-        const top = y * BLOCK + lift - extra
-        ctx.fillStyle = look.top
-        ctx.fillRect(px, top, 1, 1)
-        if (extra !== 0) {
-          ctx.fillStyle = look.body
-          ctx.fillRect(px, top + 1, 1, Math.max(0, extra))
-        }
-        if ((px + Math.floor(time * 7)) % 11 === 0) {
-          ctx.fillStyle = look.crest
-          ctx.fillRect(px, top, 1, 1)
-        }
-      }
-    }
-  }
-}
-
-const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
-const GAS_COLOURS = { [M.SMOKE]: '#747a72', [M.STEAM]: '#c8d8d8', [M.METHANE]: '#b07cd8' }
-const GAS_LEVELS = [1, 3, 5, 7]
-const GAS_TILE = 16
-
-const makeGasTile = (colour, level) => {
-  const canvas = blank(GAS_TILE, GAS_TILE)
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = colour
-  for (let y = 0; y < GAS_TILE; y++) {
-    for (let x = 0; x < GAS_TILE; x++) if (BAYER[y % 4][x % 4] < level) ctx.fillRect(x, y, 1, 1)
-  }
-  return canvas
-}
-
-const gasTiles = Object.fromEntries(Object.entries(GAS_COLOURS).map(([m, colour]) => [m, GAS_LEVELS.map(level => makeGasTile(colour, level))]))
-const GAS_DRIFT = { [M.SMOKE]: 3, [M.STEAM]: 6, [M.METHANE]: 1.6 }
-
-const isGas = (world, x, y) => props(matAt(world, x, y)).gas === true
-
-const drawGas = (ctx, world, time) => {
-  for (let y = 0; y < ROOM; y++) {
-    for (let x = 0; x < ROOM; x++) {
-      const m = matAt(world, x, y)
-      const tiles = gasTiles[m]
-      if (!tiles) continue
-      const around = isGas(world, x - 1, y) + isGas(world, x + 1, y) + isGas(world, x, y - 1) + isGas(world, x, y + 1)
-      const life = world.life[y * ROOM + x]
-      const swell = Math.round(Math.sin(x * 0.8 + time * 0.7) + Math.cos(y * 1.1 - time * 0.5))
-      const level = Math.max(0, Math.min(3, Math.floor(around / 2) + (life > 1.5 ? 1 : 0) - (life < 0.6 ? 1 : 0) + swell))
-      const drift = Math.floor(time * GAS_DRIFT[m])
-      const sway = Math.floor(Math.sin(time * 0.8 + y * 0.5) * 2)
-      const sx = (x * BLOCK + sway + 64) % BLOCK
-      const sy = (y * BLOCK + drift) % BLOCK
-      ctx.drawImage(tiles[level], sx, sy, BLOCK, BLOCK, x * BLOCK, y * BLOCK, BLOCK, BLOCK)
-    }
-  }
+const drawVines = (ctx, world) => {
+  for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) if (matAt(world, x, y) === M.VINE) drawVine(ctx, x, y)
 }
 
 const drawArc = (ctx, x, y) => {
@@ -510,11 +381,11 @@ const drawDoorPulse = (ctx, doors, amount, time) => {
   }
 }
 
-export const drawScene = (ctx, g, room, live) => {
-  const { world, theme } = room
+export const drawActors = (ctx, g, room, live) => {
+  const { world } = room
   const time = g.time
-  drawSolids(ctx, world, g.depth, THEMES[theme]?.skin, theme)
   if (live) drawSkillMatter(ctx, g)
+  drawVines(ctx, world)
   drawCards(ctx, time, room.cards)
   drawWares(ctx, room.wares, g.gold)
   drawPickups(ctx, time, room.pickups)
@@ -523,10 +394,6 @@ export const drawScene = (ctx, g, room, live) => {
     drawEffects(ctx, time, g.effects, g.player)
   }
   drawCreatures(ctx, g, room.enemies)
-  drawLiquids(ctx, world, time, live ? g.ripples : [])
-  drawGas(ctx, world, time)
   drawOverlays(ctx, world, time)
   if (live) drawDoorPulse(ctx, room.doors, g.doorPulse, g.fxClock)
 }
-
-export const liquidOverlay = m => LIQUID[m]?.body
