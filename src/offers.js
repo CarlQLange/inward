@@ -19,12 +19,12 @@ const MAKES = {
 
 const REGION_FOOD = [
   ['moss', 'fire', 'gas', 'rubble'],
-  ['water', 'charge', 'rubble'],
-  ['fire', 'gas', 'moss', 'acid'],
+  ['water', 'charge', 'rubble', 'mud'],
+  ['fire', 'gas', 'moss', 'acid', 'mud'],
   ['metal', 'scrap', 'charge', 'falling', 'blast'],
-  ['lava', 'water', 'steam', 'metal', 'scrap'],
-  ['ice', 'falling', 'water'],
-  ['blast', 'blastKill', 'gas', 'acid'],
+  ['lava', 'water', 'steam', 'metal', 'scrap', 'glass'],
+  ['ice', 'falling', 'water', 'snow'],
+  ['blast', 'blastKill', 'gas', 'acid', 'glass'],
 ]
 
 const BAND_OF_RING = [0, 0, 1, 1, 2, 2, 3]

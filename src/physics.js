@@ -1,4 +1,4 @@
-import { BLOCK, ROOM } from './config.js'
+import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { matAt } from './world.js'
 
@@ -35,10 +35,13 @@ export const moveAxis = (world, e, axis, distance) => {
   return false
 }
 
+export const miredAtPx = (world, px, py) => props(matAt(world, cell(px), cell(py))).thick === true
+
 export const move = (world, e, dt, down = 1) => {
-  e.hitWall = moveAxis(world, e, 'x', e.vx * dt)
+  const drag = miredAtPx(world, e.x + e.w / 2, down > 0 ? e.y + e.h - 1 : e.y + 1) ? TUNING.world.mudDrag : 1
+  e.hitWall = moveAxis(world, e, 'x', e.vx * dt * drag)
   if (e.hitWall) e.vx = 0
-  const blocked = moveAxis(world, e, 'y', e.vy * dt)
+  const blocked = moveAxis(world, e, 'y', e.vy * dt * drag)
   e.grounded = blocked && e.vy * down > 0
   if (blocked) e.vy = 0
 }

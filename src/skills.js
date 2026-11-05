@@ -1,6 +1,6 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
+import { energize, explode, ignite, matAt, puff, setCell, shatter } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { chunks } from './feel.js'
@@ -522,7 +522,9 @@ export const thrown = (g, p, aim, lands, { speed, lift = 0, gravity = TUNING.fir
   addEffect(g, { kind: 'thrown', lands, x: from.x - size / 2, y: from.y - size / 2, w: size, h: size, vx: aim.x * speed, vy: aim.y * speed - lift, gravity, colour, splashes, life: 5 })
 }
 
-export const BREAKS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE, M.BRICK, M.SCRAP, M.VINE])
+export const BREAKS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE, M.BRICK, M.SCRAP, M.VINE, M.GLASS, M.SNOW])
+
+const shatterFrom = (g, x, y) => shatter(g.world, x, y, cell(centre(g.player).x), cell(centre(g.player).y))
 
 export const quake = (g, count, power = 6) => {
   const loose = []
@@ -541,7 +543,7 @@ export const smash = (g, x, y) => {
   const m = matAt(g.world, x, y)
   if (m === M.VOLATILE) ignite(g.world, x, y)
   else if (m === M.ROCK) setCell(g.world, x, y, M.SAND)
-  else if (BREAKS.has(m)) setCell(g.world, x, y, M.EMPTY)
+  else if (!shatterFrom(g, x, y) && BREAKS.has(m)) setCell(g.world, x, y, M.EMPTY)
   chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, m, 7)
   if (BREAKS.has(m)) feedEvent(g, 'smashed', (x + 0.5) * BLOCK, (y + 0.5) * BLOCK)
   return BREAKS.has(m)
@@ -872,7 +874,7 @@ const grapple = (g, p) => {
     return
   }
   if (owns(p, 'grapple.yank') && BREAKS.has(hit.m)) {
-    setCell(g.world, x, y, M.EMPTY)
+    if (!shatterFrom(g, x, y)) setCell(g.world, x, y, M.EMPTY)
     if (hit.m === M.SCRAP || hit.m === M.ROCK) g.flung.push(flungFrom(p, { x: hit.last.x - 4 - p.aim.x * 6, y: hit.last.y - 4 - p.aim.y * 6, vx: -p.aim.x * 200, vy: -p.aim.y * 200 - 30 }))
     return
   }
@@ -1149,7 +1151,7 @@ export const pourAcid = (g, x, y, count) => {
   }
 }
 
-const BORES = new Set([...BREAKS, M.METAL, M.GATE])
+const BORES = new Set([...BREAKS, M.METAL, M.GATE].filter(m => m !== M.GLASS))
 
 export const boreCell = (g, x, y) => {
   const m = matAt(g.world, x, y)
@@ -1480,7 +1482,7 @@ const mine = (g, p) => {
   if (limpet) zap(g, muzzle(p), hit.last, BLOOD)
 }
 
-const SHATTERS = new Set([M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE])
+const SHATTERS = new Set([M.ICE, M.FLOE, M.RIME, M.SAND, M.VOLATILE, M.GLASS])
 
 export const roarCell = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
@@ -1506,7 +1508,7 @@ export const roarFoe = (g, p, e, away, shove) => {
 
 const shoutBreaks = (g, x, y) => {
   const m = matAt(g.world, x, y)
-  if (SHATTERS.has(m) && m !== M.VOLATILE) {
+  if (SHATTERS.has(m) && m !== M.VOLATILE && !shatterFrom(g, x, y)) {
     setCell(g.world, x, y, m === M.SAND ? M.EMPTY : M.WATER)
     chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, m, 3)
   }

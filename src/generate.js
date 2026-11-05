@@ -11,7 +11,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 const WATER_BOTTOM = 25
 const LOWEST_FLOOR = 23
 const HIGHEST_FLOOR = 9
-const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B', 'W'])
+const SOLID = new Set(['#', 'R', 'm', 'p', 'w', 'M', 'G', 's', 'S', 'V', 'I', 'B', 'W', 'x', 'n'])
 
 export const LAYOUTS = {
   caves: { length: [3, 6], gap: [2, 3], pits: 0.45, rise: [-3, 3], headroom: [7, 10], blobs: [2, 4], ledges: [2, 5] },
@@ -205,13 +205,13 @@ const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, ra
 }
 
 export const THEMES = [
-  { name: 'THE MOSS CAVES', top: 'm', ledge: 'w', skin: null, pits: 0, peat: 0.4, props: { lamp: 0.6, tank: 0.2 }, flourish: 'roots', foes: ['crawler', 'spitter', 'bat', 'slug', 'tick', 'snapweed', 'gnat', 'pillbug', 'spore', 'mimic'] },
-  { name: 'THE DROWNED HALLS', top: 'R', ledge: 'R', bridge: 'B', skin: 'brick', pits: 0.3, oil: 0.1, hopper: { strut: 'G', load: 's', rail: true }, props: { battery: 0.7, tank: 0.35, lamp: 0.1 }, flourish: 'seepage', foes: ['crawler', 'slug', 'bat', 'imp', 'gasbag', 'dripper', 'pillbug', 'coil', 'tick'] },
-  { name: 'THE PEAT BOG', top: 'p', ledge: 'w', skin: 'fungus', pits: 0.1, oil: 0.3, peat: 0.6, props: { lamp: 0.6, tank: 0.15 }, flourish: 'bog', foes: ['spitter', 'spore', 'slug', 'gasbag', 'emberbat', 'gnat', 'snapweed', 'dripper', 'tick'] },
-  { name: 'THE OLD WORKINGS', top: 'M', ledge: 'M', bridge: 'M', skin: 'brick', pits: -0.1, gas: 0.3, scrap: 0.4, hopper: { strut: 'G', load: 'S', rail: true }, props: { battery: 0.8, carboy: 0.25, lamp: 0.1 }, flourish: 'struts', foes: ['turret', 'crawler', 'bomber', 'crab', 'gasbag', 'scrapper', 'coil', 'stilt', 'pillbug'] },
-  { name: 'THE FOUNDRY', top: 'M', ledge: 'M', bridge: 'M', skin: 'charred', pits: 0.15, lava: 0.7, scrap: 0.3, hopper: { strut: 'G', load: 'S', rail: true }, props: { ladle: 0.5, tank: 0.5, battery: 0.3 }, flourish: 'forge', foes: ['turret', 'bomber', 'crab', 'slime', 'scrapper', 'coil', 'stilt', 'crawler'] },
-  { name: 'THE ICE SHAFTS', top: 'I', ledge: 'I', bridge: 'I', skin: 'ice', pits: 0.2, hopper: { strut: 'I', load: 's' }, props: { carboy: 0.3, tank: 0.2, lamp: 0.1 }, flourish: 'icicles', foes: ['imp', 'crab', 'slime', 'bat', 'urchin', 'stilt', 'shade', 'tick', 'crawler'] },
-  { name: 'THE CRYSTAL HOLLOW', top: 'R', ledge: 'V', bridge: 'R', skin: 'crystal', pits: 0.1, gas: 0.4, volatile: 0.2, hopper: { strut: 'V', load: 'S' }, props: { battery: 0.35, carboy: 0.3, lamp: 0.25 }, flourish: 'crystals', foes: ['spore', 'emberbat', 'bomber', 'turret', 'slime', 'shade', 'urchin', 'gnat', 'bat'] },
+  { name: 'THE MOSS CAVES', top: 'm', ledge: 'w', skin: null, pits: 0, peat: 0.4, puddles: 0.5, props: { lamp: 0.6, tank: 0.2 }, flourish: 'roots', foes: ['crawler', 'spitter', 'bat', 'slug', 'tick', 'snapweed', 'gnat', 'pillbug', 'spore', 'mimic'] },
+  { name: 'THE DROWNED HALLS', top: 'R', ledge: 'R', bridge: 'B', skin: 'brick', pits: 0.3, oil: 0.1, mud: 0.7, sand: 0.35, hopper: { strut: 'G', load: 's', rail: true }, props: { battery: 0.7, tank: 0.35, sandbag: 0.45, lamp: 0.1 }, flourish: 'seepage', foes: ['crawler', 'slug', 'bat', 'imp', 'gasbag', 'dripper', 'pillbug', 'coil', 'tick'] },
+  { name: 'THE PEAT BOG', top: 'p', ledge: 'w', skin: 'fungus', pits: 0.1, oil: 0.3, peat: 0.6, mud: 0.6, puddles: 0.3, props: { lamp: 0.6, tank: 0.15 }, flourish: 'bog', foes: ['spitter', 'spore', 'slug', 'gasbag', 'emberbat', 'gnat', 'snapweed', 'dripper', 'tick'] },
+  { name: 'THE OLD WORKINGS', top: 'M', ledge: 'M', bridge: 'M', skin: 'brick', pits: -0.1, gas: 0.3, scrap: 0.4, sand: 0.3, hopper: { strut: 'G', load: 'S', rail: true }, props: { battery: 0.8, carboy: 0.25, sandbag: 0.25, lamp: 0.1 }, flourish: 'struts', foes: ['turret', 'crawler', 'bomber', 'crab', 'gasbag', 'scrapper', 'coil', 'stilt', 'pillbug'] },
+  { name: 'THE FOUNDRY', top: 'M', ledge: 'M', bridge: 'M', skin: 'charred', pits: 0.15, lava: 0.7, scrap: 0.3, sand: 0.8, hopper: { strut: 'G', load: 'S', rail: true }, props: { ladle: 0.5, tank: 0.5, sandbag: 0.35, battery: 0.3 }, flourish: 'forge', foes: ['turret', 'bomber', 'crab', 'slime', 'scrapper', 'coil', 'stilt', 'crawler'] },
+  { name: 'THE ICE SHAFTS', top: 'I', ledge: 'I', bridge: 'I', skin: 'ice', pits: 0.2, snow: 0.6, cold: true, hopper: { strut: 'I', load: 's' }, props: { carboy: 0.3, tank: 0.2, ladle: 0.3, lamp: 0.1 }, flourish: 'icicles', foes: ['imp', 'crab', 'slime', 'bat', 'urchin', 'stilt', 'shade', 'tick', 'crawler'] },
+  { name: 'THE CRYSTAL HOLLOW', top: 'R', ledge: 'V', bridge: 'R', skin: 'crystal', pits: 0.1, gas: 0.4, volatile: 0.2, sand: 0.3, panes: 0.12, hopper: { strut: 'V', load: 'S' }, props: { battery: 0.35, carboy: 0.3, sandbag: 0.3, lamp: 0.25 }, flourish: 'crystals', foes: ['spore', 'emberbat', 'bomber', 'turret', 'slime', 'shade', 'urchin', 'gnat', 'bat'] },
   { name: 'THE CORE', top: 'R', ledge: 'R', skin: 'charred', pits: 0, lava: 0.5, volatile: 0.1, foes: [] },
 ]
 
@@ -281,6 +281,70 @@ const FLOURISHES = {
   },
 }
 
+const STIRS = { s: ['~', 'L'], n: ['L'], u: ['L', 's'], '~': ['L', 's', 'n'] }
+
+const calm = (grid, x, y, tile) => [[0, -1], [1, 0], [0, 1], [-1, 0]].every(([dx, dy]) => !STIRS[tile].includes(grid[y + dy]?.[x + dx]))
+
+const clearOfDoors = (layout, s, x) => {
+  const first = layout.segments[0]
+  const last = layout.segments.at(-1)
+  return !(s === first && x <= first.from + 2) && !(s === last && x >= last.to - 2)
+}
+
+const pile = (grid, layout, s, x, tile) => {
+  if (!clearOfDoors(layout, s, x) || grid[s.floor - 1][x] !== '.' || !calm(grid, x, s.floor - 1, tile)) return
+  grid[s.floor - 1][x] = tile
+}
+
+const drift = (grid, layout, range, rand, tile, chance) => {
+  for (const s of layout.segments) {
+    if (rand() > chance || s.to - s.from < 2) continue
+    const x = range(s.from, s.to - 1)
+    const width = range(2, 3)
+    for (let at = x; at < x + width && at <= s.to; at++) pile(grid, layout, s, at, tile)
+    const crest = x + 1
+    if (width === 3 && grid[s.floor - 1][crest] === tile && grid[s.floor - 2][crest] === '.' && calm(grid, crest, s.floor - 2, tile)) grid[s.floor - 2][crest] = tile
+  }
+}
+
+const sink = (grid, layout, range, rand, tile, chance, width) => {
+  for (const s of layout.segments) {
+    if (rand() > chance) continue
+    const x = range(s.from, s.to)
+    const span = range(...width)
+    for (let at = x; at < x + span && at <= s.to; at++) {
+      const open = grid[s.floor - 1][at] === '.' || (tile === 'u' && grid[s.floor - 1][at] === '~')
+      if (!clearOfDoors(layout, s, at) || !SOLID.has(grid[s.floor + 1]?.[at]) || !open || !calm(grid, at, s.floor, tile)) continue
+      grid[s.floor][at] = tile
+    }
+  }
+}
+
+const hangPanes = (grid, ceilings, range, rand, chance) => {
+  for (let x = 2; x < ROOM - 2; x++) {
+    if (rand() > chance) continue
+    for (let y = ceilings[x], n = range(2, 4); n > 0 && grid[y]?.[x] === '.'; y++, n--) grid[y][x] = 'x'
+  }
+}
+
+const dust = (grid, rand, tile, chance) => {
+  for (let y = 2; y < ROOM - 2; y++) {
+    for (let x = 4; x < ROOM - 4; x++) {
+      if (grid[y][x] !== '.' || !SOLID.has(grid[y + 1][x]) || grid[y + 1][x] === tile || rand() > chance || !calm(grid, x, y, tile)) continue
+      grid[y][x] = tile
+    }
+  }
+}
+
+const deposit = ({ grid, layout, ceilings, range, rand, theme }) => {
+  if (theme.mud) sink(grid, layout, range, rand, 'u', theme.mud, [2, 4])
+  for (let n = 0; n < 2; n++) if (theme.puddles) sink(grid, layout, range, rand, '~', theme.puddles, [1, 1])
+  if (theme.sand) drift(grid, layout, range, rand, 's', theme.sand)
+  if (theme.snow) drift(grid, layout, range, rand, 'n', theme.snow)
+  if (theme.snow) dust(grid, rand, 'n', theme.snow * 0.3)
+  if (theme.panes) hangPanes(grid, ceilings, range, rand, theme.panes)
+}
+
 const hangVine = (grid, x, ceiling, length) => {
   for (let y = ceiling; y < ceiling + length; y++) {
     if (grid[y]?.[x] !== '.') return
@@ -348,13 +412,16 @@ const conductorNear = (grid, x, ceiling) => {
   return false
 }
 
+const below = tiles => (grid, x, ceiling) => tiles.includes(firstBelow(grid, x, ceiling))
+
 const PROP_SPOTS = {
   lamp: (grid, x, ceiling) => FUEL.has(firstBelow(grid, x, ceiling)),
   battery: conductorNear,
-  tank: (grid, x, ceiling) => firstBelow(grid, x, ceiling) === 'L',
-  ladle: (grid, x, ceiling) => firstBelow(grid, x, ceiling) === '~',
+  tank: below(['L', 's']),
+  ladle: below(['~', 's', 'I', 'n']),
+  sandbag: below(['~', 'L', 'u']),
 }
-const PROP_OFFSET = { lamp: 1, battery: 0, tank: -2, carboy: 0, ladle: -1 }
+const PROP_OFFSET = { lamp: 1, battery: 0, tank: -2, carboy: 0, ladle: -1, sandbag: 0 }
 
 const hangProps = (grid, ceilings, rand, range, enemies, theme, event) => {
   const spots = Array.from({ length: ROOM - 6 }, (_, i) => i + 3)
@@ -380,7 +447,7 @@ const rot = (grid, rand, share) => {
 
 const standing = (grid, extra) => (x, y) => {
   const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || SOLID.has(grid[b][a])
-  const wet = (a, b) => ['~', 'o'].includes(grid[b]?.[a])
+  const wet = (a, b) => ['~', 'o', 'u'].includes(grid[b]?.[a])
   const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || grid[y]?.[x] === 'v' || extra.has(`${x},${y}`)
   return { solid, ok: !solid(x, y) && !solid(x, y - 1) && stands }
 }
@@ -593,6 +660,7 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   if (theme.rust) rot(grid, rand, theme.rust)
   if (theme.shards) for (const s of layout.segments) if (rand() < theme.shards) grid[s.floor][range(s.from, s.to)] = 'V'
   FLOURISHES[theme.flourish]?.({ grid, floors, ceilings, range, rand, depth })
+  deposit({ grid, layout, ceilings, range, rand, theme })
   for (let n = theme.vines ?? 0; n > 0; n--) {
     const x = range(2, ROOM - 3)
     hangVine(grid, x, ceilings[x], range(3, 8))

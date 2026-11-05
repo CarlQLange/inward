@@ -36,6 +36,9 @@ export const TASTES = {
   gas: { name: 'SMOKE AND GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
   acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
   falling: { name: 'FALLING BLOCKS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
+  glass: { name: 'GLASS', colours: ['#d6f6f0', '#ffffff'], flight: 'shard', cell: made(M.GLASS) },
+  mud: { name: 'MUD', colours: ['#8e7c60', '#b8a684'], flight: 'drip', cell: made(M.MUD) },
+  snow: { name: 'SNOW', colours: ['#eef4f4', '#c2d0d8'], flight: 'puff', cell: made(M.SNOW) },
 }
 
 const DISTINCT = [M.WATER, M.OIL, M.LAVA, M.ACID, M.STEAM, M.SMOKE, M.METHANE]
@@ -101,6 +104,14 @@ const OTHERS = {
       return { amount: aloft.length / F.full.airborne, spots: aloft.map(centre) }
     },
   },
+  flying: {
+    colours: ['#d6f6f0', '#c9b48a'], flight: 'tumble',
+    sense: (g, p) => {
+      const c = centre(p)
+      const near = g.flung.filter(f => Math.hypot(f.x + f.w / 2 - c.x, f.y + f.h / 2 - c.y) < REACH_PX * 2)
+      return { amount: near.length / F.full.flying, spots: near.map(f => ({ x: f.x + f.w / 2, y: f.y + f.h / 2 })) }
+    },
+  },
   air: {
     colours: ['#f4f8f2', '#9fb0a8'], flight: 'streak',
     sense: (g, p) => {
@@ -142,7 +153,7 @@ export const dietOf = foodOf
 
 const EATS = {
   variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', drawn: 'FOES NEAR THE DECOY', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
-  hit: 'TAKING HITS', returned: 'RETURNED SHOTS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
+  flying: 'FLYING BLOCKS AND SHARDS', hit: 'TAKING HITS', returned: 'RETURNED SHOTS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
   airborne: 'FOES IN THE AIR', worldKill: 'WORLD KILLS',
 }
 

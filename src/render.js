@@ -60,7 +60,7 @@ const drawLook = (ctx, g) => {
       const m = matAt(g.world, x, y)
       const p = props(m)
       const hurts = burningAt(g.world, x, y) || chargedAt(g.world, x, y) || m === M.LAVA || m === M.ACID || p.harmful
-      const blows = p.blast
+      const blows = p.blast || p.brittle
       const burns = p.flammability
       const conducts = p.conductance
       const colour = hurts ? 'rgba(255, 50, 40, 0.8)' : blows ? 'rgba(220, 90, 255, 0.75)' : burns ? 'rgba(255, 150, 30, 0.5)' : conducts ? 'rgba(255, 235, 70, 0.45)' : null
@@ -76,6 +76,7 @@ const drawLook = (ctx, g) => {
   }
   ctx.fillStyle = COLOURS.hurt
   for (const f of g.fireballs) if (!f.friendly) ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, f.w + 2, f.h + 2)
+  for (const f of g.flung) if (!f.safe) ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, f.w + 2, f.h + 2)
 }
 
 const drawReticle = (ctx, pointer) => {

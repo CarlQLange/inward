@@ -182,6 +182,10 @@ const hash = (x, y) => (Math.imul(x * 374761393 + y * 668265263, 1274126177) >>>
 
 const cellSolid = (w, x, y) => x < 0 || y < 0 || x >= ROOM || y >= ROOM || props(w.mat[y * ROOM + x]).solid === true
 
+const opaque = m => (props(m).solid && !props(m).clear) || props(m).thick === true
+
+const cellOpaque = (w, x, y) => x < 0 || y < 0 || x >= ROOM || y >= ROOM || opaque(w.mat[y * ROOM + x])
+
 const fixturesCache = new WeakMap()
 
 export const fixturesOf = (w, seed) => {
@@ -218,7 +222,7 @@ const stillBeams = (w, seed) => {
   for (const slot of slots) {
     if (slot >= ROOM - 1) continue
     let first = 1
-    while (first < ROOM - 1 && cellSolid(w, slot, first)) first++
+    while (first < ROOM - 1 && cellOpaque(w, slot, first)) first++
     if (first >= ROOM - 2) continue
     if (first > 12) continue
     const width = 4 + (hash(slot, seed) % 3) * 2
@@ -283,7 +287,7 @@ const stillChanged = w => {
   memo.world = w
   memo.solidKey = (memo.solidKey?.length === w.mat.length ? memo.solidKey : new Uint8Array(w.mat.length))
   memo.solidKey.set(w.mat)
-  for (let i = 0; i < solid.length; i++) solid[i] = props(w.mat[i]).solid ? 1 : 0
+  for (let i = 0; i < solid.length; i++) solid[i] = opaque(w.mat[i]) ? 1 : 0
   return true
 }
 

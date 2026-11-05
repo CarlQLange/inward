@@ -194,8 +194,8 @@ export const stepKeystones = (g, p, dt) => {
 }
 
 const FIRES = new Set([M.MOSS, M.PEAT, M.WOOD, M.VINE])
-const STONES = new Set([M.ROCK, M.BRICK, M.BEDROCK, M.SAND, M.ASH, M.STILL])
-const COLD = new Set([M.ICE, M.FLOE, M.RIME])
+const STONES = new Set([M.ROCK, M.BRICK, M.BEDROCK, M.SAND, M.ASH, M.STILL, M.GLASS, M.MUD])
+const COLD = new Set([M.ICE, M.FLOE, M.RIME, M.SNOW])
 const LIVE = new Set([M.METAL, M.GATE, M.SCRAP])
 
 const spillInto = (g, x, y, material) => {

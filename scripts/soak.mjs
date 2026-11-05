@@ -123,7 +123,7 @@ const worker = async ({ opts, from, to }) => {
     return foe
   }
 
-  const CHARS = { [M.EMPTY]: '.', [M.BEDROCK]: '#', [M.ROCK]: 'R', [M.MOSS]: 'm', [M.PEAT]: 'p', [M.WOOD]: 'w', [M.METAL]: 'M', [M.GATE]: 'G', [M.SAND]: 's', [M.ASH]: ',', [M.WATER]: '~', [M.SMOKE]: ':', [M.STEAM]: ':', [M.SCRAP]: 'S', [M.VOLATILE]: 'V', [M.ICE]: 'I', [M.OIL]: 'o', [M.METHANE]: ':', [M.BRICK]: 'B', [M.LAVA]: 'L', [M.VINE]: 'v', [M.ACID]: 'A', [M.SOURCE]: 'W' }
+  const CHARS = { [M.EMPTY]: '.', [M.BEDROCK]: '#', [M.ROCK]: 'R', [M.MOSS]: 'm', [M.PEAT]: 'p', [M.WOOD]: 'w', [M.METAL]: 'M', [M.GATE]: 'G', [M.SAND]: 's', [M.ASH]: ',', [M.WATER]: '~', [M.SMOKE]: ':', [M.STEAM]: ':', [M.SCRAP]: 'S', [M.VOLATILE]: 'V', [M.ICE]: 'I', [M.OIL]: 'o', [M.METHANE]: ':', [M.BRICK]: 'B', [M.LAVA]: 'L', [M.VINE]: 'v', [M.ACID]: 'A', [M.SOURCE]: 'W', [M.GLASS]: 'x', [M.MUD]: 'u', [M.SNOW]: 'n' }
   const asciiRoom = (g, room, from) => [
     `${room.layout} ring ${room.ring} event ${room.event} doors ${JSON.stringify(room.doors)} links ${Object.entries(room.links).map(([d, l]) => `${d}:${l.lock}`)} player ${from.x},${from.y} passed ${room.passed} cleared ${room.cleared}`,
     ...Array.from({ length: ROOM }, (_, y) => Array.from({ length: ROOM }, (_, x) => (x === from.x && y === from.y ? '@' : CHARS[matAt(g.world, x, y)])).join('')),
