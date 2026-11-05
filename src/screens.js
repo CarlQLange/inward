@@ -3,7 +3,7 @@ import { ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { ENEMY_DEFS, ENEMY_TRAITS } from './enemies.js'
 import { FORKS, SKILL_DETAILS, formOf, owns } from './skills.js'
 import { tintedIcon } from './skillart.js'
-import { SPRITES } from './sprites.js'
+import { SPRITES, creatureFrames } from './sprites.js'
 import { knownNotes, save } from './store.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
@@ -235,7 +235,7 @@ const drawNotes = (ctx, menu) => {
       ctx.fillStyle = SWATCH[line.tile]
       ctx.fillRect(x, y, 8, 8)
     } else {
-      const sprite = SPRITES.creatures[ENEMY_DEFS[line.creature].sprite[0]][0]
+      const sprite = creatureFrames(line.creature)[0][0]
       ctx.drawImage(sprite, x - 3, y - 2, 14, 14)
     }
     drawText(ctx, line.name, x + 16, y - 1, WHITE)

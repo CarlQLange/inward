@@ -1,5 +1,5 @@
 import { ENEMY_DEFS } from './enemies.js'
-import { SPRITES } from './sprites.js'
+import { creatureAnchor, creatureFrames as spriteFrames } from './sprites.js'
 import { drawText } from './font.js'
 import { setPixelSource } from './fx.js'
 
@@ -11,15 +11,20 @@ const GAS = '#c79ae0'
 const PALE = '#c9d4c0'
 const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, armoured: PALE }
 
-const creatureFrames = kind => frameIndex => {
-  const { sprite } = ENEMY_DEFS[kind]
-  return SPRITES.creatures[sprite[frameIndex % sprite.length]]
+const STRIDE = { crawler: 7, bat: 10, emberbat: 11, fish: 5, jelly: 3, gasbag: 2, slug: 2, imp: 6, coil: 6, tick: 8, stilt: 3, spore: 3, lantern: 3 }
+
+const framesOf = kind => spriteFrames(kind)
+
+const frameIndex = (e, frames, time) => {
+  if (frames.length < 2) return 0
+  if (e.windup || e.lit || e.frame === 1) return 1
+  const stride = STRIDE[e.kind]
+  return stride ? Math.floor(time * stride) % frames.length : 0
 }
 
 const creatureArt = (e, time) => {
-  const { sprite } = ENEMY_DEFS[e.kind]
-  const index = e.kind === 'crawler' ? Math.floor(time * 6) % sprite.length : Math.min(e.frame, sprite.length - 1)
-  return creatureFrames(e.kind)(index)[e.facing > 0 ? 0 : 1]
+  const frames = framesOf(e.kind)
+  return frames[frameIndex(e, frames, time)][e.facing > 0 ? 0 : 1]
 }
 
 const silhouettes = new WeakMap()
@@ -61,9 +66,16 @@ const pixelsOf = art => {
   return pixels
 }
 
+const ORIGINS = {
+  ground: (e, art) => e.y + e.h - art.height,
+  hang: e => e.y,
+  free: (e, art) => e.y + e.h / 2 - art.height / 2,
+  wall: (e, art) => e.y + e.h / 2 - art.height / 2,
+}
+
 const artOrigin = (e, art) => ({
   x: Math.round(e.x + e.w / 2 - art.width / 2),
-  y: Math.round(e.y + e.h - art.height),
+  y: Math.round(ORIGINS[creatureAnchor(e.kind)](e, art)),
 })
 
 setPixelSource(e => {
