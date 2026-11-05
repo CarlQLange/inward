@@ -1,5 +1,6 @@
 import { paintFrames, creatureClip } from './sprites.js'
 import { artKind, artTop } from './cast.js'
+import { WORLD_PX, solidAt } from './physics.js'
 import { setPixelSource } from './fx.js'
 
 const HURT = '#ff5a4a'
@@ -240,6 +241,23 @@ const stalk = (ctx, e, top) => {
   ctx.fillRect(x - 1, from, 2, top - from + 2)
 }
 
+const BIG_FLASH = 0.4
+const STILT_FEET = [-0.42, 0, 0.42]
+
+const drawStilts = (ctx, g, e, art, at, y) => {
+  const bottom = y + art.height - 1
+  const middle = at + art.width / 2
+  for (const spread of STILT_FEET) {
+    const x = Math.round(middle + spread * art.width)
+    let floor = bottom
+    while (floor < WORLD_PX && !solidAt(g.world, x, floor + 1)) floor += 1
+    ctx.fillStyle = '#26262a'
+    ctx.fillRect(x - 1, bottom, 3, floor - bottom + 1)
+    ctx.fillStyle = '#8a8a90'
+    ctx.fillRect(x, bottom, 1, floor - bottom + 1)
+  }
+}
+
 const drawOne = (ctx, g, e) => {
   const time = g.time
   const a = animOf(e, time)
@@ -256,10 +274,12 @@ const drawOne = (ctx, g, e) => {
   if (e.elite || e.ally) ring(ctx, art, at, y, pose, e.ally ? GAS : ELITE_COLOURS[e.elite])
   stamp(ctx, art, at, y, pose)
   ctx.globalAlpha = 1
-  if (e.flash > 0) stamp(ctx, silhouette(art, '#ffffff'), at, y, pose)
-  else {
-    const warning = telegraphColour(e, time)
-    if (warning) stamp(ctx, silhouette(art, warning), at, y, pose)
+  if (e.kind === 'crucible') drawStilts(ctx, g, e, art, at, y)
+  const overlay = e.flash > 0 ? '#ffffff' : telegraphColour(e, time)
+  if (overlay) {
+    ctx.globalAlpha = e.warden ? BIG_FLASH : 1
+    stamp(ctx, silhouette(art, overlay), at, y, pose)
+    ctx.globalAlpha = 1
   }
   if (e.frozen > 0) {
     ctx.globalAlpha = 0.6
