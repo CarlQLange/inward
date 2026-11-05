@@ -9,8 +9,6 @@ import { blank, paint } from './room.js'
 
 const E = TUNING.enemies
 
-export const WARDEN_IDS = ['bellows', 'colossus', 'crucible', 'eel', 'brood', 'conductor']
-
 const toward = (from, to) => (to < from ? -1 : 1)
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
 

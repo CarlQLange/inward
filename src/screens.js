@@ -307,6 +307,7 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
       }
     }
   }
+  drawWardenMarks(ctx, g, left, top, pitch)
 }
 
 const LOCK_CELL = {
@@ -323,7 +324,6 @@ const drawMap = (ctx, g, menu) => {
   const pitch = 10
   const size = 15 * pitch
   drawMapGrid(ctx, g, CENTRE - size / 2, ORIGIN.y + 34, pitch)
-  drawWardenMarks(ctx, g, CENTRE - size / 2, ORIGIN.y + 34, pitch)
   centred(ctx, `RING ${g.ring + 1} OF ${CORE_RING + 1}   ROOMS SEEN ${g.roomsSeen}`, ORIGIN.y + 188, PALE)
   drawList(ctx, menu, ORIGIN.y + 200)
 }
