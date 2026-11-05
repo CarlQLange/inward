@@ -387,11 +387,12 @@ const drawCounts = (ctx, g, y) => {
   const book = almanac()
   const items = [
     [`X${g.chainPeak}`, YELLOW, 'chain'],
+    [g.wardenWins, g.outwits > 0 ? YELLOW : WHITE, g.outwits > 0 ? 'seal_broken' : 'seal'],
     [g.cleanClears, WHITE, 'heart'],
     [g.gold, WHITE, 'coin'],
     [`${book.found}/${book.total}`, DIM, 'discovery'],
   ]
-  const pitch = 50
+  const pitch = 42
   const left = Math.round(midX() - (items.length * pitch) / 2)
   ctx.imageSmoothingEnabled = false
   items.forEach(([value, colour, icon], i) => {

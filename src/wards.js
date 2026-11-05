@@ -55,13 +55,22 @@ export const readBuild = (g, e) => {
 }
 
 export const adaptWards = (g, e) => {
-  const top = ranked(e.taken ?? {}).filter(allowed(e))[0]
+  const top = ranked(e.taken ?? {}).filter(school => SCHOOLS[school]).filter(allowed(e))[0]
   e.taken = {}
   if (!top) return
   const share = shareFor(g)
   const held = (e.wards ?? []).filter(w => w.school !== top).slice(0, 1).map(w => ({ ...w, share: Math.min(1, w.share + W().fade) }))
   e.wards = [{ school: top, share }, ...held]
   e.reading = W().readTime
+}
+
+export const outwitted = e => {
+  if (!e.wards?.length) return false
+  const worn = e.wards.map(w => w.school)
+  const taken = Object.entries(e.taken ?? {})
+  const total = taken.reduce((n, [, amount]) => n + amount, 0)
+  const open = taken.filter(([school]) => !worn.includes(school)).reduce((n, [, amount]) => n + amount, 0)
+  return total > 0 && open / total >= W().outwitShare
 }
 
 export const wardShare = (e, school) => e.wards?.find(w => w.school === school)?.share ?? 1

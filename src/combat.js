@@ -49,7 +49,7 @@ const hurtWarden = (g, e, amount, source, cause) => {
   const dealt = amount * (fromWorld ? TUNING.enemies.warden.world : 1)
   e.hp -= scale * dealt * share
   e.sinceHit = 0
-  if (school && e.taken) e.taken[school] = (e.taken[school] ?? 0) + dealt
+  if (e.taken) e.taken[school ?? 'WEAK'] = (e.taken[school ?? 'WEAK'] ?? 0) + dealt
   if (fromWorld) {
     e.iframes = TUNING.enemyIframes
     e.worldDamage = (e.worldDamage ?? 0) + dealt

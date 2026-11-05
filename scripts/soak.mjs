@@ -257,7 +257,10 @@ const worker = async ({ opts, from, to }) => {
         input.pointer = target ? input.pointer : c
         if (!room.sealed) {
           bot.enteredAt = g.time
-          if (p.y + p.h > room.arena.interior.y1) input.jump = true
+          if (p.y + p.h > room.arena.interior.y1) {
+            input.jump = !bot.jumpHeld
+            bot.jumpHeld = input.jump
+          }
           const dx = (ROOM * BLOCK) / 2 - p.x
           if (Math.abs(dx) > 4) input[dx > 0 ? 'right' : 'left'] = true
           if (!p.grounded && p.vy < 0) input.jump = true

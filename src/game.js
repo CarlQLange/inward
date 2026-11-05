@@ -22,7 +22,7 @@ import { buildArena, openArena, stepArena } from './wardens.js'
 import { exitsFrom } from './reach.js'
 import { KEYSTONE_BY_ID, bombReady, bombThrown, castWait, crowdedOut, hasKeystone, heartCap, openKeystones, rechargeRate, slotsOf, stainColour, stainStrikes, stepKeystones } from './keystones.js'
 import { deepKill, mutateFoe, rollMutation, stepMutations } from './deep.js'
-import { emptyTally, noteKill, wardedAgainst } from './wards.js'
+import { emptyTally, noteKill, outwitted, wardedAgainst } from './wards.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -402,7 +402,7 @@ const RUN_FIELDS = [
   'seed', 'map', 'x', 'y', 'awake', 'roomsSeen', 'deepestRing', 'cardPool', 'score', 'chainPeak',
   'xp', 'level', 'nextLevel', 'gold', 'kills', 'environmentKills', 'pendingOffers', 'relicPool', 'lastTheme', 'quick', 'quickRing',
   'bands', 'bandFoes', 'omen', 'ambient', 'flocking', 'secrets', 'plants', 'foundThisRun', 'wardens', 'wardenAt', 'wardenOrder', 'seals', 'charted', 'ghost', 'cleanClears', 'mercyBombs',
-  'loop', 'omens', 'mutations', 'tally', 'recent', 'keystoneDue', 'bestBeaten', 'wardenWins',
+  'loop', 'omens', 'mutations', 'tally', 'recent', 'keystoneDue', 'bestBeaten', 'wardenWins', 'outwits',
 ]
 
 const packRoom = room => ({
@@ -535,6 +535,7 @@ const createRun = (depthOverride, quickRing = null, discovering = false) => {
     sealHold: false,
     bestBeaten: false,
     wardenWins: 0,
+    outwits: 0,
     echoes: [],
     tempo: 1,
     bands,
@@ -904,9 +905,11 @@ const onWardenKilled = (g, e) => {
   openArena(g, room)
   room.sealed = false
   room.cleared = true
-  award(g, ENEMY_DEFS[e.kind].value)
+  const outwit = outwitted(e)
+  award(g, ENEMY_DEFS[e.kind].value * (outwit ? R.wards.outwitPays : 1))
   g.kills += 1
   g.wardenWins += 1
+  g.outwits += outwit ? 1 : 0
   noteKill(g, e)
   if (e.lastSource !== 'player') g.environmentKills += 1
   g.pulse = 1
