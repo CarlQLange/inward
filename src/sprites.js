@@ -54,6 +54,14 @@ const ICON_INDEX = {
   icons4: { shock: 0, frostshot: 1, pierce: 2, spread: 3, ricochet: 4, stomp: 5, chest: 6, altar: 7, gem: 8, skull: 9, crown: 10, acidskull: 11, wind: 12, dice: 13, eye: 14, chain: 15 },
 }
 
+const SIGN_NAMES = [
+  'cause_fire', 'cause_lava', 'cause_acid', 'cause_charge', 'cause_smoke', 'cause_crushed', 'cause_bitten', 'cause_shot',
+  'omen_tinder', 'omen_deluge', 'omen_blackout', 'omen_rust', 'omen_bloom', 'omen_swarm', 'omen_moon', 'omen_midas', 'omen_glass',
+  'map_skull', 'seal', 'seal_broken', 'map_core', 'almanac', 'discovery',
+]
+
+const REGION_NAMES = ['moss', 'drowned', 'peat', 'workings', 'foundry', 'ice', 'crystal', 'core']
+
 const loadImage = src => new Promise((resolve, reject) => {
   const image = new Image()
   image.onload = () => resolve(image)
@@ -65,6 +73,14 @@ const cutTile = (atlas, index, size) => {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = size
   canvas.getContext('2d').drawImage(atlas, (index % 4) * size, Math.floor(index / 4) * size, size, size, 0, 0, size, size)
+  return canvas
+}
+
+const cutBox = (atlas, [x, y, w, h]) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  canvas.getContext('2d').drawImage(atlas, x, y, w, h, 0, 0, w, h)
   return canvas
 }
 
@@ -82,6 +98,8 @@ export const SPRITES = {
   tiles: {},
   extra: {},
   creatures: [],
+  cast: {},
+  regions: {},
   icons: {},
   ash: paint(ASH, { b: '#5a5a52', c: '#8a8a80' }),
   flames: FLAMES.map(rows => paint(rows, { f: '#d9531c', g: '#ff9a2e', y: '#ffe84a' })),
@@ -93,8 +111,38 @@ export const SPRITES = {
   heartEmpty: paint(HEART, { g: '#26542a' }),
 }
 
+let castAliases = {}
+
+const castEntry = kind => SPRITES.cast[castAliases[kind] ?? kind]
+
+export const creatureFrames = kind => castEntry(kind)?.frames ?? []
+
+export const creatureAnchor = kind => castEntry(kind)?.anchor ?? 'ground'
+
+export const creatureSize = kind => {
+  const [first] = creatureFrames(kind)
+  return first ? { w: first[0].width, h: first[0].height } : { w: 0, h: 0 }
+}
+
+export const regionTiles = region => SPRITES.regions[typeof region === 'number' ? REGION_NAMES[region] : region] ?? []
+
+const loadCast = async () => {
+  const [atlas, { aliases, creatures }] = await Promise.all([
+    loadImage('assets/cast.png'),
+    fetch('assets/cast.json').then(response => response.json()),
+  ])
+  castAliases = aliases
+  SPRITES.cast = Object.fromEntries(Object.entries(creatures).map(([kind, { anchor, frames }]) => [kind, {
+    anchor,
+    frames: frames.map(box => {
+      const sprite = cutBox(atlas, box)
+      return [sprite, flipped(sprite)]
+    }),
+  }]))
+}
+
 export const loadSprites = async () => {
-  const sheets = ['tiles', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4']
+  const sheets = ['tiles', 'tiles2', 'signs', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4']
   const loaded = Object.fromEntries(await Promise.all(sheets.map(async name => [name, await loadImage(`assets/${name}.png`)])))
   const { tiles, creatures, creatures2 } = loaded
   for (const [name, indices] of Object.entries(TILE_INDEX)) {
@@ -113,4 +161,9 @@ export const loadSprites = async () => {
   for (const [sheet, names] of Object.entries(ICON_INDEX)) {
     for (const [name, index] of Object.entries(names)) SPRITES.icons[name] = cutTile(loaded[sheet], index, 16)
   }
+  SIGN_NAMES.forEach((name, index) => { SPRITES.icons[name] = cutTile(loaded.signs, index, 16) })
+  REGION_NAMES.forEach((name, index) => {
+    SPRITES.regions[name] = [cutTile(loaded.tiles2, index * 2, 8), cutTile(loaded.tiles2, index * 2 + 1, 8)]
+  })
+  await loadCast()
 }
