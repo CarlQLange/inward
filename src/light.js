@@ -26,6 +26,8 @@ const CORE = [0.45, 0.85, 1]
 const ACID = [0.55, 1, 0.25]
 const VOLATILE = [1, 0.45, 0.95]
 const FOE_GLOW = [1, 0.5, 0.45]
+const BEAM = [1, 0.95, 0.72]
+const BEAM_TONES = { [-1]: [1, 0.6, 0.5], 0: BEAM, 1: [0.55, 0.82, 1] }
 
 const cellOf = (x, y) => (x < 0 || y < 0 || x >= ROOM_PX || y >= ROOM_PX ? 1 : solid[((y / BLOCK) | 0) * ROOM + ((x / BLOCK) | 0)])
 
@@ -98,6 +100,28 @@ const cone = (into, px, py, dir, reach, spread, [r, g, b], power) => {
       red[i] += r * v
       green[i] += g * v
       blue[i] += b * v
+    }
+  }
+}
+
+const streak = (into, a, b, width, [r, g, bl], power) => {
+  const [red, green, blue] = into
+  const length = Math.hypot(b.x - a.x, b.y - a.y)
+  if (length < 1) return
+  const ux = (b.x - a.x) / length
+  const uy = (b.y - a.y) / length
+  const span = Math.ceil(width / TEXEL)
+  for (let d = 0; d <= length; d += TEXEL) {
+    for (let k = -span; k <= span; k++) {
+      const tx = ((a.x + ux * d - uy * k * TEXEL) / TEXEL) | 0
+      const ty = ((a.y + uy * d + ux * k * TEXEL) / TEXEL) | 0
+      if (tx < 0 || ty < 0 || tx >= LIGHT_SIZE || ty >= LIGHT_SIZE) continue
+      const edge = 1 - Math.abs(k) / (span + 1)
+      const v = edge * edge * power
+      const i = ty * LIGHT_SIZE + tx
+      red[i] += r * v
+      green[i] += g * v
+      blue[i] += bl * v
     }
   }
 }
@@ -277,6 +301,11 @@ const actorLights = (g, dark) => {
   }
   for (const card of g.cards) if (card.kind === 'core') splat(live, card.x + 8, card.y + 8, 70, CORE, 0.8)
   for (const l of g.lights) splat(live, l.x, l.y, l.radius, [l.r, l.g, l.b], (l.life / l.max) * 1.3)
+  for (const f of g.effects) {
+    if (f.kind !== 'beam') continue
+    for (const [a, b, tone] of f.segments ?? []) streak(live, a, b, 6, BEAM_TONES[tone] ?? BEAM, 0.55)
+    for (const end of f.ends ?? []) splat(live, end.x, end.y, 26, BEAM, 0.9)
+  }
 }
 
 const memo = { world: null, solidKey: null, seed: -1, fixture: null, beams: false }

@@ -13,6 +13,8 @@ const MAKES = {
   'spring.slush': ['ice'], 'bolt.split': ['gas'], 'hammer.tremor': ['falling'], 'hammer.fuse': ['blast', 'blastKill'], 'frost.shatter': ['blast', 'blastKill'],
   'seed.tinder': ['blast', 'blastKill'], 'melt.flash': ['blast', 'steam'], 'roar.rime': ['ice', 'stun'], 'alchemy.vapour': ['gas'], 'mine.gas': ['gas'], 'decoy.gas': ['gas'],
   'ember.napalm': ['fire'], 'melt.forge': ['lava'],
+  lens: ['glass', 'fire'], chime: ['flying', 'stun'], 'lens.kiln': ['glass'], 'lens.dazzle': ['stun'], 'chime.bell': ['glass'], 'chime.statue': ['glass'],
+  repel: ['flying'], 'grapple.yank': ['flying'],
 }
 
 const REGION_FOOD = [

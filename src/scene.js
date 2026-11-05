@@ -401,11 +401,13 @@ const drawEffects = (ctx, time, effects, player) => {
 
 const FLUNG_TILE = { ...TILE, [M.FLOE]: 'ice' }
 
+const ICE_SHARD = '#bff2ff'
+
 const drawShard = (ctx, f) => {
   const x = Math.round(f.x)
   const y = Math.round(f.y)
   const tilt = Math.floor(f.age * 18) % 2
-  ctx.fillStyle = GLASS_FRAME
+  ctx.fillStyle = f.mat === M.ICE ? ICE_SHARD : GLASS_FRAME
   ctx.fillRect(x + 1, y, 2, 4)
   ctx.fillRect(x, y + 1 + tilt, 4, 2 - tilt)
   ctx.fillStyle = GLASS_GLINT

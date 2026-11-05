@@ -3,11 +3,12 @@ import { M, props } from './materials.js'
 import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, centre, forEachCell, hitsSolid, moveAxis, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
-import { MATERIAL_COLOURS, drop } from './fx.js'
+import { MATERIAL_COLOURS, drop, ripple } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, muzzle, orbitFires, owns,
-  recordPast, releaseMatter, returnedShot, ring, setAblaze, shoutFront, smash, spend, strike, zap,
+  prey, recordPast, releaseMatter, returnedShot, ring, setAblaze, shardAt, shoutFront, smash, spend, strike, turnToGlass, zap,
 } from './skills.js'
+import { beamSparks, pealRings } from './matter.js'
 
 const S = TUNING.skills
 
@@ -1033,16 +1034,54 @@ const stepShout = (g, f, dt) => {
 
 const endMatter = g => releaseMatter(g)
 
+const stepBeam = (g, f) => beamSparks(g, f)
+
+const stepPeal = (g, f) => {
+  if (f.rung) return
+  f.rung = true
+  pealRings(g, f)
+  ripple(g, f.x, f.y, S.chime.reach * 4, f.broke ? 3 : 1.5, S.chime.ringTime, 5)
+}
+
+const stepVolley = (g, f, dt) => {
+  const C = S.chime
+  if (!f.pieces.length) {
+    end(f)
+    return
+  }
+  f.clock -= dt
+  if (f.clock > 0) return
+  const foes = prey(g)
+  const shot = f.pieces.map((piece, i) => [i, nearest(foes, piece.x, piece.y, C.volleyReach)]).find(([, foe]) => foe)
+  if (!shot) return
+  shardAt(g, f.pieces.splice(shot[0], 1)[0], shot[1])
+  f.clock = C.volleyEvery
+}
+
+const stepHover = (g, f) => {
+  const foes = prey(g)
+  f.pieces = f.pieces.filter(piece => {
+    const foe = nearest(foes, piece.x, piece.y, S.chime.hoverReach)
+    if (foe) shardAt(g, piece, foe)
+    return !foe
+  })
+  if (!f.pieces.length) end(f)
+}
+
+const dropPieces = (g, f) => f.pieces.forEach(piece => shardAt(g, { ...piece, from: { x: piece.x, y: piece.y - BLOCK } }))
+
 const STEP = {
   well: stepWell, decoy: stepDecoy, drone: stepDrone, rod: stepRod, mine: stepMine, mirror: stepMirror,
   globe: stepGlobe, nail: stepNail, thrown: stepThrown, fuse: stepFuse, hurl: stepHurl, orbit: stepOrbit, wisp: stepWisp, glide: stepGlide,
   twister: stepTwister, lure: stepLure, pane: stepPane, span: stepSpan, flytrap: stepFlytrap, geyser: stepGeyser, font: stepFont,
   bore: stepBore, cloud: stepCloud, fissure: stepFissure, contagion: stepContagion, tether: stepTether, wraith: stepWraith, shout: stepShout,
   seeker: stepSeeker, caught: stepCaught, hurled: stepHurled, rope: stepRope,
+  beam: stepBeam, peal: stepPeal, volley: stepVolley, hover: stepHover, statues: g => turnToGlass(g),
 }
 const END = {
   decoy: endDecoy, mirror: endMirror, fuse: endFuse, drone: endDrone, flytrap: endFlytrap,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall,
+  volley: dropPieces, hover: dropPieces,
 }
 
 const stepAblaze = (g, e, dt) => {

@@ -1,9 +1,10 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { energize, explode, ignite, matAt, puff, setCell, shatter } from './world.js'
+import { bake, energize, explode, ignite, matAt, puff, setCell, shatter, tallyRule } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { chunks } from './feel.js'
+import { chipsAt } from './fx.js'
 import { shotBox } from './cast.js'
 import { feedEvent } from './feed.js'
 
@@ -126,6 +127,14 @@ export const FORKS = {
     [form('mirror.pane', 'PANE', 'LEAVES A MIRROR STANDING', COLD), form('mirror.maw', 'MAW', 'TAKES IN SHOTS, THEN FIRES THEM BACK', BLOOD)],
     [form('mirror.parry', 'PARRY', 'SHORTER. EACH RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
+  lens: [
+    [form('lens.prism', 'PRISM', 'GLASS SPLITS THE BEAM IN THREE', MAGNET), form('lens.glance', 'GLANCE', 'BOUNCES OFF METAL', STONE)],
+    [form('lens.kiln', 'KILN', 'TURNS ROCK AND BRICK TO GLASS', FIRE), form('lens.dazzle', 'DAZZLE', 'STUNS FOES INSTEAD OF BURNING THEM', WHITE)],
+  ],
+  chime: [
+    [form('chime.volley', 'VOLLEY', 'SHARDS FLY AT FOES ONE BY ONE', BLOOD), form('chime.hover', 'HOVER', 'SHARDS HANG IN THE AIR UNTIL A FOE COMES NEAR', GAS)],
+    [form('chime.bell', 'BELL', 'WALLS YOU IN GLASS. PRESS AGAIN TO BREAK IT', COLD), form('chime.statue', 'STATUE', 'FOES KILLED BY ITS SHARDS TURN TO GLASS', WHITE)],
+  ],
 }
 
 export const TREES = Object.fromEntries(Object.entries(FORKS).map(([kind, forks]) => [kind, forks.flat()]))
@@ -159,6 +168,7 @@ const HANDS = {
   'dash.drive': { type: 'stream', time: S.dash.driveTime },
   'grapple.sling': { type: 'stream', time: S.grapple.slingTime },
   'frost.glide': { type: 'toggle', time: S.frost.glideTime },
+  lens: { type: 'stream', time: S.lens.time },
 }
 
 export const handOf = (p, kind) => ownedForms(p, kind).map(f => HANDS[f.id]).filter(Boolean).at(-1) ?? HANDS[kind] ?? TAP
@@ -1571,6 +1581,251 @@ export const salvage = (g, e) => {
 
 const held = (g, kind) => g.effects.find(f => f.kind === kind && !f.done)
 
+const METALS = new Set([M.METAL, M.GATE])
+const KILNED = new Set([M.ROCK, M.BRICK])
+
+const shines = m => {
+  const q = props(m)
+  if (m === M.EMPTY || m === M.GLASS) return true
+  if (q.flammability || q.hot) return false
+  return Boolean(q.gas || q.liquid)
+}
+
+const turnBy = ({ x, y }, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) })
+
+const bounceOff = (w, aim, [cx, cy], [nx, ny]) => {
+  const hard = (x, y) => METALS.has(matAt(w, x, y))
+  const flipX = nx !== cx && (ny === cy || hard(nx, cy))
+  const flipY = ny !== cy && (nx === cx || hard(cx, ny))
+  const both = !flipX && !flipY
+  return { x: flipX || both ? -aim.x : aim.x, y: flipY || both ? -aim.y : aim.y }
+}
+
+const beamFrom = (g, p, start, dir, reach, splits, bounces, out, foes, tone = 0) => {
+  const L = S.lens
+  let { x, y } = start
+  let from = { x, y }
+  let here = [cell(x), cell(y)]
+  let aim = dir
+  for (let travelled = 0; travelled < reach; travelled += 2) {
+    x += aim.x * 2
+    y += aim.y * 2
+    const foe = foes.find(e => overlap(shotBox(e), { x, y, w: 1, h: 1 }))
+    if (foe) {
+      out.segments.push([from, { x, y }, tone])
+      out.ends.push({ foe, x, y })
+      return
+    }
+    const next = [cell(x), cell(y)]
+    if (next[0] === here[0] && next[1] === here[1]) continue
+    const m = matAt(g.world, next[0], next[1])
+    if (METALS.has(m) && bounces > 0 && owns(p, 'lens.glance')) {
+      x -= aim.x * 2
+      y -= aim.y * 2
+      out.segments.push([from, { x, y }, tone])
+      out.turns.push({ x, y })
+      aim = bounceOff(g.world, aim, here, next)
+      from = { x, y }
+      bounces -= 1
+      continue
+    }
+    if (!shines(m)) {
+      out.segments.push([from, { x, y }, tone])
+      out.ends.push({ cell: next, m, x, y })
+      return
+    }
+    if (m === M.GLASS && splits > 0 && owns(p, 'lens.prism') && out.segments.length < L.beamsMost) {
+      out.segments.push([from, { x, y }, tone])
+      out.turns.push({ x, y })
+      from = { x, y }
+      for (const side of [-1, 1]) beamFrom(g, p, { x, y }, turnBy(aim, side * L.spread), reach - travelled, splits - 1, bounces, out, foes, side)
+      splits -= 1
+    }
+    here = next
+  }
+  out.segments.push([from, { x, y }, tone])
+}
+
+const heats = new WeakMap()
+
+const heatOf = w => {
+  if (!heats.has(w)) heats.set(w, { heat: new Float32Array(ROOM * ROOM), at: new Float32Array(ROOM * ROOM) })
+  return heats.get(w)
+}
+
+const warm = (heat, at, now, dt) => Math.max(0, heat - Math.max(0, now - at - S.lens.gap) * S.lens.cool) + dt
+
+const needOf = (p, m) => {
+  const L = S.lens
+  if (props(m).flammability) return L.lightAfter
+  if (m === M.SAND) return L.glazeAfter
+  if (m === M.MUD) return L.bakeAfter
+  if (props(m).melts) return L.meltAfter
+  if (KILNED.has(m) && owns(p, 'lens.kiln')) return L.kilnAfter
+  return null
+}
+
+const heatCell = (g, p, { cell: [x, y], m }, dt) => {
+  const i = y * ROOM + x
+  const need = needOf(p, m)
+  if (need === null || g.world.burn[i] > 0) return false
+  const stock = heatOf(g.world)
+  stock.heat[i] = warm(stock.heat[i], stock.at[i], g.time, dt)
+  stock.at[i] = g.time
+  if (stock.heat[i] < need) return false
+  stock.heat[i] = 0
+  if (KILNED.has(m)) {
+    setCell(g.world, x, y, M.GLASS)
+    tallyRule(g.world, 'glaze', m)
+    return true
+  }
+  return bake(g.world, x, y)
+}
+
+const heatFoe = (g, p, e, dt) => {
+  const L = S.lens
+  if (owns(p, 'lens.dazzle')) {
+    if (e.heavy) return false
+    e.stun = Math.max(e.stun, L.dazzle)
+    e.dazzled = L.dazzle
+    return false
+  }
+  e.lensHeat = warm(e.lensHeat ?? 0, e.lensAt ?? g.time, g.time, dt)
+  e.lensAt = g.time
+  e.lensClock = (e.lensClock ?? L.foeEvery) + dt
+  if (e.lensClock >= L.foeEvery) {
+    e.lensClock = 0
+    hurt(g, e, L.foeDamage, 'player', 'FIRE')
+  }
+  if (e.lensHeat < L.igniteAfter || e.ablaze > 0) return false
+  setAblaze(g, e)
+  return true
+}
+
+const shine = (g, p, dt) => {
+  const out = { segments: [], ends: [], turns: [] }
+  const foes = hostile(g).filter(e => !e.intangible && !e.stowed)
+  beamFrom(g, p, muzzle(p), p.aim, S.lens.reach, S.lens.splits, S.lens.bounces, out, foes)
+  out.ends.forEach(end => { end.changed = end.foe ? heatFoe(g, p, end.foe, dt) : heatCell(g, p, end, dt) })
+  const beam = held(g, 'beam')
+  if (beam) Object.assign(beam, out, { life: S.lens.linger, held: (beam.held ?? 0) + dt })
+  else addEffect(g, { kind: 'beam', ...out, life: S.lens.linger, held: 0, tint: hue(p, 'lens', null), dazzle: owns(p, 'lens.dazzle') })
+  return true
+}
+
+const lens = (g, p) => {
+  shine(g, p, 0)
+}
+
+const lensFlow = (g, p, dt) => shine(g, p, dt)
+
+const ringing = m => m === M.GLASS || m === M.VOLATILE || ICY.has(m)
+
+const chimeCells = (g, here) => {
+  const found = []
+  forEachCell((x, y, point) => {
+    const m = matAt(g.world, x, y)
+    const d = distance(point, here)
+    if (d <= S.chime.reach && ringing(m)) found.push({ x, y, d, m })
+  })
+  return found.sort((a, b) => a.d - b.d).slice(0, S.chime.most)
+}
+
+const piecesOf = ({ x, y, m }, here) => Array.from({ length: S.chime.shards }, (_, n) => ({
+  x: (x + 0.5) * BLOCK + (n - 1) * 2, y: (y + 0.5) * BLOCK, mat: m === M.GLASS ? M.GLASS : M.ICE, from: here, seed: Math.random() * 6.28,
+}))
+
+const outwardFrom = piece => {
+  const C = S.chime
+  const a = Math.atan2(piece.y - piece.from.y, piece.x - piece.from.x || Math.random() - 0.5) + (Math.random() - 0.5) * C.scatter
+  const v = C.speed[0] + Math.random() * (C.speed[1] - C.speed[0])
+  return { vx: Math.cos(a) * v, vy: Math.sin(a) * v - C.lift }
+}
+
+const lobAt = (from, to, speed) => {
+  const t = Math.max(1, distance(from, to)) / speed
+  return { vx: (to.x - from.x) / t, vy: (to.y - from.y) / t - 0.5 * TUNING.flung.gravity * t }
+}
+
+const watchStatues = g => {
+  const watch = held(g, 'statues')
+  if (watch) watch.life = Math.max(watch.life, S.chime.statueWatch)
+  else addEffect(g, { kind: 'statues', life: S.chime.statueWatch })
+}
+
+export const prey = g => hostile(g).filter(e => !e.prop && !e.intangible && !e.stowed)
+
+export const shardAt = (g, piece, foe = null) => {
+  const C = S.chime
+  const { vx, vy } = foe ? lobAt(piece, centre(foe), C.aimSpeed) : outwardFrom(piece)
+  if (g.flung.length >= TUNING.flung.most) return
+  g.flung.push({
+    x: piece.x - 2, y: piece.y - 2, w: 4, h: 4, vx, vy, age: 0, life: C.life,
+    mat: piece.mat, shard: true, safe: true, by: 'chime', cause: 'CRUSHED', damage: C.damage, armed: 0,
+  })
+  if (owns(g.player, 'chime.statue')) watchStatues(g)
+}
+
+export const turnToGlass = g => {
+  const p = g.player
+  const inset = S.chime.statueInset
+  for (const e of g.enemies) {
+    if (e.hp > 0 || e.flungBy !== 'chime' || e.statue || e.warden || e.partOf || e.prop) continue
+    e.statue = true
+    cellsUnder({ x: e.x + inset, y: e.y + inset, w: Math.max(1, e.w - inset * 2), h: Math.max(1, e.h - inset * 2) })
+      .filter(([x, y]) => inPlay(x, y) && !props(matAt(g.world, x, y)).solid && !overlap(p, { x: x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK }))
+      .forEach(([x, y]) => setCell(g.world, x, y, M.GLASS))
+  }
+}
+
+const gather = (g, kind, pieces, life) => {
+  const keep = held(g, kind)
+  if (keep) {
+    keep.pieces = [...keep.pieces, ...pieces].slice(-S.chime.piecesMost)
+    keep.life = life
+  } else if (pieces.length) addEffect(g, { kind, pieces: pieces.slice(-S.chime.piecesMost), life, clock: 0 })
+}
+
+const bellAround = (g, p) => {
+  const [x0, x1] = [cell(p.x) - 1, cell(p.x + p.w - 0.01) + 1]
+  const [y0, y1] = [cell(p.y) - 1, cell(p.y + p.h - 0.01) + 1]
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) if (x === x0 || x === x1 || y === y0 || y === y1) lay(g, p, x, y, M.GLASS)
+  }
+}
+
+const peal = (g, p) => {
+  const here = centre(p)
+  const pieces = []
+  for (const found of chimeCells(g, here)) {
+    if (found.m === M.VOLATILE) {
+      ignite(g.world, found.x, found.y)
+      continue
+    }
+    setCell(g.world, found.x, found.y, M.EMPTY)
+    tallyRule(g.world, 'shatter', found.m)
+    chipsAt(g, (found.x + 0.5) * BLOCK, (found.y + 0.5) * BLOCK, found.m, 3)
+    pieces.push(...piecesOf(found, here))
+  }
+  if (owns(p, 'chime.hover')) gather(g, 'hover', pieces, S.chime.hoverLife)
+  else if (owns(p, 'chime.volley')) gather(g, 'volley', pieces, S.chime.volleyLife)
+  else pieces.forEach(piece => shardAt(g, piece))
+  addEffect(g, { kind: 'peal', x: here.x, y: here.y, life: S.chime.ringTime, broke: pieces.length, tint: hue(p, 'chime', null) })
+  g.shake = Math.max(g.shake, pieces.length ? 3 : 1)
+  g.pulse = Math.max(g.pulse, 0.4)
+}
+
+const chime = (g, p) => {
+  const bell = held(g, 'bell')
+  if (owns(p, 'chime.bell') && !bell) {
+    bellAround(g, p)
+    addEffect(g, { kind: 'bell', life: S.chime.bellLife })
+    return FREE
+  }
+  if (bell) Object.assign(bell, { life: 0, done: true })
+  peal(g, p)
+}
+
 const jetFlow = (g, p, dt, skill) => {
   skill.clock = (skill.clock ?? 0) + dt
   while (skill.clock > S.ember.jetEvery) {
@@ -1651,13 +1906,15 @@ const STREAMS = {
   'dash.drive': { run: driveOn },
   'grapple.sling': { run: swing, stop: letGo },
   'frost.glide': { run: glideOn, stop: glideOff },
+  lens: { run: lensFlow },
 }
 
-export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id]).filter(Boolean).at(-1)
+export const streamOf = (p, kind) => ownedForms(p, kind).map(f => STREAMS[f.id]).filter(Boolean).at(-1) ?? STREAMS[kind]
 
 export const SKILLS = {
   bolt, repel, ember, frost, hammer, gust, blink, grapple, dash, rewind, mason, seed, spring, acid, melt, alchemy,
   well, swap, stop, charm, decoy, drone, rod, mine, roar, mirror,
+  lens, chime,
 }
 
 export const SKILL_NAMES = Object.fromEntries(Object.keys(SKILLS).map(k => [k, k.toUpperCase()]))
@@ -1689,6 +1946,8 @@ export const SKILL_DETAILS = {
   mine: 'EXPLODES WHEN A FOE COMES NEAR.',
   roar: 'STUNS AND SCATTERS.',
   mirror: 'THROWS SHOTS BACK.',
+  lens: 'HOLD FOR A BEAM THAT HEATS WHAT IT HITS.',
+  chime: 'BREAKS NEARBY GLASS AND ICE INTO FLYING SHARDS.',
 }
 
 export const spillNapalm = (g, x, y) => {

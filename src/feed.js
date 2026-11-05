@@ -128,6 +128,7 @@ export const DIETS = {
   spring: ['steam', 'ice'], gust: ['gas'], acid: ['acid'], hammer: ['smashed', 'falling'], alchemy: ['variety'], swap: ['stun'], roar: ['crowd'], decoy: ['drawn'],
   stop: ['still'], grapple: ['air'], mine: ['blastKill'], well: ['blast'], rewind: ['hit'], mirror: ['returned'], charm: ['allyKill'], dash: ['dashHit'],
   blink: ['crossed'], drone: ['coin'],
+  lens: ['glass'], chime: ['flying'],
 }
 
 const foodOf = (p, kind) => {

@@ -110,6 +110,17 @@ export const TUNING = {
     mine: { every: 2.4, stock: 3, reach: 40, life: 40, trigger: 16, damage: 3, radius: 28, limpetFuse: 1.6, farReach: 130 },
     roar: { every: 4, reach: 62, shoutStep: 0.03, shoutRange: 190, shoutShove: 300, swellTime: 1.4, swellMin: 0.6, swellMax: 2.1, swellBreaks: 1.6, forms: { 'roar.shout': 3 } },
     mirror: { every: 4.5, life: 1.3, parryLife: 0.3, paneLife: 5, paneReach: 26, paneHalf: 15, shotReturn: 200, seekLife: 2, seekTurn: 9 },
+    lens: {
+      every: 3, time: 2.2, reach: 230, linger: 0.06, cool: 1.2, gap: 0.05,
+      lightAfter: 0.12, meltAfter: 0.2, glazeAfter: 0.3, bakeAfter: 0.4, kilnAfter: 0.55,
+      foeEvery: 0.3, foeDamage: 1, igniteAfter: 0.9, dazzle: 0.6,
+      splits: 2, spread: 0.42, beamsMost: 14, bounces: 4,
+    },
+    chime: {
+      every: 3.2, reach: 64, most: 12, shards: 3, speed: [130, 200], lift: 30, scatter: 0.7, life: 0.8, damage: 2, aimSpeed: 230,
+      ringTime: 0.35, piecesMost: 36, volleyLife: 6, volleyEvery: 0.09, volleyReach: 180, hoverLife: 8, hoverReach: 48,
+      bellLife: 10, statueWatch: 1.2, statueInset: 2,
+    },
   },
   feed: {
     reach: 7,
@@ -129,7 +140,7 @@ export const TUNING = {
     stillAfter: 0.3,
     stillFull: 1,
     airAfter: 0.12,
-    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3 },
+    gain: { all: 6, stop: 2, drone: 3, grapple: 4, rewind: 3, roar: 3, decoy: 3, seed: 3, lens: 3, chime: 2 },
     full: { fire: 4, charge: 4, water: 18, ice: 18, lava: 6, scrap: 6, moss: 16, vine: 30, metal: 24, rubble: 8, steam: 4, gas: 4, acid: 5, falling: 2, variety: 3, stun: 2, crowd: 4, drawn: 3, glass: 10, mud: 12, snow: 14, flying: 3 },
     refund: { blast: 0.35, blastKill: 0.7, hit: 0.6, returned: 0.5, allyKill: 0.6, dashHit: 0.6, crossed: 0.22, coin: 0.1, smashed: 0.3 },
     blastWindow: 0.3,

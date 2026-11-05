@@ -32,6 +32,7 @@ export const LADDER = [
   'foe:lantern', 'omen:glass', 'relic:skull', 'skill:mirror', 'foe:shade', 'relic:acidskull',
   'skill:stop', 'relic:dice', 'omen:blackout', 'skill:rewind', 'relic:eye',
   'keystone:onecut', 'relic:phoenix',
+  'skill:lens', 'skill:chime',
 ]
 
 const CATALOGUE = [...BASE, ...LADDER]

@@ -964,3 +964,36 @@ export const sloshAt = (g, x, y, vx) => {
 export const swimBubble = (g, x, y) => spawn(g, 'bubble', x, y, 0, rand(-26, -14), rand(0.8, 1.6), '#bff2ff', '#bff2ff', rnd() < 0.5 ? 2 : 1)
 
 export const wetAt = (g, x, y) => liquidAtPx(g.world, x, y)
+
+const BEAM_WARM = '#fff3b4'
+
+export const beamSparks = (g, f) => {
+  const era = eraOf(g)
+  const index = eraIndex(g)
+  const colour = f.tint ?? BEAM_WARM
+  for (const end of f.ends ?? []) {
+    if (end.changed) {
+      glitter(g, end.x, end.y, colour, many(g, 5), 60)
+      if (index >= 2) spawn(g, 'pop', end.x, end.y, 0, 0, 0.18, colour, '#ffffff', 8)
+      continue
+    }
+    if (rnd() > 0.5 * era.count) continue
+    const burns = !f.dazzle && (end.foe || props(end.m).flammability)
+    if (burns) emberAt(g, end.x + rand(-2, 2), end.y + rand(-2, 2), rnd() < 0.5 ? '#ffe84a' : '#ff9a2e')
+    else spawn(g, 'spark', end.x, end.y, rand(-30, 30), rand(-50, -10), rand(0.08, 0.18), colour, '#ffffff').hits = 1
+    if (index >= 3 && rnd() < 0.3) glint(g, end.x, end.y, colour, 2, 0.08)
+  }
+  if (index >= 1) for (const turn of f.turns ?? []) if (rnd() < 0.25) glint(g, turn.x, turn.y, '#ffffff', index >= 3 ? 3 : 1, 0.1)
+  if (index < 5 || !f.segments?.length || rnd() > 0.35) return
+  const [a, b] = pick(f.segments)
+  const t = rnd()
+  spawn(g, 'mote', a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, rand(-4, 4), rand(-6, 2), rand(0.6, 1.2), '#fff3d0')
+}
+
+export const pealRings = (g, f) => {
+  const index = eraIndex(g)
+  const colour = f.tint ?? '#d6f6f0'
+  if (index >= 2) spawn(g, 'pop', f.x, f.y, 0, 0, 0.28, colour, '#ffffff', TUNING.skills.chime.reach)
+  if (index >= 4) spawn(g, 'pop', f.x, f.y, 0, 0, 0.4, '#ffffff', '#ffffff', TUNING.skills.chime.reach * 0.6)
+  if (index >= 6 && f.broke) raysFrom(g, f.x, f.y, isTouchLayout() ? 4 : 8, 30, mix(colour, '#ffffff', 0.4))
+}
