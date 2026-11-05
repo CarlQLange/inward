@@ -15,6 +15,7 @@ import { drawActors, drawSubmergedTint, terrainLayer } from './scene.js'
 import { tileLook } from './era.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
 import { drawSkillEffects } from './skillart.js'
+import { drawBolt, drawFireball, drawShot } from './projectiles.js'
 
 const GREEN = '#76d648'
 const DIM = '#26542a'
@@ -25,56 +26,11 @@ const COLOURS = {
 }
 const ROOM_PX = ROOM * BLOCK
 
-const drawBolt = (ctx, bolt) => {
-  ctx.fillStyle = COLOURS[bolt.colour] ?? bolt.colour ?? COLOURS.charge
-  bolt.points.slice(1).forEach((b, i) => {
-    const a = bolt.points[i]
-    const steps = Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)))
-    for (let s = 0; s <= steps; s++) {
-      const t = steps ? s / steps : 0
-      ctx.fillRect(Math.round(a.x + (b.x - a.x) * t), Math.round(a.y + (b.y - a.y) * t), 1, 1)
-    }
-  })
-}
-
-const drawShot = (ctx, s) => {
-  const speed = Math.hypot(s.vx, s.vy) || 1
-  const ux = s.vx / speed
-  const uy = s.vy / speed
-  const x = s.x + s.w / 2
-  const y = s.y + s.h / 2
-  ctx.fillStyle = s.friendly ? '#fff3b4' : COLOURS.pale
-  for (let i = 2; i <= 6; i++) ctx.fillRect(Math.round(x - ux * i), Math.round(y - uy * i), 1, 1)
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(Math.round(s.x), Math.round(s.y), s.w, s.h)
-}
-
-const fireballColour = (f, time) => {
-  if (f.acid) return ['#8ae04a', '#d8ff80']
-  if (f.bomb) return [COLOURS.pale, Math.floor(time * 14) % 2 ? COLOURS.hurt : '#ffffff']
-  if (f.pellet) return f.friendly ? [COLOURS.magnet, '#ffffff'] : [COLOURS.hurt, Math.floor(time * 14) % 2 ? '#ffffff' : COLOURS.hurt]
-  return Math.floor(time * 14) % 2 ? [COLOURS.fire, '#ffffff'] : [COLOURS.charge, COLOURS.fire]
-}
-
-const drawFireball = (ctx, f, time) => {
-  const [body, core] = fireballColour(f, time)
-  const x = Math.round(f.x)
-  const y = Math.round(f.y)
-  ctx.fillStyle = '#10080a'
-  ctx.fillRect(x - 1, y - 1, f.w + 2, f.h + 2)
-  const speed = Math.hypot(f.vx, f.vy) || 1
-  ctx.fillStyle = body
-  for (let i = 2; i <= 7; i += 2) ctx.fillRect(Math.round(f.x + f.w / 2 - (f.vx / speed) * i), Math.round(f.y + f.h / 2 - (f.vy / speed) * i), 1, 1)
-  ctx.fillRect(x, y, f.w, f.h)
-  ctx.fillStyle = core
-  ctx.fillRect(x + 1, y + 1, Math.max(1, f.w - 2), Math.max(1, f.h - 2))
-}
-
 const drawProjectiles = (ctx, g) => {
-  g.shots.forEach(s => drawShot(ctx, s))
-  g.fireballs.forEach(f => drawFireball(ctx, f, g.time))
   drawParticles(ctx, g)
-  g.bolts.forEach(b => drawBolt(ctx, b))
+  g.shots.forEach(s => drawShot(ctx, s, g))
+  g.fireballs.forEach(f => drawFireball(ctx, f, g))
+  g.bolts.forEach(b => drawBolt(ctx, b, g))
 }
 
 const drawIcon = (ctx, name, x, y, size) => {

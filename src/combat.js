@@ -3,7 +3,7 @@ import { props } from './materials.js'
 import { acidAt, burningAt, chargedAt, crushingAt, explode, lavaAt, matAt, vineAt } from './world.js'
 import { cell, cellsUnder, centre } from './physics.js'
 import { rumble } from './pad.js'
-import { burstSparks, hitFx, hurtFx } from './fx.js'
+import { burstSparks, hitFx, hurtFx, woundFx } from './fx.js'
 
 export const burst = burstSparks
 
@@ -49,8 +49,7 @@ const hurtWarden = (g, e, amount, source) => {
   } else e.gunDamage = (e.gunDamage ?? 0) + amount
   e.flash = TUNING.feel.enemyFlash
   e.lastSource = source
-  const c = centre(e)
-  burst(g, c.x, c.y, 'pale', 3)
+  woundFx(g, e)
 }
 
 export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {

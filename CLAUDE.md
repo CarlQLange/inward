@@ -50,7 +50,7 @@ is drawn procedurally each frame. Creatures are named clips listed in `art/anim.
 `art/proof/body-sizes.json` into the table in `cast.js`, which drives shot boxes.
 
 Presentation is separate from the simulation. `hero.js` animates and draws the player,
-`fx.js` holds particles, shake, slow motion, door slides and the moments, `creatures.js`
+`fx.js` holds shake, slow motion, door slides and the moments, `particles.js` is the pooled particle kinds and their era ladder, `matter.js` says what each material, foe and death does and watches the world for changes, `marks.js` holds stains and piles, `projectiles.js` draws shots, fireballs and bolts, `creatures.js`
 draws foes and their squash, `scene.js` paints the terrain layer and draws everything that
 lives on the actor layer, `backdrop.js` holds the silhouette masks and each region's air
 colours, `cells.js` turns the world into small textures, `light.js` builds an occluded light
@@ -75,7 +75,8 @@ For moments that take over the picture, `setStage(fn)` in `present.js` replaces 
 and `fn` gets the WebGL context, `drawFrame()` for the normal picture and `drawRoom(mat4, options)`
 to put the finished room on any quad. `g.depthDrive` overrides how much of the ring's depth shows
 (0 is flat, 1 full, unset means on once a seal has broken) and `g.vanish` overrides the point depth
-recedes to, in room pixels. Both can change every frame.
+recedes to, in room pixels. Both can change every frame. `stage.js` uses this for the moment a seal breaks,
+when `pit.js` shows the map as a pit and `moment.js` holds the game while it plays.
 
 Mechanically it draws on the archived `magicschool` project, where everything
 has properties and changing one can trigger rules that change others. That game
