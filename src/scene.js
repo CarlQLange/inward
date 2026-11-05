@@ -80,7 +80,7 @@ const mixHex = (a, b, t) => {
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`
 }
 
-const BACKDROP_QUIET = 0.45
+const BACKDROP_QUIET = 0.68
 
 const makeBackdrop = ({ bg, speck, pattern }) => {
   const canvas = blank(ROOM_PX, ROOM_PX)
@@ -113,8 +113,8 @@ const tintTile = (theme, tile) => {
 
 const TINTED_TILES = new Set(['bedrock', 'brick'])
 
-const MUTING = { rock: [0.5, 0.68], bedrock: [0.5, 0.6] }
-const LIGHT_MUTING = [0.15, 0.88]
+const MUTING = { rock: [0.34, 0.8], bedrock: [0.34, 0.72] }
+const LIGHT_MUTING = [0.08, 0.95]
 const LOUD = new Set(['volatile', 'gate'])
 const mutedTiles = new Map()
 
@@ -169,7 +169,7 @@ const scorchMark = SCORCH_RADII.map(radius => {
   return canvas
 })
 
-const SCORCH_ALPHA = 0.3
+const SCORCH_ALPHA = 0.5
 
 const paintScorch = (ctx, world) => {
   ctx.globalAlpha = SCORCH_ALPHA

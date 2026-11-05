@@ -103,8 +103,8 @@ const actorLights = (g, dark) => {
     const h = heroOf(p)
     const tip = h.tip
     const dir = { x: Math.cos(h.angle), y: Math.sin(h.angle) }
-    splat(p.x + 3, p.y + p.h / 2, dark ? 46 : 26, LAMP, dark ? 0.8 : 0.22)
-    cone(tip.x, tip.y, dir, dark ? 120 : 60, 0.82, LAMP, dark ? 1.3 : 0.25)
+    splat(p.x + 3, p.y + p.h / 2, dark ? 46 : 30, LAMP, dark ? 0.8 : 0.3)
+    cone(tip.x, tip.y, dir, dark ? 120 : 68, 0.82, LAMP, dark ? 1.3 : 0.38)
     if (h.flash > 0) splat(tip.x, tip.y, 30, LAMP, 1.1)
   }
   for (const s of g.shots) splat(s.x, s.y, 12, SHOT, 0.5)

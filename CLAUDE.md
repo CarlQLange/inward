@@ -71,10 +71,10 @@ effects must spread across blocks visibly and be readable without text.
 - Very few words on screen. A finished game, not a demo, with lots of depth from a simple core
   loop. Removing what doesn't work is part of polishing.
 - Controller support. Full animations for most creatures rather than two or three frames.
-- Legibility beats spectacle. After his first phone run he found deep rooms hard to read, so shaders
-  no longer warp, fringe or hue-shift the picture at depth, scenery is muted, shake and flashes are
-  small, the chain counter sits outside the room, and rooms have a foe limit per ring. Bright saturated
-  colour is for foes, hazards and the hero. Depth shows through region, lighting and glow.
+- Legibility matters, but so does punch. After his first phone run he found deep rooms hard to read. A
+  heavy cleanup then went "a notch too far", so effects sit between the two: mild fringing at the room's
+  edges, moderate shake and glow, lightly muted scenery, the chain counter outside the room, and a foe limit
+  per ring. The strongest depth shader lives in the black margins around the room, away from play.
 - He wants to play on his phone, from an artifact. Touch devices get their own layout, portrait with
   controls under the room or landscape with controls beside it, and the canvas fills the screen at a
   whole number of device pixels. Foes in reach are shot automatically, which can be turned off.

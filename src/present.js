@@ -31,7 +31,7 @@ void main() {
   float grid = step(0.86, cell.x) + step(0.86, cell.y);
   float lcd = (1.0 - smoothstep(0.0, 0.35, depth)) * 0.16;
   if (inRoom) colour *= 1.0 - min(grid, 1.0) * lcd;
-  colour *= 1.0 - deep * 0.05 * (0.5 + 0.5 * sin(uv.y * view.y * 6.283));
+  colour *= 1.0 - deep * 0.08 * (0.5 + 0.5 * sin(uv.y * view.y * 6.283));
   gl_FragColor = vec4(colour, 1.0);
 }`
 
@@ -65,7 +65,7 @@ float luma(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
 
 vec3 bright(vec2 p) {
   vec3 c = texture2D(screen, p).rgb;
-  return c * smoothstep(0.82, 1.0, max(c.r, max(c.g, c.b)));
+  return c * smoothstep(0.72, 1.0, max(c.r, max(c.g, c.b)));
 }
 
 vec3 gameBoy(vec3 c) {
@@ -100,11 +100,13 @@ void main() {
   bool inRoom = uv.x > room.x && uv.y > room.y && uv.x < room.z && uv.y < room.w;
   vec2 p = inRoom ? worldWarp(pix) : pix;
 
+  if (inRoom) p.x += sin(p.y * 46.0 + time * 2.2) * deep * deep * 0.0007;
+
   vec3 centre = texture2D(screen, p).rgb;
   float spot = max(step(distance(centre, SPOT), 0.012), step(distance(centre, SPOT_DEEP), 0.012));
 
   vec2 fromCentre = p - 0.5;
-  float kick = inRoom ? pulse * 0.7 + aberration * 0.9 : 0.0;
+  float kick = inRoom ? depth * depth * 0.5 + pulse * 1.1 + aberration * 1.2 : 0.0;
   float spread = kick / view.x;
   vec3 colour = vec3(
     texture2D(screen, p + fromCentre * spread * 2.0).r,
@@ -112,7 +114,7 @@ void main() {
     texture2D(screen, p - fromCentre * spread * 2.0).b
   );
 
-  float glow = inRoom ? smoothstep(0.3, 0.9, depth) * 0.4 + pulse * 0.35 : 0.0;
+  float glow = inRoom ? smoothstep(0.3, 0.9, depth) * 0.62 + pulse * 0.55 : 0.0;
   if (glow > 0.01) {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < 8; i++) {
@@ -129,12 +131,12 @@ void main() {
     float peak = max(light.r, max(light.g, light.b));
     if (peak > 0.0) light *= (floor(peak * 7.0 + 0.5) / 7.0) / peak;
     float already = luma(colour);
-    vec3 lit = colour * (lighting.x + light * (1.1 - already)) + light * light * 0.07 * (1.0 - already);
+    vec3 lit = colour * (lighting.x + light * (1.25 - already * 1.1)) + light * light * 0.1 * (1.0 - already);
     colour = mix(colour, lit, lighting.y);
   }
 
   float grey = luma(colour);
-  colour = mix(vec3(grey), colour, 1.0 + deep * 0.2);
+  colour = mix(vec3(grey), colour, 1.0 + deep * 0.42);
 
   float lit = step(0.02, luma(colour));
   float handheld = 1.0 - smoothstep(0.0, 0.25, depth);
@@ -142,9 +144,17 @@ void main() {
     colour = mix(colour, gameBoy(colour), handheld);
   }
 
+  if (!inRoom && luma(colour) < 0.03) {
+    vec2 fromRoom = (uv - 0.5 * (room.xy + room.zw)) * view;
+    float ripple = floor(length(fromRoom) / 5.0) * 5.0 * 0.09 - time * 1.1 + atan(fromRoom.y, fromRoom.x) * 2.0;
+    float crest = pow(max(0.0, sin(ripple)), 5.0);
+    vec3 aura = mix(vec3(0.05, 0.42, 0.42), vec3(0.62, 0.12, 0.42), smoothstep(0.55, 1.0, depth));
+    colour += aura * crest * deep * (0.2 + pulse * 0.45);
+  }
+
   float reach = length(fromCentre);
-  colour += vec3(0.08, 0.32, 0.38) * core * (0.5 + 0.5 * sin(time * 1.7)) * pow(max(0.0, 1.0 - reach * 2.0), 2.0) * 0.2;
-  colour *= 1.0 - deep * 0.12 * reach * reach;
+  colour += vec3(0.08, 0.32, 0.38) * core * (0.5 + 0.5 * sin(time * 1.7)) * pow(max(0.0, 1.0 - reach * 2.0), 2.0) * 0.32;
+  colour *= 1.0 - deep * 0.18 * reach * reach;
 
   float stopped = luma(colour);
   colour = mix(colour, vec3(stopped * 0.75, stopped * 0.95, stopped * 1.25), stop * 0.85);
@@ -154,7 +164,7 @@ void main() {
     colour = mix(colour, paper, flash);
     vec2 edge = min(uv - room.xy, room.zw - uv) / (room.zw - room.xy);
     float rim = 1.0 - smoothstep(0.0, 0.22, min(edge.x, edge.y));
-    colour = mix(colour, SPOT, clamp(hurt * rim * 0.5, 0.0, 1.0));
+    colour = mix(colour, SPOT, clamp(hurt * (0.03 + rim * 0.58), 0.0, 1.0));
   }
 
   float dull = luma(colour);
@@ -292,7 +302,7 @@ export const createPresenter = canvas => {
     const dark = ambientOf(state)
     if (dark !== null) return [dark, 1]
     const amount = Math.min(1, Math.max(0, (state.depth - 0.3) / 0.4))
-    return [1 - 0.2 * state.depth * state.depth, amount]
+    return [1 - 0.3 * state.depth * state.depth, amount]
   }
 
   const present = (source, state) => {
@@ -307,7 +317,7 @@ export const createPresenter = canvas => {
     gl.uniform1f(stop, state.stop ?? 0)
     gl.uniform3f(zoom, toUvX(state.zoom?.x ?? 112), toUvY(state.zoom?.y ?? 112), (state.zoom?.amount ?? 0) * power)
     gl.uniform1f(aberration, (state.aberr ?? 0) * power)
-    gl.uniform1f(flash, Math.min(0.28, state.white ?? 0) * Math.max(power, 0.25))
+    gl.uniform1f(flash, Math.min(0.42, state.white ?? 0) * Math.max(power, 0.25))
     gl.uniform1f(desaturate, state.desat ?? 0)
     gl.uniform1f(hurt, Math.max(state.hurtFlash ?? 0, state.danger ?? 0))
     gl.uniform2f(lighting, ambient, amount)

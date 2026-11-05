@@ -6,8 +6,8 @@ import { matAt } from './world.js'
 import { centre, liquidAtPx, solidAt } from './physics.js'
 import { SCARF_RED, heroFired, heroOf, stepHero } from './hero.js'
 
-const MAX_PARTICLES = 200
-const THIN_ABOVE = 110
+const MAX_PARTICLES = 290
+const THIN_ABOVE = 170
 const MAX_RINGS = 6
 const MAX_SCORCH = 14
 const F = TUNING.feel
@@ -55,14 +55,14 @@ export const createFx = () => ({
 })
 
 const add = (g, particle) => {
-  if (g.particles.length > THIN_ABOVE && Math.random() < 0.6) return
+  if (g.particles.length > THIN_ABOVE && Math.random() < 0.45) return
   if (g.particles.length < MAX_PARTICLES) g.particles.push(particle)
 }
 
 export const spark = (g, x, y, vx, vy, colour, life = rand(0.14, 0.34)) =>
   add(g, { kind: 'spark', x, y, vx, vy, life, max: life, colour: paint(colour) })
 
-export const debris = (g, x, y, vx, vy, colour, size = 1, life = rand(0.5, 1.2)) =>
+export const debris = (g, x, y, vx, vy, colour, size = 1, life = rand(0.7, 1.6)) =>
   add(g, { kind: 'debris', x, y, vx, vy, life, max: life, colour: paint(colour), size })
 
 export const ember = (g, x, y, colour = '#ff9a2e') => {
@@ -170,8 +170,8 @@ const rumble = (g, amount) => {
 }
 
 export const cameraOffset = g => {
-  const trauma = Math.min(9, g.shake)
-  const amp = ((trauma * trauma) / 30) * (isTouchLayout() ? 0.7 : 1)
+  const trauma = Math.min(11, g.shake)
+  const amp = ((trauma * trauma) / 22) * (isTouchLayout() ? 0.8 : 1)
   const t = g.fxClock
   const wobbleX = Math.sin(t * 61.3) + Math.sin(t * 37.1 + 1.3) * 0.7
   const wobbleY = Math.sin(t * 53.7 + 2.1) + Math.sin(t * 43.9) * 0.7
@@ -189,7 +189,7 @@ export const shotFx = (g, p, aim) => {
   }
   smoke(g, from.x + aim.x * 3, from.y + aim.y * 3, aim.x * 12, aim.y * 12 - 4, '#a9b6b2')
   addLight(g, from.x, from.y, 26, [1, 0.85, 0.5], 0.07)
-  punch(g, -aim.x * 0.2, -aim.y * 0.2)
+  punch(g, -aim.x * 0.35, -aim.y * 0.35)
   rumble(g, 0.08)
 }
 
@@ -212,8 +212,8 @@ const shatter = (g, e) => {
 
 export const hitFx = (g, e) => {
   const c = centre(e)
-  g.aberr = Math.max(g.aberr, 0.12)
-  shakeTo(g, 1.2)
+  g.aberr = Math.max(g.aberr, 0.2)
+  shakeTo(g, 1.7)
   rumble(g, 0.15)
   for (let i = 0; i < 5; i++) {
     const a = Math.random() * Math.PI * 2
@@ -229,15 +229,15 @@ export const killFx = (g, e) => {
   for (let i = 0; i < 3; i++) smoke(g, c.x + rand(-4, 4), c.y + rand(-4, 4))
   const p = centre(g.player)
   const d = Math.hypot(c.x - p.x, c.y - p.y) || 1
-  punch(g, ((c.x - p.x) / d) * 0.7, ((c.y - p.y) / d) * 0.7)
-  shakeTo(g, e.heavy ? 8 : 3)
+  punch(g, ((c.x - p.x) / d) * 1.1, ((c.y - p.y) / d) * 1.1)
+  shakeTo(g, e.heavy ? 10 : 4)
   rumble(g, e.heavy ? 1 : 0.35)
-  g.aberr = Math.max(g.aberr, e.heavy ? 0.5 : 0.2)
+  g.aberr = Math.max(g.aberr, e.heavy ? 0.7 : 0.35)
   addLight(g, c.x, c.y, e.heavy ? 70 : 30, [1, 0.95, 0.8], 0.14)
   if (e.heavy) {
     addRing(g, c.x, c.y, 260, 7, 0.45)
     g.white = Math.max(g.white, 1)
-    zoomPunch(g, c.x, c.y, 0.07)
+    zoomPunch(g, c.x, c.y, 0.1)
     slowMo(g, 0.45, 0.3)
   }
   g.lastKill = { x: c.x, y: c.y }
@@ -247,7 +247,7 @@ export const roomClearFx = g => {
   const at = g.lastKill ?? centre(g.player)
   if (g.chain >= TUNING.feel.grandClear) {
     slowMo(g, 0.55, 0.22)
-    zoomPunch(g, at.x, at.y, 0.09, 0.3)
+    zoomPunch(g, at.x, at.y, 0.13, 0.3)
   }
   g.doorPulse = 1.8
   addRing(g, at.x, at.y, 240, 3.5, 0.5, 9)
@@ -258,10 +258,11 @@ const CAUSE_KICK = { CHARGE: 1, CRUSHED: 1.4, LAVA: 0.9 }
 
 export const hurtFx = (g, p, cause) => {
   const c = centre(p)
-  shakeTo(g, 5.5)
+  shakeTo(g, 6.5)
   rumble(g, 0.8)
-  g.aberr = 0.5
-  punch(g, -p.facing * 1.1 * (CAUSE_KICK[cause] ?? 1), -0.6)
+  g.aberr = 0.7
+  punch(g, -p.facing * 1.5 * (CAUSE_KICK[cause] ?? 1), -0.8)
+  zoomPunch(g, c.x, c.y, 0.025)
   for (let i = 0; i < 9; i++) {
     const a = Math.random() * Math.PI * 2
     const v = rand(30, 110)
@@ -274,9 +275,9 @@ export const blastFx = (g, { x, y, reach }) => {
   const px = (x + 0.5) * BLOCK
   const py = (y + 0.5) * BLOCK
   const heavy = reach >= 2
-  shakeTo(g, 3 + reach * 1.4)
+  shakeTo(g, 4 + reach * 1.9)
   rumble(g, heavy ? 1 : 0.6)
-  g.aberr = Math.max(g.aberr, heavy ? 0.45 : 0.2)
+  g.aberr = Math.max(g.aberr, heavy ? 0.7 : 0.35)
   addRing(g, px, py, 190 + reach * 55, 3 + reach * 2.2, 0.32 + reach * 0.06, 6 + reach)
   addLight(g, px, py, 40 + reach * 22, [1, 0.72, 0.36], 0.28)
   burstSparks(g, px, py, '#ffe84a', 8 + reach * 5, 130 + reach * 30)
@@ -303,7 +304,7 @@ export const blastFx = (g, { x, y, reach }) => {
   if (g.blastCool <= 0) {
     g.hitstop = Math.max(g.hitstop, heavy ? F.blastStop * 1.5 : F.blastStop)
     g.blastCool = 0.3
-    if (heavy) zoomPunch(g, px, py, 0.04)
+    if (heavy) zoomPunch(g, px, py, 0.07)
   }
   if (heavy && g.whiteCool <= 0) {
     g.white = 1
@@ -318,11 +319,11 @@ export const levelBurstDone = g => {
     g.levelBurst = F.levelBurst
     p.iframes = Math.max(p.iframes, F.levelBurst + 0.4)
     slowMo(g, F.levelBurst, 0.25)
-    zoomPunch(g, c.x, c.y, 0.08)
+    zoomPunch(g, c.x, c.y, 0.11)
     addRing(g, c.x, c.y, 200, 3.5, 0.45, 8)
     addLight(g, c.x, c.y, 70, [0.6, 1, 0.5], 0.5)
     g.pulse = 1
-    shakeTo(g, 3)
+    shakeTo(g, 4)
     rumble(g, 0.6)
     for (let i = 0; i < 28; i++) {
       const a = (i / 28) * Math.PI * 2
@@ -477,8 +478,8 @@ const stepHeroSide = (g, dt) => {
   if (h.stance === 'cling' && Math.random() < dt * 22) spark(g, p.x + (p.facing > 0 ? p.w : 0), p.y + p.h - 2, -p.facing * 12, -20, 'pale', 0.14)
   if (!grounded && p.grounded && fell > 235) {
     const c = p.x + p.w / 2
-    shakeTo(g, 2)
-    punch(g, 0, 0.7)
+    shakeTo(g, 2.6)
+    punch(g, 0, 1)
     dustAt(g, c - 3, p.y + p.h, 4)
     dustAt(g, c + 3, p.y + p.h, 4)
   }
@@ -496,8 +497,8 @@ const stepDeath = (g, realDt) => {
   g.deathSeen = true
   const c = centre(g.player)
   slowMo(g, 1.1, 0.28)
-  zoomPunch(g, c.x, c.y, 0.12, 0.9)
-  shakeTo(g, 7)
+  zoomPunch(g, c.x, c.y, 0.16, 0.9)
+  shakeTo(g, 9)
   rumble(g, 1)
   g.white = 1
   g.aberr = 0.5
