@@ -2,6 +2,7 @@ import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, createWorld, encodeWorld, energize, explode, ignite, loosen, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
 import { STARTERS, TITLE_ROOM } from './room.js'
+import { beginMoment, stepMoment } from './moment.js'
 import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
@@ -546,6 +547,9 @@ const createRun = (depthOverride, quickRing = null, discovering = false) => {
     wasPause: false,
     wasSkillsPage: false,
     pendingOffers: 0,
+    moment: null,
+    afterMoment: null,
+    depthDrive: null,
     rekindle: 0,
     newBest: false,
     summaryShown: false,
@@ -786,8 +790,8 @@ const onWardenKilled = (g, e) => {
   p.hp = P.hp
   g.score += R.wardenBonus * g.seals
   gainXp(g, g.nextLevel - g.xp)
-  showReveal(g, 'seal', e.kind)
-  offerRelics(g)
+  beginMoment(g)
+  g.afterMoment = [() => showReveal(g, 'seal', e.kind), () => offerRelics(g)]
 }
 
 const killXp = (g, environmental) =>
@@ -1861,6 +1865,10 @@ const edges = (g, input) => {
 }
 
 export const step = (g, input, realDt) => {
+  if (stepMoment(g, realDt, input.jump || input.shoot)) {
+    if (g.moment?.landed) stepFx(g, realDt, 0)
+    return
+  }
   g.looking = input.look === true && g.phase === 'playing' && g.menus.length === 0
   const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g)
   g.time += dt

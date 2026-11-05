@@ -173,6 +173,8 @@ export const TUNING = {
     plantAfterRooms: 1,
     plantAtRing: 2,
     lampRespawn: 14,
+    momentDelay: 0.9,
+    momentSpring: 2.6,
     bloodPrice: 2,
     cartographerChance: 0.04,
     tinkerChance: 0.04,

@@ -18,7 +18,6 @@ attribute float kind;
 attribute float ring;
 attribute float height;
 uniform mat4 camera;
-uniform vec2 shift;
 varying vec2 vUv;
 varying float vKind;
 varying float vRing;
@@ -31,7 +30,6 @@ void main() {
   vHeight = height;
   vWorld = position;
   gl_Position = camera * vec4(position, 1.0);
-  gl_Position.xy += shift * gl_Position.w;
 }`
 
 const FRAGMENT = `
@@ -40,7 +38,6 @@ uniform sampler2D atlas;
 uniform float time;
 uniform float openRing;
 uniform float sweep;
-uniform float live;
 varying vec2 vUv;
 varying float vKind;
 varying float vRing;
@@ -87,8 +84,7 @@ void main() {
     float rings = 0.5 + 0.5 * sin(d * 18.0 - time * 5.0);
     colour = mix(vec3(0.75, 1.0, 1.0) * 1.5, ROSE * (0.5 + rings), smoothstep(0.1, 0.9, d)) * beat;
   }
-  if (live > 0.5) colour = texture2D(atlas, vUv).rgb;
-  colour += hue * coreLight * coreLight * 0.1 * beat * (1.0 - live);
+  colour += hue * coreLight * coreLight * 0.1 * beat;
   gl_FragColor = vec4(colour, 1.0);
 }`
 
@@ -228,104 +224,81 @@ const paintAtlas = (canvas, g) => {
   }
 }
 
-export const createPit = (width = VIEW.w, height = VIEW.h) => {
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: true, preserveDrawingBuffer: true })
+const cameraMatrix = view => {
+  const aspect = VIEW.w / VIEW.h
+  const lens = perspective(FOV, aspect, 0.05, 200)
+  const shift = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, view.shift[0], view.shift[1], 0, 1]
+  return times(times(shift, lens), lookAt(view.eye, view.target, view.up))
+}
+
+export const tileTransform = (view, [x, y]) => {
+  const model = [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, worldX(x) - 0.5, worldY(y) + 0.5, levelOf(x, y) + 0.002, 1]
+  return new Float32Array(times(cameraMatrix(view), model))
+}
+
+export const createPit = gl => {
   const program = buildProgram(gl)
-  gl.useProgram(program)
   const mesh = buildMesh()
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+  const solidBuffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, solidBuffer)
   gl.bufferData(gl.ARRAY_BUFFER, mesh.solid, gl.STATIC_DRAW)
-  ATTRIBUTES.reduce((offset, [, size], i) => {
-    gl.enableVertexAttribArray(i)
-    gl.vertexAttribPointer(i, size, gl.FLOAT, false, FLOATS * 4, offset * 4)
-    return offset + size
-  }, 0)
-  const meshBuffer = gl.getParameter(gl.ARRAY_BUFFER_BINDING)
   const shaftBuffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, shaftBuffer)
   gl.bufferData(gl.ARRAY_BUFFER, mesh.shaft, gl.STATIC_DRAW)
-  const liveBuffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, meshBuffer)
-  const uniform = name => gl.getUniformLocation(program, name)
-  const U = Object.fromEntries(['camera', 'shift', 'time', 'openRing', 'sweep', 'live', 'atlas'].map(name => [name, uniform(name)]))
+  const U = Object.fromEntries(['camera', 'time', 'openRing', 'sweep', 'atlas'].map(name => [name, gl.getUniformLocation(program, name)]))
 
   const atlasCanvas = document.createElement('canvas')
   atlasCanvas.width = atlasCanvas.height = MAP_SIZE * THUMB
-  const makeTexture = () => {
-    const texture = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, texture)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    return texture
-  }
-  const atlas = makeTexture()
-  const liveTexture = makeTexture()
-  gl.enable(gl.DEPTH_TEST)
-  gl.uniform1i(U.atlas, 0)
+  const atlas = gl.createTexture()
+  gl.bindTexture(gl.TEXTURE_2D, atlas)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 
   const refresh = g => {
     paintAtlas(atlasCanvas, g)
+    gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, atlas)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, atlasCanvas)
   }
 
-  const setLiveRoom = image => {
-    gl.bindTexture(gl.TEXTURE_2D, liveTexture)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
+  const bindMesh = buffer => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    ATTRIBUTES.reduce((offset, [, size], i) => {
+      gl.vertexAttribPointer(i, size, gl.FLOAT, false, FLOATS * 4, offset * 4)
+      return offset + size
+    }, 0)
   }
 
-  const liveQuad = (mx, my) => {
-    const [cx, cy, z] = [worldX(mx), worldY(my), levelOf(mx, my) + 0.002]
-    const ring = ringOf(mx, my)
-    const corner = (dx, dy, u, v) => [cx + dx, cy + dy, z, u, v, 0, ring, 0]
-    return new Float32Array(quad(corner(-0.5, 0.5, 0, 0), corner(0.5, 0.5, 1, 0), corner(0.5, -0.5, 1, 1), corner(-0.5, -0.5, 0, 1)))
-  }
-
-  const bindAttributes = () => ATTRIBUTES.reduce((offset, [, size], i) => {
-    gl.vertexAttribPointer(i, size, gl.FLOAT, false, FLOATS * 4, offset * 4)
-    return offset + size
-  }, 0)
-
-  const render = (view, { time, seals = 0, sweep = -5, tile = null, showLive = false }) => {
-    gl.viewport(0, 0, width, height)
+  const draw = (view, { time, seals = 0, sweep = -5 }) => {
+    gl.useProgram(program)
+    ATTRIBUTES.forEach((_, i) => gl.enableVertexAttribArray(i))
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, atlas)
+    gl.uniform1i(U.atlas, 0)
     gl.clearColor(0, 0, 0, 1)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-    gl.uniformMatrix4fv(U.camera, false, new Float32Array(times(perspective(FOV, width / height, 0.05, 200), lookAt(view.eye, view.target, view.up))))
-    gl.uniform2f(U.shift, view.shift[0], view.shift[1])
+    gl.enable(gl.DEPTH_TEST)
+    gl.uniformMatrix4fv(U.camera, false, new Float32Array(cameraMatrix(view)))
     gl.uniform1f(U.time, time)
-    gl.uniform1f(U.openRing, seals > 0 ? SEAL_RINGS[Math.min(seals, 3) - 1] : -1)
+    gl.uniform1f(U.openRing, seals > 0 ? SEAL_RINGS[Math.min(seals, SEAL_RINGS.length) - 1] : -1)
     gl.uniform1f(U.sweep, sweep)
-    gl.uniform1f(U.live, 0)
-    gl.bindTexture(gl.TEXTURE_2D, atlas)
-    gl.bindBuffer(gl.ARRAY_BUFFER, meshBuffer)
-    bindAttributes()
+    bindMesh(solidBuffer)
     gl.drawArrays(gl.TRIANGLES, 0, mesh.solid.length / FLOATS)
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE)
     gl.depthMask(false)
-    gl.bindBuffer(gl.ARRAY_BUFFER, shaftBuffer)
-    bindAttributes()
+    bindMesh(shaftBuffer)
     gl.drawArrays(gl.TRIANGLES, 0, mesh.shaft.length / FLOATS)
     gl.depthMask(true)
     gl.disable(gl.BLEND)
-    if (showLive && tile) {
-      const verts = liveQuad(tile[0], tile[1])
-      gl.uniform1f(U.live, 1)
-      gl.bindTexture(gl.TEXTURE_2D, liveTexture)
-      gl.bindBuffer(gl.ARRAY_BUFFER, liveBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.DYNAMIC_DRAW)
-      bindAttributes()
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
-    }
-    return canvas
+    gl.disable(gl.DEPTH_TEST)
+    ATTRIBUTES.forEach((_, i) => { if (i > 0) gl.disableVertexAttribArray(i) })
   }
 
-  return { canvas, refresh, setLiveRoom, render, release: () => gl.getExtension('WEBGL_lose_context')?.loseContext() }
+  return { refresh, draw }
 }
 
 const clamp01 = v => Math.max(0, Math.min(1, v))
@@ -348,11 +321,12 @@ const orbit = (target, distance, pitch, yaw, shift) => {
 
 const PIT_CENTRE = [0, 0, CORE_Z * 0.5]
 const WIDE = 21
+const wideDistance = () => WIDE * Math.max(1, 1.6 / (VIEW.w / VIEW.h))
 const TILT = 0.92
 const QUARTER = Math.PI / 2
 
-const FIRST = { hold: 0.7, pull: 1.9, turns: 4, turn: 0.72, rest: 0.1, dive: 1.5, settle: 0.5 }
-const LATER = { hold: 0.2, pull: 1, turns: 1, turn: 0.72, rest: 0.1, dive: 1, settle: 0.25 }
+const FIRST = { hold: 0.5, pull: 1.9, turns: 4, turn: 0.72, rest: 0.1, dive: 1.5, settle: 1.5 }
+const LATER = { hold: 0.15, pull: 1, turns: 1, turn: 0.72, rest: 0.1, dive: 1, settle: 0.5 }
 
 const lengthOf = plan => plan.hold + plan.pull + plan.turns * (plan.turn + plan.rest) + plan.dive + plan.settle
 
@@ -374,15 +348,16 @@ export const pitView = (t, { plan }, tile) => {
   const part = ease(clamp01((spent - whole) * (plan.turn + plan.rest) / plan.turn))
   const yaw = (Math.min(whole, plan.turns) + (whole < plan.turns ? part : 0)) * QUARTER * (plan.turns === 4 ? 1 : 0)
   const swing = plan.turns === 1 ? Math.sin(Math.min(1, spent) * Math.PI) * QUARTER * 0.5 : 0
-  const distance = Math.exp(mix(Math.log(closeDistance()), Math.log(WIDE), away))
-  const framing = roomShift().map(v => v * (1 - clamp01(away * 3)))
+  const distance = Math.exp(mix(Math.log(closeDistance()), Math.log(wideDistance()), away))
+  const framing = roomShift().map(v => v * (1 - clamp01(away * 2)))
+  const focus = away * away * away
   return {
-    view: orbit(mix3(close, PIT_CENTRE, away), distance, TILT * away, yaw + swing, framing),
+    view: orbit(mix3(close, PIT_CENTRE, focus), distance, TILT * away, yaw + swing, framing),
     away,
-    liveAmount: 1 - clamp01(away * 2.5),
+    liveAmount: 1 - clamp01((away - 0.25) * 3),
     sweep: mix(-2, CORE_RING + 3, clamp01((t - pullEnd * 0.8) / (diveEnd - pullEnd))),
     landed: clamp01((t - diveEnd) / plan.settle),
   }
 }
 
-export const overview = time => orbit(PIT_CENTRE, WIDE * 0.92, TILT * 0.8, time * 0.12, [0, 0])
+export const overview = time => orbit(PIT_CENTRE, wideDistance() * 0.92, TILT * 0.8, time * 0.12, [0, 0])
