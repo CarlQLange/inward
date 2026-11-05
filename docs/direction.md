@@ -80,3 +80,38 @@ The world rules stay the source of synergy, and the rules read without text.
 Very few words on screen. No sound. Irish and British spelling. Plain JavaScript modules with no build step for
 development. Fixed 60 Hz simulation. Everything must work on an iPhone in Safari through WebGL 1. Tuning values
 stay in `src/config.js`. The fire rebalance stands: fire belongs mainly to the Moss Caves and Peat Bog.
+
+## Pillar 4: more verbs, more rules, and time to read them
+
+After playing the release pass Carl asked for more skills and more emergence, with slightly slower play so
+that more happening at once stays readable.
+
+**Slower.** The world, foes, shots and skills run on a tempo below real time. The hero's run and jump keep
+their feel, because sluggish controls aren't the same thing as a slower game. You get more time to see a
+chain start and decide what to do about it.
+
+**New world rules.** Each one joins systems that already exist, so old skills find new uses:
+
+- Glass. Lava touching sand or ice, or charge running into sand, makes glass. Light passes through it. A blast,
+  a falling block or a hard hit shatters it into shards that fly and hurt.
+- Mud. Water soaking into sand or ash makes mud. Mud slows anything in it and puts out fire. Fire or lava next
+  to mud bakes it into brick.
+- Snow. Steam that touches ice or cold air falls as snow. It piles like sand, smothers fire and melts back to
+  water near heat.
+- Blasts throw loose matter. Sand, scrap, floes and shards beside a blast fly outward and hurt what they hit.
+- Regrowth. Ash beside water turns to moss, so a burnt room grows back and can burn again.
+- Charged metal is a magnet. While it carries charge it pulls scrap and metal foes toward it.
+
+**New skills.** Each is a verb that works on world rules, eats something from the world, feels different in
+the hand and has two forks of two forms that change what it does.
+
+| Skill | What it does |
+|---|---|
+| Flask | Hold to soak up liquid near you, release to throw it. Carries lava into an ice room or acid onto a gate |
+| Wick | Lays a fuse along the ground that burns to its end and blows up. Fire where a region has none |
+| Float | Things in a bubble fall upward: water, lava, sand, foes and you |
+| Link | Ties foes together. What happens to one happens to all of them: fire, charge, ice, a shove, a hit |
+| Lens | Hold for a beam of focused light that heats: lights fires, melts ice, glazes sand, bakes mud |
+| Chime | Shatters glass and ice nearby and throws the shards outward |
+| Clay | Throws mud that slows foes and puts out fire. Fire bakes it into brick |
+| Burrow | Swim through sand, mud, snow, ash and peat |
