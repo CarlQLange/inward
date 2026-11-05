@@ -31,6 +31,10 @@ rooms and time per run, deaths per ring, kills by source, secrets met and tick c
 lists the flags, such as `--god`, `--found rand`, `--career` and `--warden bellows --gun`. The bot
 walks badly, so read its time-per-run numbers as an upper bound and its deaths as pessimistic.
 
+`node scripts/bundle.mjs` packs everything into `dist/inward.html`, the one page published as the artifact
+at https://claude.ai/artifact/6mA22hzMWHpUoG5f7wEdBS. Republish that file to update it. Add `?touch` to the
+local URL to get the phone layout on a desktop browser.
+
 Regenerate the sprite atlases with
 `uv run --with pillow --with numpy --with scipy python art/process_art.py`.
 
@@ -67,6 +71,9 @@ effects must spread across blocks visibly and be readable without text.
 - Very few words on screen. A finished game, not a demo, with lots of depth from a simple core
   loop. Removing what doesn't work is part of polishing.
 - Controller support. Full animations for most creatures rather than two or three frames.
+- He wants to play on his phone, from an artifact. Touch devices get their own layout, portrait with
+  controls under the room or landscape with controls beside it, and the canvas fills the screen at a
+  whole number of device pixels. Foes in reach are shot automatically, which can be turned off.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
