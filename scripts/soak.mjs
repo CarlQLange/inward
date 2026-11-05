@@ -39,6 +39,7 @@ const worker = async ({ opts, from, to }) => {
   const { matAt, setCell } = await import('../src/world.js')
   const { TUNING } = await import('../src/config.js')
   const { keyOf, ringOf } = await import('../src/map.js')
+  const { doorGoal, exitsFrom, pathTo } = await import('../src/reach.js')
 
   const TICK = 1 / 60
   const BLOCK = 8
@@ -47,57 +48,6 @@ const worker = async ({ opts, from, to }) => {
   save.settings.controls = 'mouse'
 
   const solid = (w, x, y) => x < 0 || y < 0 || x >= ROOM || y >= ROOM || props(matAt(w, x, y)).solid === true
-  const swimmable = (w, x, y) => [M.WATER, M.OIL].includes(matAt(w, x, y))
-  const standable = (w, extra) => (x, y) => {
-    if (solid(w, x, y) || solid(w, x, y - 1) || matAt(w, x, y) === M.LAVA) return false
-    return solid(w, x, y + 1) || swimmable(w, x, y) || swimmable(w, x, y + 1) || matAt(w, x, y) === M.VINE || extra.has(y * ROOM + x)
-  }
-  const arcOpen = (w, x0, y0, x1, y1) => {
-    const top = Math.min(y0, y1) - 1
-    for (let y = top; y <= y0; y++) if (y >= 0 && solid(w, x0, y)) return false
-    for (let y = top; y <= y1; y++) if (y >= 0 && solid(w, x1, y)) return false
-    const dir = Math.sign(x1 - x0)
-    for (let x = x0 + dir; x !== x1 && dir !== 0; x += dir) if ((top >= 0 && solid(w, x, top)) || solid(w, x, top + 1)) return false
-    return true
-  }
-  const search = (w, from, extra) => {
-    const can = standable(w, extra)
-    const parent = new Map([[from.y * ROOM + from.x, -1]])
-    const queue = [from]
-    for (let at = 0; at < queue.length; at++) {
-      const { x, y } = queue[at]
-      for (let dx = -5; dx <= 5; dx++) {
-        for (let dy = -3; dy <= 10; dy++) {
-          const nx = x + dx
-          const ny = y + dy
-          if (nx < 0 || nx >= ROOM || ny < 1 || ny >= ROOM) continue
-          if (dy === -3 && Math.abs(dx) > 3) continue
-          const key = ny * ROOM + nx
-          if (parent.has(key) || !can(nx, ny) || !arcOpen(w, x, y, nx, ny)) continue
-          parent.set(key, y * ROOM + x)
-          queue.push({ x: nx, y: ny })
-        }
-      }
-    }
-    return parent
-  }
-  const pathTo = (parent, goal) => {
-    const path = []
-    for (let k = goal; k !== -1 && k !== undefined; k = parent.get(k)) path.unshift({ x: k % ROOM, y: Math.floor(k / ROOM) })
-    return path
-  }
-
-  const doorGoal = (dir, door) => ({
-    left: { x: 1, y: door.row + 1 },
-    right: { x: ROOM - 2, y: door.row + 1 },
-    up: { x: door.col, y: 1 },
-    down: { x: door.col, y: ROOM - 2 },
-  }[dir])
-
-  const doorLocked = (g, dir, door) => {
-    const { x, y } = doorGoal(dir, door)
-    return solid(g.world, x, dir === 'up' || dir === 'down' ? y : y) || solid(g.world, x, dir === 'left' || dir === 'right' ? y - 1 : y)
-  }
 
   const routeTo = (g, target, avoid) => {
     const start = keyOf(g.x, g.y)
@@ -126,12 +76,12 @@ const worker = async ({ opts, from, to }) => {
   const liveWarden = g => Object.values(g.wardens).find(w => !w.dead)
 
   const chooseDirection = (g, bot, avoid) => {
-    const { ring } = g
+    const ring = g.deepestRing
     const here = keyOf(g.x, g.y)
     const quota = bot.ringQuota[ring] ??= 2 + Math.floor(Math.random() * 4)
     const seenHere = Object.values(g.rooms).filter(r => r.ring === ring && r.visited).length
     const warden = liveWarden(g)
-    if (warden && (seenHere >= 2 || ring >= 6)) {
+    if (warden && (seenHere >= 2 || ring >= 6 || warden.x !== undefined)) {
       const dir = routeTo(g, (x, y) => x === warden.x && y === warden.y, avoid)
       if (dir) return dir
     }
@@ -141,7 +91,11 @@ const worker = async ({ opts, from, to }) => {
     }
     const inward = routeTo(g, (x, y) => ringOf(x, y) > ring, avoid)
     if (inward) return inward
-    return routeTo(g, (x, y) => keyOf(x, y) !== here && !g.rooms[keyOf(x, y)]?.visited, avoid) ?? Object.keys(g.map.links[here] ?? {}).find(d => !avoid.has(`${here}:${d}`))
+    const next = routeTo(g, (x, y) => keyOf(x, y) !== here && !g.rooms[keyOf(x, y)]?.visited, avoid)
+    if (next) return next
+    bot.avoid.clear()
+    bot.forceRing = ring
+    return routeTo(g, (x, y) => ringOf(x, y) > ring, avoid) ?? Object.keys(g.map.links[here] ?? {})[0]
   }
 
   const lineClear = (w, a, b) => {
@@ -179,25 +133,18 @@ const worker = async ({ opts, from, to }) => {
     const p = g.player
     const room = g.rooms[keyOf(g.x, g.y)]
     const from = { x: cell(middle(p).x), y: cell(p.y + p.h - 1) }
-    const anchors = Object.entries(room.doors).map(([dir, door]) => ({ dir, ...doorGoal(dir, door), locked: doorLocked(g, dir, door) }))
-    const extra = new Set(anchors.filter(a => !a.locked).map(a => a.y * ROOM + a.x))
-    extra.add(from.y * ROOM + from.x)
-    const parent = search(g.world, from, extra)
-    const near = (t, reach) => [...parent.keys()]
-      .map(k => ({ k, d: Math.hypot((k % ROOM) - t.x, Math.floor(k / ROOM) - t.y) }))
-      .filter(c => c.d <= reach)
-      .sort((a, b) => a.d - b.d)[0]?.k
-    const exitsOpen = anchors.filter(a => !a.locked && parent.has(a.y * ROOM + a.x))
-    const exitsLocked = anchors.filter(a => a.locked && near(a, 4) !== undefined)
+    const { parent, near, anchors, open: exitsOpen, locked: exitsLocked } = exitsFrom(g.world, room.doors, from)
     const isStart = keyOf(g.x, g.y) === keyOf(...g.map.start)
     if (!room.sealed && !isStart && exitsOpen.length === 0 && exitsLocked.length === 0 && g.time - bot.enteredAt > 2 && !bot.softRooms.has(room)) {
       bot.softRooms.add(room)
       bot.softlocks += 1
       stats.softlockRooms.push(`${room.layout}@${room.ring}:${room.event ?? '-'}:${Object.keys(room.doors).join('')}:${room.cleared ? 'after' : 'fresh'}`)
-      if (stats.softMaps.length < 2) stats.softMaps.push(asciiRoom(g, room, from))
+      if (stats.softMaps.length < 2) stats.softMaps.push(`reach ${parent.size} anchors ${JSON.stringify(anchors)}\n${asciiRoom(g, room, from)}`)
     }
     const dir = chooseDirection(g, bot, bot.avoid)
-    const wanted = anchors.find(a => a.dir === dir)
+    const chosen = anchors.find(a => a.dir === dir)
+    const usable = chosen && (chosen.locked ? near(chosen, 4) !== undefined : parent.has(chosen.y * ROOM + chosen.x))
+    const wanted = usable || g.time - bot.enteredAt < 6 ? chosen : exitsOpen[Math.floor(Math.random() * exitsOpen.length)] ?? chosen
     const errands = [...g.cards.map(c => ({ c, kind: 'card' })), ...g.wares.filter(w => w.price <= g.gold && (bot.opts.gun !== true)).map(c => ({ c, kind: 'ware' })), ...g.pickups.map(c => ({ c, kind: 'pickup' })), ...g.enemies.filter(e => e.friendly && !e.prop && !e.spent).map(c => ({ c, kind: 'talk' }))]
     const errand = errands
       .map(({ c }) => near({ x: cell(c.x + c.w / 2), y: cell(c.y + c.h - 1) }, 1.5))
@@ -256,7 +203,9 @@ const worker = async ({ opts, from, to }) => {
       bot.gaveUp = new Set()
       bot.stuckAt = g.time
     }
-    const target = targetFor(g, bot, me)
+    const wantedLock = bot.plan?.wanted?.locked && room.links[bot.plan.wanted.dir]?.lock === 'peat'
+    const lampForLock = wantedLock ? g.enemies.find(e => e.prop && lineClear(g.world, me, middle(e))) : null
+    const target = lampForLock ?? targetFor(g, bot, me)
     if (target) {
       input.pointer = middle(target)
       input.shoot = true
@@ -298,6 +247,19 @@ const worker = async ({ opts, from, to }) => {
         return input
       }
     }
+    if (room.sealed) {
+      bot.enteredAt = g.time
+      bot.stuckAt = g.time
+      const foe = g.enemies.find(e => !e.friendly && !e.ally && !e.partOf)
+      if (foe && !target) {
+        const dx = middle(foe).x - me.x
+        if (Math.abs(dx) > 10) input[dx > 0 ? 'right' : 'left'] = true
+      }
+      if (p.grounded && !bot.jumpHeld && (p.hitWall || Math.random() < 0.04)) input.jump = true
+      else if (bot.jumpHeld && p.vy < 0) input.jump = true
+      bot.jumpHeld = input.jump === true
+      return input
+    }
     if (g.time - bot.planAt > 0.4 || !bot.plan) {
       bot.plan = planRoom(g, bot, stats)
       bot.planAt = g.time
@@ -331,10 +293,14 @@ const worker = async ({ opts, from, to }) => {
         if (p.bombs > 0 && bot.bombClock <= 0 && bot.opts.gun !== true) {
           input.bomb = true
           bot.bombClock = 1
-        } else if (p.bombs === 0 && stuckFor > 3) {
-          bot.avoid.add(`${keyOf(g.x, g.y)}:${wanted.dir}`)
-          bot.plan = null
+        } else if (p.bombs === 0 && stuckFor > 4) {
           bot.stuckAt = g.time
+          bot.plan = null
+          if (bot.forceRing === g.deepestRing) {
+            stats.lockedOut += 1
+            stats.assistWhy.push(`${room.layout}:lockedout:${room.links[wanted.dir]?.lock}`)
+            clearDoorAndGo(g, bot, wanted.dir)
+          } else bot.avoid.add(`${keyOf(g.x, g.y)}:${wanted.dir}`)
         }
         return input
       }
@@ -349,7 +315,7 @@ const worker = async ({ opts, from, to }) => {
       input.jump = true
       input[Math.random() < 0.5 ? 'left' : 'right'] = true
     }
-    const overdue = g.time - bot.enteredAt > (keyOf(g.x, g.y) === keyOf(...g.map.start) ? 25 : 60)
+    const overdue = g.time - bot.enteredAt > (keyOf(g.x, g.y) === keyOf(...g.map.start) ? 25 : 35)
     if ((stuckFor > 9 || overdue) && wanted) {
       if (bot.opts.trace) console.log(`  t=${g.time.toFixed(0)} assist ${wanted.dir} stuck=${stuckFor.toFixed(0)} overdue=${overdue} locked=${wanted.locked} goal=${goalKey} at ${from.x},${from.y} errand=${errand} reach=${parent.size}`)
       stats.assistWhy.push(`${room.layout}:${room.sealed ? 'sealed' : wanted.locked ? 'locked' : parent.has(wanted.y * ROOM + wanted.x) ? 'route' : 'noroute'}:${overdue ? 'late' : 'still'}`)
@@ -386,7 +352,7 @@ const worker = async ({ opts, from, to }) => {
     save.ghost = null
   }
 
-  const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0 })
+  const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {} })
 
   const playRun = (index, opts) => {
     Math.random = seededRandom(opts.seed * 1000003 + index * 7919)
@@ -462,6 +428,9 @@ const worker = async ({ opts, from, to }) => {
         if (b) wardenStart[b.kind] && (wardenStart[b.kind].hits += 1)
       }
       lastHp = g.player.hp
+      const place = g.boss ? `boss` : g.reveal ? 'reveal' : g.menus.length ? 'menu' : g.rooms[keyOf(g.x, g.y)].sealed ? 'sealed' : g.rooms[keyOf(g.x, g.y)].visited && g.time - bot.enteredAt > 30 ? 'overstay' : 'walk'
+      stats.timeIn[place] = (stats.timeIn[place] ?? 0) + TICK
+      stats.ringTime[g.ring] = (stats.ringTime[g.ring] ?? 0) + TICK
       const boss = g.boss
       if (boss) {
         wardenStart[boss.kind] ??= { t, hits: 0, ring: g.ring }
@@ -475,6 +444,7 @@ const worker = async ({ opts, from, to }) => {
       if (opts.god) g.player.hp = TUNING.player.hp
     }
     if (g.phase === 'playing' && stats.ticks >= limit - 1) timedOut = true
+    if (opts.trace) console.log(asciiRoom(g, g.rooms[keyOf(g.x, g.y)], { x: cell(g.player.x + 3), y: cell(g.player.y + g.player.h - 1) }), `p ${g.player.x},${g.player.y} v ${g.player.vx},${g.player.vy}`)
     return {
       index,
       phase: g.phase,
@@ -494,6 +464,7 @@ const worker = async ({ opts, from, to }) => {
       gold: g.gold,
       seals: g.seals,
       clean: g.cleanClears,
+      mercy: g.mercyBombs ?? 0,
       secrets,
       met: secretsAt,
       omen: g.omen,
@@ -503,6 +474,9 @@ const worker = async ({ opts, from, to }) => {
       softMaps: stats.softMaps,
       assists: bot.assists,
       assistWhy: stats.assistWhy,
+      lockedOut: stats.lockedOut,
+      timeIn: stats.timeIn,
+      ringTime: stats.ringTime,
       failedRooms: Object.values(g.rooms).filter(r => r.passed === false).map(r => `${r.layout}@${r.ring}`),
       hits: stats.hits,
       ringHits: stats.ringHits ?? {},
@@ -544,10 +518,13 @@ const report = (results, opts, realSeconds) => {
   if (opts.maps) results.flatMap(r => r.softMaps).slice(0, Number(opts.maps) || 4).forEach(line)
   line(`generator gave up: ${top(tally(results.flatMap(r => r.failedRooms)), 8)}`)
   line(`bot teleports (stuck, not necessarily a softlock): mean ${fmt(mean(results.map(r => r.assists)))} per run`)
+  line(`locked out (no bomb, no open gate, bot could not open the door): ${fmt(mean(results.map(r => r.lockedOut)))} per run`)
+  line(`mercy bombs: ${fmt(mean(results.map(r => r.mercy)))} per run`)
   line(`  why: ${top(tally(results.flatMap(r => r.assistWhy)), 14)}`)
   line(`rooms per run (p10/p50/p90): ${spread(results.map(r => r.rooms))}`)
   line(`minutes per run: ${spread(results.map(r => r.seconds / 60))}`)
   const roomSecs = results.flatMap(r => r.roomTimes.map((t, i) => t - (r.roomTimes[i - 1] ?? 0)))
+  line(`time split (minutes per run): ${Object.entries(merge(results.map(r => r.timeIn))).map(([k, v]) => `${k} ${fmt(v / 60 / results.length)}`).join(', ')}. by ring: ${Object.entries(merge(results.map(r => r.ringTime))).map(([k, v]) => `r${k} ${fmt(v / 60 / results.length)}`).join(', ')}`)
   line(`seconds per new room: ${spread(roomSecs)}`)
   line(`deepest ring: ${top(tally(results.map(r => `r${r.ring}`)), 9)}`)
   line(`deaths per ring: ${top(tally(results.filter(r => r.deathRing !== null).map(r => `r${r.deathRing}`)), 9)}`)

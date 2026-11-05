@@ -102,6 +102,8 @@ export const TUNING = {
     minerChance: 0.05,
     moleChance: 0.08,
     bombDropChance: 0.06,
+    bombMercy: 0.3,
+    mercyEvery: 4,
     eventChance: 0.3,
     echoDelay: 0.3,
     batteryRecharge: 0.4,

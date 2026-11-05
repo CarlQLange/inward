@@ -350,7 +350,7 @@ const rot = (grid, rand, share) => {
 const standing = (grid, extra) => (x, y) => {
   const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || SOLID.has(grid[b][a])
   const wet = (a, b) => ['~', 'o'].includes(grid[b]?.[a])
-  const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || extra.has(`${x},${y}`)
+  const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || grid[y]?.[x] === 'v' || extra.has(`${x},${y}`)
   return { solid, ok: !solid(x, y) && !solid(x, y - 1) && stands }
 }
 
@@ -399,19 +399,20 @@ const passes = (grid, anchors, goals) => {
   return goals.every(near)
 }
 
-const shaft = (grid, c, top, bottom) => {
+const shaft = (grid, c, top, bottom, ladders) => {
   for (let y = Math.max(top, 1); y <= bottom; y++) {
-    for (let x = c; x <= c + 3; x++) grid[y][x] = '.'
+    for (let x = c; x <= c + 3; x++) grid[y][x] = ladders && (x === c + 1 || x === c + 2) ? 'v' : '.'
   }
+  if (ladders) return
   let side = 0
-  let last = bottom + 1
+  let last = top
   const ledge = y => {
-    grid[y][c + side] = grid[y][c + side + 1] = 'R'
-    side = side === 0 ? 2 : 0
+    grid[y][c + side] = 'R'
+    side = side === 0 ? 3 : 0
     last = y
   }
-  for (let y = bottom - 2; y >= top + 4; y -= 3) ledge(y)
-  if (last > top + 5 && last <= bottom) ledge(top + 4)
+  for (let y = top + (top === 0 ? 4 : 3); y <= bottom - 2; y += 3) ledge(y)
+  if (last > top && last < bottom - 2) ledge(bottom - 2)
 }
 
 const widestSegment = (segments, rand) =>
@@ -437,7 +438,7 @@ const addDoors = (grid, links, layout, floors) => {
   return { doors, anchors, floors }
 }
 
-const addVerticalDoors = (grid, links, layout, floors, doors, anchors, rand) => {
+const addVerticalDoors = (grid, links, layout, floors, doors, anchors, rand, ladders) => {
   const columnFor = () => {
     const s = widestSegment(layout.segments, rand)
     return clamp(s.from, 2, ROOM - 6)
@@ -445,7 +446,7 @@ const addVerticalDoors = (grid, links, layout, floors, doors, anchors, rand) => 
   if (links.up) {
     const c = columnFor()
     const floor = floors[c + 1] ?? floors[c] ?? WATER_BOTTOM
-    shaft(grid, c, 0, floor - 1)
+    shaft(grid, c, 0, floor - 1, ladders)
     grid[0][c + 1] = grid[0][c + 2] = '.'
     doors.up = { col: c + 1 }
     anchors.push([c + 1, 1])
@@ -453,7 +454,7 @@ const addVerticalDoors = (grid, links, layout, floors, doors, anchors, rand) => 
   if (links.down) {
     const c = columnFor()
     const floor = Math.min(...[c, c + 1, c + 2, c + 3].map(x => floors[x] ?? WATER_BOTTOM))
-    shaft(grid, c, floor, ROOM - 2)
+    shaft(grid, c, floor, ROOM - 2, ladders)
     grid[ROOM - 1][c + 1] = grid[ROOM - 1][c + 2] = '.'
     doors.down = { col: c + 1 }
     anchors.push([c + 1, ROOM - 2])
@@ -468,13 +469,20 @@ export const LOCK_CELLS = {
 }
 const LOCK_TILES = { peat: 'p', gate: 'G', brick: 'B', ice: 'I', scrap: 'S', seal: '#' }
 
-const applyLocks = (grid, links, doors, layout, enemies) => {
+const hangLockLamp = (grid, ceilings, dir, enemies) => {
+  const columns = dir === 'left' ? [2, 3, 4] : [ROOM - 3, ROOM - 4, ROOM - 5]
+  const x = columns.find(c => grid[ceilings[c]]?.[c] === '.')
+  if (x !== undefined) enemies.push({ kind: 'lamp', x: x * BLOCK + 1, y: ceilings[x] * BLOCK })
+}
+
+const applyLocks = (grid, links, doors, layout, enemies, ceilings) => {
   const first = layout.segments[0]
   const last = layout.segments[layout.segments.length - 1]
   for (const [dir, link] of Object.entries(links)) {
     if (!link.lock || !doors[dir]) continue
     for (const [x, y] of LOCK_CELLS[dir](doors[dir])) grid[y][x] = LOCK_TILES[link.lock]
     if (link.lock !== 'peat') continue
+    if (dir === 'left' || dir === 'right') hangLockLamp(grid, ceilings, dir, enemies)
     const s = dir === 'left' ? first : last
     const toward = dir === 'left' ? s.from + 2 : s.to - 2
     if (dir === 'left' || dir === 'right') {
@@ -570,7 +578,7 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   EVENT_SETUP[special.event]?.(grid, layout, ceilings, range)
 
   const { doors, anchors } = addDoors(grid, links, layout, floors)
-  addVerticalDoors(grid, links, layout, floors, doors, anchors, rand)
+  addVerticalDoors(grid, links, layout, floors, doors, anchors, rand, special.ladders)
 
   const first = layout.segments[0]
   const last = layout.segments[layout.segments.length - 1]
@@ -617,7 +625,7 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   const spare = mark(last, 1)
 
   const ok = passes(grid, anchors, goals)
-  applyLocks(grid, links, doors, layout, enemies)
+  applyLocks(grid, links, doors, layout, enemies, ceilings)
 
   const drains = []
   grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
@@ -628,9 +636,8 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
 const NO_LEAN = { metal: false, water: false, fuel: false, scrap: false }
 
 export const generateRoom = ({ seed, depth, links, lean = NO_LEAN, special = {}, theme = THEMES[0], themeIndex = 0 }) => {
-  let result = attempt({ seed, depth, links, lean, special, theme, themeIndex })
-  for (let tries = 1; tries < 60 && !result.ok; tries++) {
-    result = attempt({ seed: seed + tries * 104729, depth, links, lean, special, theme, themeIndex })
-  }
+  const tryWith = (tries, extra = {}) => attempt({ seed: seed + tries * 104729, depth, links, lean, special: { ...special, ...extra }, theme, themeIndex })
+  let result = tryWith(0)
+  for (let tries = 1; tries < 90 && !result.ok; tries++) result = tryWith(tries, tries > 40 ? { ladders: true } : {})
   return { ...result.definition, passed: result.ok }
 }

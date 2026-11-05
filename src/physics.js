@@ -44,7 +44,24 @@ export const move = (world, e, dt) => {
 }
 
 export const pushOutOfSolid = (world, e) => {
-  for (let i = 0; i < 24 && hitsSolid(world, e); i++) e.y -= 1
+  for (let i = 0; i < 24 && e.y > 1 && hitsSolid(world, e); i++) e.y -= 1
+}
+
+export const unbury = (world, e) => {
+  const home = { x: e.x, y: e.y }
+  const fits = (dx, dy) => !hitsSolid(world, { x: home.x + dx * BLOCK, y: home.y + dy * BLOCK, w: e.w, h: e.h })
+    && home.y + dy * BLOCK > 0 && home.x + dx * BLOCK > 0 && home.x + dx * BLOCK + e.w < WORLD_PX && home.y + dy * BLOCK + e.h < WORLD_PX
+  for (let r = 1; r < ROOM; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !fits(dx, dy)) continue
+        e.x = home.x + dx * BLOCK
+        e.y = home.y + dy * BLOCK
+        return true
+      }
+    }
+  }
+  return false
 }
 
 export const inWater = (world, e) => {

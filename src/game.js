@@ -4,7 +4,7 @@ import { createWorld, encodeWorld, energize, explode, ignite, matAt, puff, resto
 import { STARTERS } from './room.js'
 import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
-import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
+import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid, unbury } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, muzzle, pourAcid, recordTrail, spillNapalm, stepDash } from './skills.js'
@@ -17,6 +17,7 @@ import { clearRun, knownNotes, loadRun, persist, recordRun, save, saveRun } from
 import { isKnown, knownFrom, knownOf, meet, pickSecrets, plantsFor, rollOmen, showReveal } from './discover.js'
 import { OMENS, applyOmen, omenFoes, omenTheme } from './omens.js'
 import { buildArena, openArena, stepArena } from './wardens.js'
+import { exitsFrom } from './reach.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -361,7 +362,7 @@ const walkThrough = (g, dir) => {
 const RUN_FIELDS = [
   'seed', 'map', 'x', 'y', 'awake', 'roomsSeen', 'deepestRing', 'cardPool', 'score', 'chainPeak',
   'xp', 'level', 'nextLevel', 'gold', 'kills', 'environmentKills', 'pendingOffers', 'relicPool', 'lastTheme', 'quick', 'quickRing',
-  'bands', 'bandFoes', 'omen', 'ambient', 'flocking', 'secrets', 'plants', 'foundThisRun', 'wardens', 'wardenAt', 'wardenOrder', 'seals', 'charted', 'ghost', 'cleanClears',
+  'bands', 'bandFoes', 'omen', 'ambient', 'flocking', 'secrets', 'plants', 'foundThisRun', 'wardens', 'wardenAt', 'wardenOrder', 'seals', 'charted', 'ghost', 'cleanClears', 'mercyBombs',
 ]
 
 const packRoom = room => ({
@@ -667,7 +668,7 @@ const dropLoot = (g, e, base) => {
     })
   }
   if (Math.random() < 0.12) g.pickups.push({ kind: 'heart', x: c.x - 3, y: c.y - 3, w: 7, h: 6, vx: 0, vy: -90 })
-  if (Math.random() < R.bombDropChance * (hasRelic(g.player, 'sack') ? 3 : 1)) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
+  if (Math.random() < (g.player.bombs === 0 ? R.bombMercy : R.bombDropChance) * (hasRelic(g.player, 'sack') ? 3 : 1)) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
 }
 
 const offerRelics = g => {
@@ -1215,6 +1216,24 @@ const stepFirstRoom = (g, dt) => {
   knownNotes.add('met:spitter')
 }
 
+const stepMercy = (g, p, dt) => {
+  const room = g.rooms[keyOf(g.x, g.y)]
+  g.mercyClock = (g.mercyClock ?? 0) - dt
+  if (g.mercyClock > 0 || p.bombs > 0 || room.sealed || keyOf(g.x, g.y) === keyOf(...g.map.start)) return
+  g.mercyClock = R.mercyEvery
+  const from = { x: cell(p.x + p.w / 2), y: cell(p.y + p.h - 1) }
+  const { open, locked } = exitsFrom(g.world, room.doors, from)
+  if (open.length > 0) {
+    room.boxedIn = 0
+    return
+  }
+  room.boxedIn = (room.boxedIn ?? 0) + 1
+  if (room.boxedIn < 2 && locked.length === 0) return
+  if (g.pickups.some(c => c.kind === 'bomb')) return
+  g.pickups.push({ kind: 'bomb', x: p.x, y: p.y - 10, w: 7, h: 7, vx: 0, vy: -60 })
+  g.mercyBombs = (g.mercyBombs ?? 0) + 1
+}
+
 const useDoors = (g, p) => {
   const room = g.rooms[keyOf(g.x, g.y)]
   if (room.sealed) return
@@ -1304,6 +1323,7 @@ const stepPlayer = (g, input, dt) => {
   p.wasJumpFeel = input.jump
   move(world, p, dt)
   pushOutOfSolid(world, p)
+  if (hitsSolid(world, p)) unbury(world, p)
   stepMotionFeel(g, p, input, dt, wasGrounded, falling, swimming)
   stepDash(g, p, dt)
   if (p.slam && p.grounded) {
@@ -1342,6 +1362,7 @@ const stepPlayer = (g, input, dt) => {
   p.stun -= dt
 
   applyHazards(g, p, dt)
+  stepMercy(g, p, dt)
   collectCards(g, p)
   talkToInhabitants(g, p)
   buyWares(g, p)

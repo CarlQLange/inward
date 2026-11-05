@@ -82,7 +82,6 @@ const bellowsMoves = {
       e.vx = e.facing * 125
       if (!e.hitWall) return
       e.stun = 1.3
-      quake(g, 3, 5)
       burst(g, centre(e).x, centre(e).y, 'gas', 14)
       endMove(e)
     },
@@ -152,11 +151,25 @@ const bellows = (g, e, dt) => {
   runMoves(g, e, dt, bellowsMoves, () => bag(e, Object.keys(bellowsMoves)))
 }
 
+const loosenRoof = (g, count, power) => {
+  const loose = []
+  for (let y = 1; y < 10; y++) {
+    for (let x = 2; x < ROOM - 2; x++) {
+      if ([M.PEAT, M.ROCK].includes(matAt(g.world, x, y)) && matAt(g.world, x, y - 1) === M.SAND && !props(matAt(g.world, x, y + 1)).solid) loose.push([x, y])
+    }
+  }
+  for (let i = 0; i < count && loose.length; i++) {
+    const [x, y] = loose.splice(Math.floor(Math.random() * loose.length), 1)[0]
+    setCell(g.world, x, y, M.SAND)
+  }
+  g.shake = Math.max(g.shake, power)
+}
+
 const colossusMoves = {
   stomp: {
     tell: 0.85, act: 0.1, rest: 1.3,
     start: (g, e) => {
-      quake(g, 9, 7)
+      loosenRoof(g, 7, 7)
       const c = centre(e)
       floorWave(g, c.x, e.y + e.h, -1)
       floorWave(g, c.x, e.y + e.h, 1)
@@ -169,7 +182,7 @@ const colossusMoves = {
     during: (g, e) => {
       e.vx = e.facing * 135
       if (!e.hitWall) return
-      quake(g, 18, 12)
+      loosenRoof(g, 14, 12)
       e.stun = 2.2
       e.vx = 0
       burst(g, centre(e).x, e.y, 'pale', 30)
@@ -220,7 +233,7 @@ const coolLava = (g, e, dt) => {
     e.cooled.push({ i, age: 0 })
   }
   for (const c of e.cooled) c.age += 0.5
-  for (const c of e.cooled.filter(c => c.age >= CRUMBLE_AFTER && w.mat[c.i] === M.ROCK)) setCell(w, c.i % ROOM, Math.floor(c.i / ROOM), M.SAND)
+  for (const c of e.cooled.filter(c => c.age >= CRUMBLE_AFTER && w.mat[c.i] === M.ROCK)) setCell(w, c.i % ROOM, Math.floor(c.i / ROOM), M.ASH, TUNING.world.ashLife)
   e.cooled = e.cooled.filter(c => c.age < CRUMBLE_AFTER)
 }
 
@@ -752,8 +765,7 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
     for (let x = 12; x <= 15; x++) seals.push([x, roof - 1])
     let left = true
     for (let y = floor - 3; y >= 2; y -= 3) {
-      const at = left ? 12 : 14
-      exits.push([at, y], [at + 1, y])
+      exits.push([left ? 12 : 15, y])
       left = !left
     }
   }
@@ -762,7 +774,6 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
     grid[ROOM - 1][13] = grid[ROOM - 1][14] = '.'
     doors.down = { col: 13 }
     for (let x = 12; x <= 15; x++) seals.push([x, floor])
-    for (let y = floor + 2; y < ROOM - 2; y += 3) exits.push([12, y], [13, y])
   }
   return { doors, seals, exits }
 }
@@ -812,13 +823,12 @@ const ARENAS = {
     const grid = blank()
     paint(grid, 2, roof, 25, floor - 1, '.')
     paint(grid, 2, floor, 25, floor, 'M')
-    postWithTank(grid, 3, floor, roof)
-    postWithTank(grid, 11, floor, roof, 6)
-    postWithTank(grid, 20, floor, roof)
-    paint(grid, 7, 18, 9, 18, 'R')
-    paint(grid, 18, 18, 19, 18, 'R')
-    paint(grid, 13, 19, 14, 19, 'B')
-    return { grid, floor, roof, boss: { x: 12, y: 10 * BLOCK }, lamps: [8, 19] }
+    postWithTank(grid, 2, floor, roof)
+    postWithTank(grid, 8, floor, roof)
+    postWithTank(grid, 17, floor, roof)
+    paint(grid, 12, 18, 15, 18, 'R')
+    paint(grid, 22, 18, 24, 18, 'R')
+    return { grid, floor, roof, boss: { x: 12, y: 10 * BLOCK }, lamps: [7, 16] }
   },
   eel: () => {
     const floor = 26
@@ -898,7 +908,7 @@ export const buildArena = (id, links) => {
     enemies: [{ kind: id, x: plan.boss.x * BLOCK, row: plan.boss.row, y: plan.boss.y }, ...plan.lamps.map(x => lampAt(x, plan.roof))],
     layout: `arena-${id}`,
     spare: { x: 14 * BLOCK, y: (plan.floor - 2) * BLOCK },
-    arena: { id, seals, exits, interior, lamps: plan.lamps.map(x => lampAt(x, plan.roof)), lampClock: 0, watch: 0 },
+    arena: { id, seals, exits, interior, shape: plan.grid.map(row => row.join('')), lamps: plan.lamps.map(x => lampAt(x, plan.roof)), lampClock: 0, watch: 0 },
   }
 }
 
@@ -976,17 +986,24 @@ export const stepArena = (g, room, dt, seal) => {
   }
 }
 
+const settleArena = (g, arena) => {
+  for (let y = 1; y < ROOM - 1; y++) {
+    for (let x = 1; x < ROOM - 1; x++) {
+      const m = matAt(g.world, x, y)
+      if (props(m).solid && m !== M.BEDROCK && arena.shape[y][x] === '.') {
+        setCell(g.world, x, y, M.EMPTY)
+        if (Math.random() < 0.2) burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'pale', 2)
+      }
+      if (m === M.LAVA || m === M.ACID) setCell(g.world, x, y, M.EMPTY)
+    }
+  }
+}
+
 export const openArena = (g, room) => {
   const { arena } = room
+  settleArena(g, arena)
   for (const [x, y] of arena.seals) setCell(g.world, x, y, M.EMPTY)
   for (const [x, y] of arena.exits) if (!props(matAt(g.world, x, y)).solid) setCell(g.world, x, y, M.ROCK)
-  for (const dir of Object.keys(room.doors)) {
-    const door = room.doors[dir]
-    const cells = door.row !== undefined
-      ? [dir === 'left' ? 2 : ROOM - 3, dir === 'left' ? 3 : ROOM - 4].flatMap(x => [[x, door.row], [x, door.row + 1]])
-      : []
-    for (const [x, y] of cells) if (matAt(g.world, x, y) !== M.BEDROCK) setCell(g.world, x, y, M.EMPTY)
-  }
   g.enemies.forEach(o => {
     if (!o.spawned && !o.partOf) return
     o.hp = 0
