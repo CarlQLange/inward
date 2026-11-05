@@ -76,14 +76,18 @@ export const slotsOf = p => {
   return TUNING.player.skillSlots + (hasKeystone(p, 'fourth') ? 1 : 0)
 }
 
-const CLASHES = { monomania: ['fourth', 'slough'], fourth: ['monomania'], slough: ['monomania'] }
+const CLASHES = {
+  monomania: ['fourth', 'slough'],
+  fourth: ['monomania'],
+  slough: ['monomania'],
+  fists: ['stain'],
+  stain: ['fists'],
+}
 
 const fits = p => k =>
   !hasKeystone(p, k.id) &&
   !(CLASHES[k.id] ?? []).some(id => hasKeystone(p, id)) &&
-  heartCap(p) - (k.hearts ?? 0) >= 2 &&
-  !(k.id === 'fists' && hasKeystone(p, 'stain')) &&
-  !(k.id === 'stain' && hasKeystone(p, 'fists'))
+  heartCap(p) - (k.hearts ?? 0) >= 2
 
 export const openKeystones = (p, known) => KEYSTONES.filter(k => known.has(`keystone:${k.id}`)).filter(fits(p))
 
