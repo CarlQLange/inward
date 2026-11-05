@@ -1,11 +1,6 @@
-"""The cast: every creature, reduced from its posed sheet to a chunky atlas.
-
-A sheet is a grid of poses on flat magenta. Each pose is cut by connected component,
-so a limb that strays over a cell boundary stays with its owner. Each creature gets one
-palette and one scale across its poses, the poses are registered against each other, and
-a dark ring goes round the silhouette so it holds up against anything behind it.
+"""Shared reduction for the cast: magenta keying, voted palettes, tone lift and the dark ring,
+plus the pictograms and the region tiles. The animated creatures themselves live in anim.py.
 """
-import json
 from pathlib import Path
 
 import numpy as np
@@ -27,55 +22,8 @@ EDGE_FLOOR = 0.3
 # sheet: (columns, rows, [(kind, longest side, how poses line up, palette size, first cell, last cell)...])
 GROUND, HANG, FREE, WALL = 'ground', 'hang', 'free', 'wall'
 
-SHEETS = {
-    'foes-ground': (4, 4, [
-        ('spitter', 19, GROUND, 5, 2, 3), ('slime', 19, GROUND, 4, 8, 9), ('urchin', 20, FREE, 4, 12, 13),
-        ('slug', 26, GROUND, 4, 4, 5), ('crab', 20, GROUND, 4, 6, 7),
-    ]),
-    'foes-air': (4, 4, [
-        ('fish', 18, FREE, 4, 0, 1), ('bat', 24, FREE, 4, 2, 3),
-        ('emberbat', 23, FREE, 5, 8, 9),
-        ('puffer', 24, FREE, 5, 12, 13), ('lantern', 21, FREE, 5, 14, 15),
-    ]),
-    'foes-tall': (4, 4, [
-        ('imp', 21, GROUND, 4, 0, 1), ('nest', 22, GROUND, 4, 14, 15),
-    ]),
-    'foes-fixed-folk': (6, 4, [
-        ('snapweed', 26, HANG, 5, 2, 3), ('dripper', 19, HANG, 4, 4, 5),
-    ]),
-    'foes-folk-2': (4, 4, [
-        ('mole', 21, GROUND, 5, 0, 1),
-        ('miner', 21, GROUND, 5, 4, 5), ('cartographer', 22, GROUND, 4, 6, 7),
-        ('jelly', 21, FREE, 3, 8, 9),
-        ('spore', 18, FREE, 3, 14, 15),
-    ]),
-    'foes-3': (4, 4, [
-        ('crawler', 22, GROUND, 3, 0, 1), ('hermit', 22, GROUND, 4, 4, 5), ('worm', 22, GROUND, 3, 6, 7),
-        ('pillbug', 18, GROUND, 3, 10, 11), ('stilt', 26, GROUND, 2, 12, 13), ('coil', 24, GROUND, 3, 14, 15),
-    ]),
-    'foes-4': (4, 4, [
-        ('gasbag', 22, FREE, 4, 0, 1), ('mimic', 20, GROUND, 4, 2, 3),
-        ('scrapper', 22, GROUND, 4, 4, 5), ('bomber', 22, GROUND, 5, 6, 7),
-        ('turret', 20, WALL, 4, 8, 9), ('bloodletter', 22, GROUND, 5, 10, 11),
-        ('shade', 21, FREE, 3, 12, 13), ('tinker', 22, GROUND, 5, 14, 15),
-    ]),
-    'wardens': (4, 4, [
-        ('bellows', 64, GROUND, 6, 0, 1), ('crucible', 66, GROUND, 7, 2, 3),
-        ('colossus', 66, GROUND, 6, 4, 5), ('eel', 60, GROUND, 6, 6, 7),
-        ('brood', 66, HANG, 7, 8, 9), ('conductor', 72, GROUND, 7, 10, 11),
-        ('core', 60, FREE, 8, 12, 13), ('eelhead', 26, FREE, 6, 14, 14), ('eelbody', 18, FREE, 5, 15, 15),
-    ]),
-}
-
-ALIASES = {'guardian': 'colossus', 'gnat': 'gnats'}
-
 # Anything this small is a handful of pixels, so it's plotted rather than generated.
 TINY = {'y': (246, 226, 138), 'w': (255, 255, 255), 'r': (255, 96, 72), 's': (190, 44, 44)}
-GNATS = (['w.w', '.y.'], ['...', 'wyw'])
-TICK = (
-    ['....rrr.', '...rwrrr', 'y..rrrrw', '.y.srrss', 'y.y.y.y.'],
-    ['.....rrr', '....rwrw', '...yrrrr', '.yyysss.', 'yy......'],
-)
 
 SIGNS = (5, 5, [
     'cause_fire', 'cause_lava', 'cause_acid', 'cause_charge', 'cause_smoke',
@@ -328,20 +276,6 @@ def plotted(rows):
     return frame
 
 
-def build_cast():
-    cast = {}
-    for sheet, (columns, rows, entries) in SHEETS.items():
-        rgb = np.asarray(Image.open(RAW / f'{sheet}.png').convert('RGB'))
-        masks = poses_of(rgb, columns, rows)
-        for kind, longest, anchor, colours, first, last in entries:
-            cuts = [crop(rgb, masks[cell]) for cell in range(first, last + 1)]
-            cast[kind] = {'anchor': anchor, 'frames': creature(cuts, longest, anchor, colours)}
-    for kind, anchor, frames in (('gnats', FREE, GNATS), ('tick', GROUND, TICK)):
-        plots = [plotted(rows) for rows in frames]
-        cast[kind] = {'anchor': anchor, 'frames': compose(plots, [(0, 0)] * len(plots))}
-    return cast
-
-
 def build_signs():
     """Pictograms in a four-across grid of 16 pixel squares, matching the older icon atlases."""
     columns, rows, names = SIGNS
@@ -369,28 +303,3 @@ def build_region_tiles(size=8):
                 for dx, c in enumerate(row):
                     atlas[y + dy, x + dx] = (*bytes.fromhex(colours[c]), 255)
     Image.fromarray(atlas).save(OUT / 'tiles2.png')
-
-
-def pack(cast, name='cast'):
-    """Shelf-packs frames tallest-first and writes the atlas with a manifest beside it."""
-    width = 512
-    placed, x, y, shelf = [], 1, 1, 0
-    order = sorted(cast, key=lambda kind: -max(f.shape[0] for f in cast[kind]['frames']))
-    manifest = {}
-    for kind in order:
-        boxes = []
-        for frame in cast[kind]['frames']:
-            h, w = frame.shape[:2]
-            if x + w + 1 > width:
-                x, y, shelf = 1, y + shelf + 1, 0
-            placed.append((frame, x, y))
-            boxes.append([int(x), int(y), int(w), int(h)])
-            x, shelf = x + w + 1, max(shelf, h)
-        manifest[kind] = {'anchor': cast[kind]['anchor'], 'frames': boxes}
-    atlas = np.zeros((y + shelf + 1, width, 4), dtype=np.uint8)
-    for frame, fx, fy in placed:
-        atlas[fy:fy + frame.shape[0], fx:fx + frame.shape[1]] = frame
-    Image.fromarray(atlas).save(OUT / f'{name}.png')
-    manifest = dict(sorted(manifest.items()))
-    (OUT / f'{name}.json').write_text(json.dumps({'aliases': ALIASES, 'creatures': manifest}, indent=None, separators=(',', ':')))
-    return manifest

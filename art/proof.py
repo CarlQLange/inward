@@ -61,7 +61,34 @@ def sheet(entries, render, background, name):
 def slice_cast():
     manifest = json.loads((OUT / 'cast.json').read_text())['creatures']
     atlas = np.asarray(Image.open(OUT / 'cast.png').convert('RGBA'))
-    return [(kind, [atlas[y:y + h, x:x + w] for x, y, w, h in info['frames']]) for kind, info in manifest.items()]
+    return {
+        kind: {name: [atlas[y:y + h, x:x + w] for x, y, w, h in c['frames']] for name, c in info['clips'].items()}
+        for kind, info in manifest.items()
+    }
+
+
+def strips(everyone, render, background, name):
+    """Every clip as a film strip at 4×, one row per clip, with a mark under the pivot."""
+    rows = []
+    for kind, clips in everyone.items():
+        for clip_name, frames in clips.items():
+            rows.append((f'{kind} {clip_name}', frames))
+    height = sum(max(f.shape[0] for f in frames) * SCALE + LABEL + 6 for _, frames in rows)
+    width = max(sum(f.shape[1] * SCALE + 6 for f in frames) + 6 for _, frames in rows)
+    canvas = Image.new('RGB', (width, height), tuple(background))
+    draw = ImageDraw.Draw(canvas)
+    y = 0
+    for label, frames in rows:
+        draw.text((3, y), label, fill=(220, 220, 220))
+        y += LABEL
+        fx = 3
+        for frame in frames:
+            big = Image.fromarray(render(frame, np.array(background, dtype=np.uint8)).astype(np.uint8)).resize((frame.shape[1] * SCALE, frame.shape[0] * SCALE), Image.NEAREST)
+            canvas.paste(big, (fx, y))
+            draw.line((fx + big.width // 2, y + big.height + 1, fx + big.width // 2, y + big.height + 3), fill=(255, 80, 80))
+            fx += big.width + 6
+        y += max(f.shape[0] for f in frames) * SCALE + 6
+    canvas.save(PROOF / name)
 
 
 def grid_proof(name, atlas, cell, render, background):
@@ -90,8 +117,14 @@ WARDENS = {'bellows', 'crucible', 'colossus', 'eel', 'brood', 'conductor', 'core
 if __name__ == '__main__':
     PROOF.mkdir(exist_ok=True)
     everyone = slice_cast()
-    small = [e for e in everyone if e[0] not in WARDENS]
-    big = [e for e in everyone if e[0] in WARDENS]
+    firsts = {kind: [next(iter(clips.values()))[0]] for kind, clips in everyone.items()}
+    small = [(kind, frames) for kind, frames in firsts.items() if kind not in WARDENS]
+    big = [(kind, frames) for kind, frames in firsts.items() if kind in WARDENS]
+    small_clips = {kind: clips for kind, clips in everyone.items() if kind not in WARDENS}
+    big_clips = {kind: clips for kind, clips in everyone.items() if kind in WARDENS}
+    strips(small_clips, solid, (14, 18, 24), 'clips-cast.png')
+    strips(big_clips, solid, (14, 18, 24), 'clips-wardens.png')
+    strips(small_clips, gameboy, tuple(int(c) for c in GB[0]), 'clips-cast-gameboy.png')
     dark, light, handheld = (14, 18, 24), (225, 225, 215), tuple(int(c) for c in GB[0])
     for group, tag in ((small, 'cast'), (big, 'wardens')):
         sheet(group, solid, dark, f'{tag}-colour.png')
