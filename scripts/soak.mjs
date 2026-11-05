@@ -245,7 +245,8 @@ const worker = async ({ opts, from, to }) => {
         const away = c.x < me.x ? 'right' : 'left'
         const near = c.x < me.x ? 'left' : 'right'
         const blocked = !lineClear(g.world, me, c)
-        if (blocked || (p.hitWall && dist < 50)) input[me.x < (ROOM * BLOCK) / 2 ? 'right' : 'left'] = true
+        if (p.hitWall) bot.sidestep = -(bot.sidestep ?? 1)
+        if (blocked || (p.hitWall && dist < 50)) input[(bot.sidestep ?? 1) > 0 ? 'right' : 'left'] = true
         else if (dist < 50) input[away] = true
         else if (dist > 110) input[near] = true
         else if (Math.random() < 0.02) input[Math.random() < 0.5 ? 'left' : 'right'] = true

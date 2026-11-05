@@ -1,7 +1,7 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, crushingAt, energize, ignite, matAt, puff, setCell } from './world.js'
-import { WORLD_PX, cell, cellsUnder, centre, inWater, move, overlap, solidAt } from './physics.js'
+import { WORLD_PX, cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { quake, zap } from './skills.js'
 import { ENEMY_DEFS, ENEMY_TRAITS, STEPPERS, createEnemy } from './enemies.js'
@@ -60,6 +60,13 @@ const runMoves = (g, e, dt, moves, pick) => {
 }
 
 const endMove = e => { e.clock = 0 }
+
+const shoulderThrough = (g, e) => {
+  for (const [x, y] of cellsUnder(e)) {
+    const m = matAt(g.world, x, y)
+    if (m !== M.BEDROCK && props(m).solid) setCell(g.world, x, y, M.EMPTY)
+  }
+}
 
 const keepInside = e => {
   e.x = Math.max(3 * BLOCK, Math.min(WORLD_PX - 3 * BLOCK - e.w, e.x))
@@ -138,6 +145,7 @@ const bellowsMoves = {
 
 const bellows = (g, e, dt) => {
   if (e.asleep) return
+  shoulderThrough(g, e)
   const roaming = e.stage === 'rest' || e.move === undefined
   if (roaming) {
     walkTo(g, e, dt, 18, centre(g.player).x)
@@ -210,6 +218,7 @@ const colossusMoves = {
 
 const colossus = (g, e, dt) => {
   if (e.asleep) return
+  shoulderThrough(g, e)
   if (e.stage === 'rest' || e.stage === undefined) walkTo(g, e, dt, 20, centre(g.player).x)
   else {
     if (e.stage === 'tell') e.vx = 0
@@ -394,6 +403,9 @@ const eel = (g, e, dt) => {
       }
     }
   }
+  e.x = Math.max(6 * BLOCK, Math.min(22 * BLOCK - e.w, e.x))
+  e.y = Math.max(3 * BLOCK, Math.min(25 * BLOCK - e.h, e.y))
+  if (!airborne && hitsSolid(g.world, e)) Object.assign(e, { x: 13 * BLOCK, y: 22 * BLOCK, vx: 0, vy: 0 })
   runMoves(g, e, dt, eelMoves, () => bag(e, ['leap', 'electrify', 'spit', 'leap']))
 }
 
@@ -574,6 +586,7 @@ const overload = (g, e) => {
 const conductor = (g, e, dt) => {
   e.floorRow ??= cell(e.y + e.h + 1)
   if (e.asleep) return
+  shoulderThrough(g, e)
   e.wet = cellsUnder(e, 2).some(([x, y]) => matAt(g.world, x, y) === M.WATER)
   e.insulated = !e.wet
   if (e.stage === 'rest' || e.stage === undefined) walkTo(g, e, dt, 12, centre(g.player).x)
@@ -726,13 +739,13 @@ const orbit = (g, e) => {
 }
 
 Object.assign(ENEMY_DEFS, {
-  bellows: { size: [34, 26], hp: 240, value: 800, heavy: true, warden: true, sprite: [26] },
-  colossus: { size: [30, 34], hp: 270, value: 800, heavy: true, magnetic: true, warden: true, sprite: [13] },
+  bellows: { size: [34, 26], hp: 240, value: 800, heavy: true, free: true, warden: true, sprite: [26] },
+  colossus: { size: [30, 34], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, sprite: [13] },
   crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true, sprite: [16] },
   eel: { size: [14, 10], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [15] },
   eelseg: { size: [10, 8], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true, sprite: [15] },
   brood: { size: [28, 22], hp: 210, value: 800, heavy: true, free: true, warden: true, sprite: [22] },
-  conductor: { size: [18, 40], hp: 160, value: 800, heavy: true, insulated: true, warden: true, sprite: [16] },
+  conductor: { size: [18, 40], hp: 160, value: 800, heavy: true, free: true, insulated: true, warden: true, sprite: [16] },
   core: { size: [26, 26], hp: 600, value: 3000, heavy: true, free: true, warden: true, sprite: [31] },
   orbit: { size: [8, 8], hp: 9999, value: 0, heavy: true, free: true, fireproof: true, insulated: true, part: true, sprite: [6] },
 })
