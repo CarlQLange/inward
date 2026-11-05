@@ -283,7 +283,7 @@ const settleFlung = (g, f) => {
   if (f.shard) return
   const x = cell(f.x + f.w / 2)
   const y = cell(f.y + f.h / 2)
-  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => [M.EMPTY, M.SMOKE, M.STEAM, M.METHANE].includes(matAt(g.world, x + dx, y + dy)))
+  const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
   if (!spot) return
   setCell(g.world, x + spot[0], y + spot[1], f.mat ?? M.SCRAP)
   if (f.shrapnel) {
