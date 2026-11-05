@@ -290,6 +290,8 @@ export const tieUp = (g, members, hub, options) => {
   })
   if (hub === 'hero') g.player.link = f.life
   if (f.rope) measureRopes(g, f)
+  const first = hub ?? members[0]
+  members.filter(e => e !== first).forEach(e => pulse(g, f, first, e, f.colour))
   g.effects.push(f)
   return f
 }
