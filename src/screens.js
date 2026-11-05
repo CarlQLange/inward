@@ -242,6 +242,8 @@ const drawAlmanacCell = (ctx, item, x, y, on) => {
   ctx.strokeRect(x - 1.5, y - 1.5, ALMANAC_CELL + 3, ALMANAC_CELL + 3)
 }
 
+const knownReactions = () => [...knownNotes].filter(note => !/^(seen|met|killed):/.test(note))
+
 const drawAlmanac = (ctx, g, menu) => {
   shade(ctx, 0.92)
   const book = almanac(knownReactions())
