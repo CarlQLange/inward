@@ -29,11 +29,11 @@ export const TASTES = {
   moss: { name: 'MOSS', colours: ['#8ad05a', '#4f9c3a'], flight: 'leaf', cell: made(M.MOSS) },
   vine: { name: 'VINES', colours: ['#4f9c3a', '#8ad05a'], flight: 'leaf', cell: made(M.VINE), bite: gone },
   metal: { name: 'METAL', colours: ['#b6c6cc', '#6fd0ff'], flight: 'streak', cell: made(M.METAL, M.GATE) },
-  rubble: { name: 'SAND', colours: ['#d8c48a', '#9a9078'], flight: 'hop', cell: made(M.SAND, M.ASH), bite: gone },
+  rubble: { name: 'SAND AND ASH', colours: ['#d8c48a', '#9a9078'], flight: 'hop', cell: made(M.SAND, M.ASH), bite: gone },
   steam: { name: 'STEAM', colours: ['#dfe8e4', '#9fb0a8'], flight: 'puff', cell: made(M.STEAM), bite: gone },
-  gas: { name: 'GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
-  acid: { name: 'ACID', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
-  falling: { name: 'FALLS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
+  gas: { name: 'SMOKE AND GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
+  acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
+  falling: { name: 'FALLING BLOCKS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
 }
 
 const DISTINCT = [M.WATER, M.OIL, M.LAVA, M.ACID, M.STEAM, M.SMOKE, M.METHANE]
@@ -127,15 +127,15 @@ const foodOf = (p, kind) => {
 export const dietOf = foodOf
 
 const EATS = {
-  variety: 'MIXTURES', stun: 'THE STUNNED', crowd: 'A CROWD', drawn: 'ITS CROWD', still: 'STILLNESS', air: 'AIR', blast: 'BLASTS', blastKill: 'BLAST KILLS',
-  hit: 'HITS TAKEN', returned: 'RETURNS', allyKill: 'ALLY KILLS', dashHit: 'BODIES', crossed: 'WALLS', coin: 'COINS', smashed: 'BREAKAGE',
+  variety: 'MIXED LIQUIDS, GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', drawn: 'FOES NEAR THE DECOY', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
+  hit: 'TAKING HITS', returned: 'RETURNED SHOTS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
 }
 
 const named = tag => EATS[tag] ?? TASTES[tag].name
 
-export const eatsText = kind => `EATS ${named(DIETS[kind][0])}`
+export const eatsText = kind => `RECHARGE: ${named(DIETS[kind][0])}`
 
-export const eatsLine = (p, kind) => `EATS ${foodOf(p, kind).map(named).join(', ')}`
+export const eatsLine = (p, kind) => `RECHARGE: ${foodOf(p, kind).map(named).join(', ')}`
 
 const lookOf = tag => TASTES[tag] ?? OTHERS[tag] ?? EVENTS[tag]
 

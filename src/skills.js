@@ -24,7 +24,7 @@ const WHITE = '#f4f8f2'
 export const FORKS = {
   bolt: [
     [form('bolt.globe', 'GLOBE', 'WANDERING BALL LIGHTNING', MAGNET), form('bolt.nail', 'NAIL', 'STICKS, CALLS STRIKES DOWN', WHITE)],
-    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE STRIKES', CHARGE), form('bolt.split', 'SPLIT', 'TURNS WATER TO GAS', GAS)],
+    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE BOLTS, RELEASE TO FIRE ALL', CHARGE), form('bolt.split', 'SPLIT', 'TURNS WATER TO GAS', GAS)],
   ],
   repel: [
     [form('repel.orbit', 'ORBIT', 'SCRAP CIRCLES YOU', STONE), form('repel.lode', 'LODE', 'PULLS INSTEAD OF PUSHING', BLOOD)],
@@ -32,7 +32,7 @@ export const FORKS = {
   ],
   ember: [
     [form('ember.napalm', 'NAPALM', 'SPILLS BURNING OIL', GAS), form('ember.wisp', 'WISP', 'CRAWLS, HUNTS FOR FUEL', MAGNET)],
-    [form('ember.jet', 'JET', 'HOLD: A STREAM', WHITE), form('ember.torch', 'TORCH', 'FOES BURN AND SPREAD', BLOOD)],
+    [form('ember.jet', 'JET', 'HOLD: A STREAM OF FIRE', WHITE), form('ember.torch', 'TORCH', 'FOES BURN AND SPREAD', BLOOD)],
   ],
   frost: [
     [form('frost.floe', 'FLOE', 'A FALLING, FLOATING BLOCK', MAGNET), form('frost.glide', 'GLIDE', 'ICE FORMS UNDERFOOT', WHITE)],
@@ -44,7 +44,7 @@ export const FORKS = {
   ],
   gust: [
     [form('gust.siphon', 'SIPHON', 'BREATHES IN, BREATHES OUT', GAS), form('gust.twister', 'TWISTER', 'A WALKING WHIRLWIND', WHITE)],
-    [form('gust.kite', 'KITE', 'HOLD: RIDE THE AIR', COLD), form('gust.squall', 'SQUALL', 'BLOWS LIQUIDS TOO', MAGNET)],
+    [form('gust.kite', 'KITE', 'HOLD TO FLY', COLD), form('gust.squall', 'SQUALL', 'BLOWS LIQUIDS TOO', MAGNET)],
   ],
   blink: [
     [form('blink.anchor', 'ANCHOR', 'LEAVES A WAY BACK', GAS), form('blink.trade', 'TRADE', 'SWAPS WITH ANY MATTER', STONE)],
@@ -52,15 +52,15 @@ export const FORKS = {
   ],
   grapple: [
     [form('grapple.yank', 'YANK', 'TEARS OUT BLOCKS', STONE), form('grapple.tether', 'TETHER', 'TIES TWO THINGS TOGETHER', GAS)],
-    [form('grapple.sling', 'SLING', 'HOLD TO SWING, LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS, PRESS TO THROW', BLOOD)],
+    [form('grapple.sling', 'SLING', 'HOLD TO SWING, RELEASE TO LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS A FOE. PRESS AGAIN TO THROW IT', BLOOD)],
   ],
   dash: [
     [form('dash.ram', 'RAM', 'SMASHES THROUGH BLOCKS', STONE), form('dash.tackle', 'TACKLE', 'CARRIES A FOE', BLOOD)],
-    [form('dash.drive', 'DRIVE', 'HOLD: A LONG CHARGE', FIRE), form('dash.carom', 'CAROM', 'BOUNCES OFF WALLS', MAGNET)],
+    [form('dash.drive', 'DRIVE', 'HOLD TO KEEP DASHING', FIRE), form('dash.carom', 'CAROM', 'BOUNCES OFF WALLS', MAGNET)],
   ],
   rewind: [
     [form('rewind.epoch', 'EPOCH', 'THE ROOM GOES BACK', GAS), form('rewind.wraith', 'WRAITH', 'YOUR PAST WALKS AGAIN', MAGNET)],
-    [form('rewind.undo', 'UNDO', 'HEARTS RETURN TOO', BLOOD), form('rewind.relive', 'RELIVE', 'OTHER SKILLS RETURN', WHITE)],
+    [form('rewind.undo', 'UNDO', 'HEARTS RETURN TOO', BLOOD), form('rewind.relive', 'RELIVE', 'RECHARGES YOUR OTHER SKILLS', WHITE)],
   ],
   mason: [
     [form('mason.cage', 'CAGE', 'WALLS IN A FOE', BLOOD), form('mason.span', 'SPAN', 'RUNS UNTIL IT HITS', WHITE)],
@@ -88,11 +88,11 @@ export const FORKS = {
   ],
   well: [
     [form('well.rogue', 'ROGUE', 'A DRIFTING BLACK HOLE', BLOOD), form('well.nova', 'NOVA', 'PUSHES EVERYTHING AWAY', WHITE)],
-    [form('well.grind', 'GRINDER', 'CRUSHES WHAT IT HOLDS', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
+    [form('well.grind', 'GRINDER', 'HURTS FOES AT ITS CENTRE', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
   ],
   swap: [
     [form('swap.shuffle', 'SHUFFLE', 'ALL FOES TRADE PLACES', GAS), form('swap.goat', 'SCAPEGOAT', 'OTHERS TURN ON IT', BLOOD)],
-    [form('swap.recall', 'RECALL', 'PRESS AGAIN: BACK', MAGNET), form('swap.ground', 'GROUND', 'THE GROUND COMES TOO', STONE)],
+    [form('swap.recall', 'RECALL', 'PRESS AGAIN TO SWAP BACK', MAGNET), form('swap.ground', 'GROUND', 'THE GROUND COMES TOO', STONE)],
   ],
   stop: [
     [form('stop.still', 'STILL', 'ONLY MATTER STOPS', COLD), form('stop.hold', 'HOLD', 'ONLY FOES STOP', GAS)],
@@ -100,15 +100,15 @@ export const FORKS = {
   ],
   charm: [
     [form('charm.plague', 'PLAGUE', 'SPREADS BY TOUCH', ACID), form('charm.lure', 'LURE', 'ALL FOES CHASE IT', BLOOD)],
-    [form('charm.pact', 'PACT', 'ITS KILLS RENEW IT', WHITE), form('charm.bond', 'BOND', 'IT TAKES YOUR HITS', MAGNET)],
+    [form('charm.pact', 'PACT', 'KILLS RESET ITS CHARM TIME', WHITE), form('charm.bond', 'BOND', 'CHARMED FOE TAKES YOUR HITS', MAGNET)],
   ],
   decoy: [
     [form('decoy.clone', 'CLONE', 'COPIES YOUR GUN', MAGNET), form('decoy.runner', 'RUNNER', 'RUNS, DRAWING FOES', WHITE)],
-    [form('decoy.double', 'DOUBLE', 'PRESS AGAIN: TRADE PLACES', STONE), form('decoy.gas', 'GASBAG', 'LEAKS MARSH GAS', GAS)],
+    [form('decoy.double', 'DOUBLE', 'PRESS AGAIN TO SWAP WITH THE DECOY', STONE), form('decoy.gas', 'GASBAG', 'LEAKS MARSH GAS', GAS)],
   ],
   drone: [
     [form('drone.sapper', 'SAPPER', 'HUNTS, THEN BLOWS', BLOOD), form('drone.mole', 'MOLE', 'CHEWS THROUGH ROCK', STONE)],
-    [form('drone.magpie', 'MAGPIE', 'FETCHES COINS', CHARGE), form('drone.sentry', 'SENTRY', 'PARKS, FIRES FAST', MAGNET)],
+    [form('drone.magpie', 'MAGPIE', 'BRINGS YOU COINS', CHARGE), form('drone.sentry', 'SENTRY', 'STAYS IN PLACE, SHOOTS FAST', MAGNET)],
   ],
   rod: [
     [form('rod.magnet', 'MAGNET', 'DRAWS METAL AND FOES', BLOOD), form('rod.fence', 'FENCE', 'ARC BETWEEN TWO RODS', CHARGE)],
@@ -120,11 +120,11 @@ export const FORKS = {
   ],
   roar: [
     [form('roar.shout', 'SHOUT', 'A BREAKING WAVE FORWARD', WHITE), form('roar.crack', 'CRACK', 'SHATTERS ROCK', STONE)],
-    [form('roar.swell', 'SWELL', 'HOLD: IT GROWS', BLOOD), form('roar.rime', 'RIME', 'FREEZES WITH THE SHOCK', COLD)],
+    [form('roar.swell', 'SWELL', 'HOLD FOR A BIGGER ROAR', BLOOD), form('roar.rime', 'RIME', 'FREEZES WITH THE SHOCK', COLD)],
   ],
   mirror: [
     [form('mirror.pane', 'PANE', 'A STANDING PANE', COLD), form('mirror.maw', 'MAW', 'SWALLOWS, THEN FIRES BACK', BLOOD)],
-    [form('mirror.parry', 'PARRY', 'BRIEF, RETURNS RESET IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNS HUNT FOES', BLOOD)],
+    [form('mirror.parry', 'PARRY', 'LASTS LESS. A RETURNED SHOT RECHARGES IT', WHITE), form('mirror.seek', 'SEEK', 'RETURNED SHOTS CHASE FOES', BLOOD)],
   ],
 }
 

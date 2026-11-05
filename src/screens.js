@@ -345,7 +345,10 @@ const drawCard = (ctx, card, x, y, w, h, on, time) => {
     drawText(ctx, line, x + (w - textWidth(line)) / 2, y + 32 + name.length * 7 + n * 6, PALE)
   })
   if (card.prompt) drawPrompt(ctx, card.prompt, x + (w - promptWidth(card.prompt)) / 2, y + h - PROMPT_HEIGHT - 3)
-  else if (card.sub) drawText(ctx, card.sub, x + (w - textWidth(card.sub)) / 2, y + h - 9, card.subBright ? YELLOW : DIM)
+  else if (card.sub) {
+    const lines = wrapText(card.sub, chars)
+    lines.forEach((line, n) => drawText(ctx, line, x + (w - textWidth(line)) / 2, y + h - 3 - (lines.length - n) * 6, card.subBright ? YELLOW : DIM))
+  }
 }
 
 const drawCards = (ctx, g, menu, cards) => {

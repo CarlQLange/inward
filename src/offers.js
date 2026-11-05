@@ -91,7 +91,7 @@ const tasteOptions = (g, count) => {
     return true
   }).slice(0, count).map(({ kind, tag }) => ({
     type: 'taste', kind, tag,
-    card: { icon: kind, tint: TASTES[tag].colours[0], name: `EATS ${TASTES[tag].name}`, text: `${formOf(p, kind).name}, TOO` },
+    card: { icon: kind, tint: TASTES[tag].colours[0], name: TASTES[tag].name, text: `ALSO RECHARGES ${formOf(p, kind).name}` },
   }))
 }
 
@@ -103,7 +103,7 @@ const reformOptions = (g, count) => {
   }))
   return drawWeighted(all, () => 1, count).map(option => ({
     ...option,
-    card: { icon: option.skill, tint: option.node.tint, name: option.node.name, text: option.node.text, sub: `NOT ${option.drop.name}`, subBright: true },
+    card: { icon: option.skill, tint: option.node.tint, name: option.node.name, text: option.node.text, sub: `REPLACES ${option.drop.name}`, subBright: true },
   }))
 }
 
