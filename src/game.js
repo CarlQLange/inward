@@ -2,9 +2,9 @@ import { BLOCK, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, createWorld, encodeWorld, energize, explode, ignite, matAt, puff, restoreWorld, setCell, stepWorld, vineAt } from './world.js'
 import { STARTERS, TITLE_ROOM } from './room.js'
-import { THEMES, generateRoom } from './generate.js'
-import { CORE_RING, OPPOSITE, buildMap, keyOf, ringOf } from './map.js'
-import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid } from './physics.js'
+import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
+import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
+import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, move, moveAxis, overlap, pushOutOfSolid, unbury } from './physics.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, onDeath } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
@@ -15,6 +15,10 @@ import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
 import { dropCard, openMenu, openMap, openPause, openSkills, openSummary, openSwap, openTitle, slotsFull, stepMenus } from './menus.js'
 import { clearRun, knownNotes, loadRun, persist, recordRun, save, saveRun } from './store.js'
+import { isKnown, knownFrom, knownOf, meet, pickSecrets, plantsFor, rollOmen, showReveal } from './discover.js'
+import { OMENS, applyOmen, omenFoes, omenTheme } from './omens.js'
+import { buildArena, openArena, stepArena } from './wardens.js'
+import { exitsFrom } from './reach.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -35,10 +39,9 @@ const createPlayer = ({ x, row }) => ({
 
 const nextRelic = g => g.relicPool.shift() ?? null
 
-const createCard = g => ({ kind, x, row }) => {
+const createCard = g => ({ kind, x, row, relic }) => {
   const resolved = kind === 'skill' ? g.cardPool.shift() ?? 'bolt' : kind
-  const [w, h] = CARD_SIZES[resolved] ?? [12, 12]
-  return { kind: resolved, x, y: row * BLOCK - h - 1, w, h, relic: kind === 'chest' || kind === 'altar' ? nextRelic(g) : undefined }
+  return { kind: resolved, x, y: row * BLOCK - 13, w: 12, h: 12, relic: kind === 'chest' || kind === 'altar' ? relic ?? nextRelic(g) : undefined }
 }
 
 const createWare = g => ({ kind, x, row }) => ({
@@ -86,22 +89,84 @@ const resolveLinks = (g, links, depth) =>
 
 const EVENTS = ['arena', 'flood', 'gasworks', 'collapse', 'vault', 'nest', 'altar', 'chest', 'chest']
 
-const rollEvent = ring => (ring < CORE_RING && Math.random() < R.eventChance ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null)
-
-const themeFor = (g, x, y, ring) => {
-  if (ring === CORE_RING) return CORE_RING
-  const wobble = Math.floor(((Math.sin(x * 12.9898 + y * 78.233 + g.seed) * 43758.5453) % 1 + 1) * 3) % 3
-  return Math.min(CORE_RING - 1, Math.max(0, ring + (wobble === 2 ? 1 : wobble === 1 ? 0 : -1)))
+const rollEvent = g => {
+  if (Math.random() > R.eventChance) return null
+  const open = EVENTS.filter(id => isKnown(g, 'event', id))
+  return open[Math.floor(Math.random() * open.length)] ?? null
 }
 
-const rollSpecial = ring => ({
-  core: ring === CORE_RING,
-  event: rollEvent(ring),
-  card: ring < CORE_RING && Math.random() < R.cardChance,
-  hermit: ring < CORE_RING && Math.random() < R.hermitChance,
-  miner: ring < CORE_RING && Math.random() < R.minerChance,
-  mole: ring < CORE_RING && Math.random() < R.moleChance,
+const BAND_OF_RING = [0, 0, 1, 1, 2, 2, 3]
+
+const regionFor = (g, ring) => (ring === CORE_RING ? CORE_RING : g.bands[BAND_OF_RING[ring]])
+
+const chooseBands = starter => {
+  const first = starter.theme ?? 0
+  const others = shuffled([0, 1, 2, 3, 4, 5, 6].filter(t => t !== first))
+  return [first, ...others.slice(0, 3)]
+}
+
+const chooseBandFoes = (bands, known, secrets) => bands.map(theme => {
+  const local = THEMES[theme].foes.filter(kind => known.has(`foe:${kind}`))
+  const fresh = local.filter(kind => secrets.includes(`foe:${kind}`))
+  const rest = shuffled(local.filter(kind => !fresh.includes(kind)))
+  return [...fresh, ...rest].slice(0, 5)
 })
+
+const MIN_RING = {
+  spore: 1, gasbag: 1, bomber: 1, imp: 1, emberbat: 1, slime: 1, crab: 1, pillbug: 1, snapweed: 1, dripper: 1, gnat: 1, mimic: 1,
+  stilt: 2, urchin: 2, coil: 2, scrapper: 2, jelly: 2, puffer: 2, shade: 3, lantern: 3, worm: 3,
+}
+
+const fitsRing = ring => kind => (MIN_RING[kind] ?? 0) <= ring
+
+const regionTheme = (g, ring, index) => {
+  const band = BAND_OF_RING[ring]
+  const roster = (g.bandFoes[band] ?? []).filter(fitsRing(ring))
+  return omenTheme(g.omen, {
+    ...THEMES[index],
+    roster: roster.length ? roster : ['crawler'],
+    swimmers: WATER_FOES.filter(kind => isKnown(g, 'foe', kind)).filter(fitsRing(ring)),
+    worm: isKnown(g, 'foe', 'worm') && fitsRing(ring)('worm'),
+    mimics: isKnown(g, 'foe', 'mimic') && fitsRing(ring)('mimic'),
+    lamps: R.lampChance,
+  })
+}
+
+const INHABITANTS = [
+  ['hermit', () => R.hermitChance],
+  ['miner', () => R.minerChance],
+  ['mole', () => R.moleChance],
+  ['cartographer', () => R.cartographerChance],
+  ['tinker', () => R.tinkerChance],
+  ['bloodletter', () => R.bloodletterChance],
+]
+
+const rollInhabitant = g => INHABITANTS.find(([id, chance]) => isKnown(g, 'inhabitant', id) && Math.random() < chance())?.[0] ?? null
+
+const rollSpecial = g => ({
+  event: rollEvent(g),
+  card: Math.random() < R.cardChance,
+  inhabitant: rollInhabitant(g),
+})
+
+const PLANTERS = {
+  skill: (special, id) => { special.plantCard = id },
+  relic: (special, id) => { special.plantChest = id },
+  foe: (special, id) => { special.force = id },
+  event: (special, id) => { special.event = id },
+  inhabitant: (special, id) => { special.inhabitant = id },
+}
+
+const plantDue = (g, ring) => g.plants.find(plant =>
+  !plant.done && PLANTERS[plant.kind] && (plant.order === 0 ? g.roomsSeen >= R.plantAfterRooms : ring >= R.plantAtRing))
+
+const withPlant = (g, ring, special) => {
+  const plant = plantDue(g, ring)
+  if (!plant) return special
+  PLANTERS[plant.kind](special, plant.id)
+  plant.done = true
+  return special
+}
 
 const ELITES = ['burning', 'charged', 'armoured']
 
@@ -118,43 +183,68 @@ const makeElite = ring => e => {
   }
 }
 
+const arenaFor = (g, key, ring) => {
+  if (ring === CORE_RING) return 'core'
+  return g.wardenAt[key] === undefined ? null : g.wardens[g.wardenAt[key]].id
+}
+
+const dressEnemy = (g, ring) => e => {
+  if (e.warden) {
+    const hp = Math.ceil(e.hp * (ring === CORE_RING ? 1 : 1 + ring * R.wardenHpPerRing))
+    return { ...e, hp, maxHp: hp, asleep: true, pace: TUNING.enemies.warden.pace[ring] ?? 1 }
+  }
+  const omen = omenFoes(g.omen)
+  return {
+    ...e,
+    magnetic: e.magnetic || (Boolean(omen.magnetic) && !e.friendly),
+    cooldown: e.cooldown + R.entryGrace,
+    hp: e.friendly ? e.hp : Math.max(1, Math.ceil(e.hp * (1 + ring * R.hpPerRing) * (omen.hp ?? 1))),
+  }
+}
+
+const ghostPickup = (g, key, spot) => {
+  if (g.ghost?.key !== key) return []
+  return [{ kind: 'skull', coins: g.ghost.coins, x: spot.x, y: spot.y, w: 7, h: 7, vx: 0, vy: 0 }]
+}
+
 const buildRoom = (g, x, y) => {
   const key = keyOf(x, y)
   const ring = ringOf(x, y)
   const links = g.map.links[key] ?? {}
   const start = key === keyOf(...g.map.start) && !g.quick
   const depth = ring / CORE_RING
-  const themeIndex = themeFor(g, x, y, ring)
-  const special = rollSpecial(ring)
-  const definition = start
-    ? g.starter
-    : generateRoom({
-      seed: g.seed + x * 7919 + y * 104723,
-      depth,
-      links: resolveLinks(g, links, depth),
-      lean: lean(g),
-      special,
-      theme: THEMES[themeIndex],
-      themeIndex,
-    })
+  const themeIndex = regionFor(g, ring)
+  const arenaId = arenaFor(g, key, ring)
+  const special = start || arenaId ? {} : withPlant(g, ring, rollSpecial(g))
+  const definition = arenaId
+    ? buildArena(arenaId, links)
+    : start
+      ? g.starter
+      : generateRoom({
+        seed: g.seed + x * 7919 + y * 104723,
+        depth,
+        links: resolveLinks(g, links, depth),
+        lean: lean(g),
+        special,
+        theme: regionTheme(g, ring, themeIndex),
+        themeIndex,
+      })
   const world = createWorld(definition.map, ring === CORE_RING)
   world.drains = definition.drains ?? []
   return {
     x, y, ring, links,
-    theme: start ? g.starter.theme ?? 0 : themeIndex,
-    event: start ? null : special.event,
+    theme: themeIndex,
+    event: special.event ?? null,
     safetyNet: start && g.starter.safetyNet,
     layout: definition.layout,
+    passed: definition.passed ?? true,
     doors: definition.doors,
     world,
-    enemies: definition.enemies.map(createEnemy).map(makeElite(ring)).map(e => ({
-      ...e,
-      cooldown: e.cooldown + R.entryGrace,
-      hp: e.friendly ? e.hp : Math.ceil(e.hp * (1 + ring * R.hpPerRing)),
-    })),
+    arena: definition.arena,
+    enemies: definition.enemies.map(createEnemy).map(makeElite(ring)).map(dressEnemy(g, ring)),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare(g)),
-    pickups: [],
+    pickups: ghostPickup(g, key, definition.spare ?? { x: g.starter.spawn.x + 16, y: (g.starter.spawn.row - 1) * BLOCK }),
     visited: false,
   }
 }
@@ -179,18 +269,41 @@ const leaveRoom = g => {
   Object.assign(g.rooms[keyOf(g.x, g.y)], { enemies: g.enemies, cards: g.cards, wares: g.wares, pickups: g.pickups })
 }
 
-const EVENT_TEXT = {
-  arena: 'SOMETHING HERE WANTS YOU TO STAY.',
-  flood: 'THE WATER IS RISING.',
-  gasworks: 'THE AIR SMELLS WRONG.',
-  collapse: 'THE ROOF WILL NOT HOLD.',
-  nest: 'SOMETHING IS BREEDING HERE.',
-  vault: 'A HOLLOW SOUND BEHIND THE ROCK.',
-  altar: 'AN ALTAR. IT WANTS HEARTS.',
+const placeWarden = (g, x, y) => {
+  const ring = ringOf(x, y)
+  const slot = R.wardenRings.indexOf(ring)
+  if (slot < 0 || g.wardens[ring] || ring < (g.quickRing ?? 0)) return
+  const rooms = loopRooms(g.map, [x, y], ring).filter(r => r.steps > 0)
+  const [near, far] = R.wardenWalk
+  const close = rooms.filter(r => r.steps >= near && r.steps <= far)
+  const pool = close.length ? close : rooms.sort((a, b) => b.steps - a.steps).slice(0, 1)
+  if (pool.length === 0) return
+  const { cell: spot } = pool[Math.floor(Math.random() * pool.length)]
+  g.wardens[ring] = { id: g.wardenOrder[slot], x: spot[0], y: spot[1], dead: false }
+  g.wardenAt[keyOf(...spot)] = ring
+}
+
+const openCoreSeals = (g, room) => {
+  if (room.sealsOpen || g.seals < R.wardenRings.length) return
+  for (const [dir, link] of Object.entries(room.links)) {
+    if (link.lock !== 'seal' || !room.doors[dir]) continue
+    room.sealsOpen = true
+    for (const [x, y] of LOCK_CELLS[dir](room.doors[dir])) setCell(room.world, x, y, M.EMPTY)
+  }
+}
+
+const meetInhabitants = (g, room) => {
+  for (const e of room.enemies) {
+    if (e.warden) meet(g, 'warden', e.kind)
+    else if (e.friendly) meet(g, 'inhabitant', e.kind)
+    else meet(g, 'foe', e.kind)
+  }
+  if (room.event) meet(g, 'event', room.event)
 }
 
 const enterRoom = (g, x, y) => {
   const key = keyOf(x, y)
+  placeWarden(g, x, y)
   g.rooms[key] ??= buildRoom(g, x, y)
   if (g.player) g.player.iframes = Math.max(g.player.iframes, TUNING.feel.entryShield)
   const room = g.rooms[key]
@@ -199,6 +312,7 @@ const enterRoom = (g, x, y) => {
   room.world.notes = knownNotes
   room.world.mat.forEach(m => knownNotes.add(`seen:${m}`))
   room.enemies.forEach(e => knownNotes.add(`met:${e.kind}`))
+  openCoreSeals(g, room)
   if (firstVisit) g.roomsSeen += 1
   Object.assign(g, {
     x, y,
@@ -212,14 +326,17 @@ const enterRoom = (g, x, y) => {
     shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [], rings: [], lights: [], ripples: [],
     timeStop: 0,
     wasHolding: false,
+    boss: null,
+    roomHp: g.player?.hp ?? P.hp,
   })
-  if (firstVisit && room.theme !== g.lastTheme && !(room.ring > g.deepestRing)) showToast(g, THEMES[room.theme].name, EVENT_TEXT[room.event] ?? '')
-  else if (firstVisit && room.event && EVENT_TEXT[room.event]) showToast(g, '', EVENT_TEXT[room.event])
-  if (firstVisit) g.lastTheme = room.theme
+  if (firstVisit) {
+    if (room.theme !== g.lastTheme) showToast(g, THEMES[room.theme].name, '')
+    g.lastTheme = room.theme
+    if (g.phase === 'playing') meetInhabitants(g, room)
+  }
   if (room.ring > g.deepestRing) {
     g.deepestRing = room.ring
     g.score += room.ring * R.ringBonus
-    if (room.ring < CORE_RING) showToast(g, `RING ${room.ring + 1} OF ${CORE_RING}`, 'THE WORLD IS LESS PATIENT HERE.')
   }
 }
 
@@ -241,6 +358,9 @@ const walkThrough = (g, dir) => {
     p.x = (door.col + 1) * BLOCK - p.w / 2
     p.y = dir === 'down' ? 1 : WORLD_PX - p.h - 1
     p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
+    p.grounded = false
+    p.sinceGround = 1
+    p.jumpHeld = false
   }
   storeRun(g)
 }
@@ -248,11 +368,13 @@ const walkThrough = (g, dir) => {
 const RUN_FIELDS = [
   'seed', 'map', 'x', 'y', 'awake', 'roomsSeen', 'deepestRing', 'cardPool', 'score', 'chainPeak',
   'xp', 'level', 'nextLevel', 'gold', 'kills', 'environmentKills', 'pendingOffers', 'relicPool', 'lastTheme', 'quick', 'quickRing',
+  'bands', 'bandFoes', 'omen', 'ambient', 'flocking', 'secrets', 'plants', 'foundThisRun', 'wardens', 'wardenAt', 'wardenOrder', 'seals', 'charted', 'ghost', 'cleanClears', 'mercyBombs',
 ]
 
 const packRoom = room => ({
   x: room.x, y: room.y, ring: room.ring, doors: room.doors, visited: room.visited,
   theme: room.theme, event: room.event, sealed: room.sealed, cleared: room.cleared, safetyNet: room.safetyNet, healed: room.healed, layout: room.layout,
+  arena: room.arena, hadFoes: room.hadFoes, hurtHere: room.hurtHere, sealsOpen: room.sealsOpen,
   enemies: room.enemies, cards: room.cards, wares: room.wares, pickups: room.pickups,
   drains: room.world.drains, world: encodeWorld(room.world),
 })
@@ -284,7 +406,7 @@ const ringCells = (map, ring) =>
 
 const applyQuickstart = (g, ring) => {
   const p = g.player
-  const kinds = shuffled(ALL_SKILLS).slice(0, Math.min(P.skillSlots, 1 + ring))
+  const kinds = shuffled(knownOf(g, 'skill')).slice(0, Math.min(P.skillSlots, 1 + ring))
   p.skills = kinds.map(kind => ({ kind, ready: 0 }))
   for (let n = 0; n < ring * 2; n++) {
     const [pick] = shuffled(availableUpgrades(p))
@@ -314,11 +436,25 @@ const placeAtDoor = g => {
   p.iframes = TUNING.feel.entryShield * 2
 }
 
-const createRun = (depthOverride, quickRing = null) => {
+const chooseWardens = (known, secrets) => {
+  const fresh = secrets.filter(key => key.startsWith('warden:')).map(key => key.split(':')[1])
+  const owned = [...known].filter(key => key.startsWith('warden:')).map(key => key.split(':')[1]).filter(id => !fresh.includes(id))
+  return [...fresh, ...shuffled(owned)].slice(0, R.wardenRings.length)
+}
+
+const createRun = (depthOverride, quickRing = null, discovering = false) => {
   const seed = Math.floor(Math.random() * 1e9)
   const map = buildMap(seed)
   const starter = STARTERS[Math.floor(Math.random() * STARTERS.length)]
   const firstCard = starter.cards[0].kind
+  const fresh = discovering && quickRing === null
+  const secrets = fresh ? pickSecrets() : []
+  const known = knownFrom(secrets)
+  const omen = fresh ? rollOmen(secrets) : null
+  applyOmen(omen)
+  const ghost = fresh ? save.ghost : null
+  if (fresh) save.ghost = null
+  const bands = chooseBands(starter)
   const g = {
     map,
     starter,
@@ -335,15 +471,35 @@ const createRun = (depthOverride, quickRing = null) => {
     awake: false,
     shownDepth: depthOverride ?? 0,
     seed,
-    cardPool: shuffled(ALL_SKILLS.filter(s => s !== firstCard)),
-    relicPool: shuffled(RELICS.map(r => r.id)),
+    known,
+    secrets,
+    plants: plantsFor(secrets).map(plant => ({ ...plant, done: !PLANTERS[plant.kind] })),
+    foundThisRun: [],
+    reveal: null,
+    revealQueue: [],
+    omen,
+    ambient: OMENS[omen]?.ambient ?? 1,
+    flocking: omenFoes(omen).flock === true,
+    bands,
+    bandFoes: chooseBandFoes(bands, known, secrets),
+    wardenOrder: chooseWardens(known, secrets),
+    wardens: {},
+    wardenAt: {},
+    seals: quickRing === null ? 0 : R.wardenRings.filter(ring => ring < quickRing).length,
+    boss: null,
+    ending: null,
+    charted: false,
+    ghost,
+    cleanClears: 0,
+    cardPool: shuffled(knownOf({ known }, 'skill').filter(s => s !== firstCard)),
+    relicPool: shuffled(RELICS.map(r => r.id).filter(id => known.has(`relic:${id}`))),
     effects: [],
     spawns: [],
     timeStop: 0,
     matterHeld: false,
     evolving: null,
     past: [],
-    lastTheme: 0,
+    lastTheme: bands[0],
     time: 0,
     phase: 'playing',
     phaseTime: 0,
@@ -388,12 +544,14 @@ const createRun = (depthOverride, quickRing = null) => {
   } else {
     enterRoom(g, ...map.start)
     g.toast = { title: starter.name, text: '', prompts: [['move', 'MOVE'], ['jump', 'JUMP'], ['shoot', 'SHOOT'], ['look', 'LOOK']], life: 8 }
+    if (omen && !meet(g, 'omen', omen)) showReveal(g, 'omen', omen)
   }
+  if (fresh) persist()
   return g
 }
 
 export const createGame = (depthOverride = null, phase = 'playing', quickRing = null) => {
-  const g = createRun(depthOverride, quickRing)
+  const g = createRun(depthOverride, quickRing, phase === 'playing')
   if (phase === 'title') {
     Object.assign(g, {
       phase: 'title', titleTime: 0, toast: null, shownDepth: 0.25,
@@ -411,7 +569,7 @@ const availableUpgrades = p =>
 const unownedSkills = g => {
   const carried = new Set(g.player.skills.map(s => s.kind))
   const lying = new Set(g.cards.map(c => c.kind))
-  return ALL_SKILLS.filter(s => !carried.has(s) && !lying.has(s))
+  return knownOf(g, 'skill').filter(s => !carried.has(s) && !lying.has(s))
 }
 
 const evolve = (g, skill, node) => {
@@ -448,6 +606,7 @@ const learn = (g, kind) => {
 }
 
 const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
+  meet(g, 'skill', kind)
   if (!slotsFull(g.player)) {
     learn(g, kind)
     onTake(g)
@@ -520,9 +679,10 @@ const addPopup = (g, x, y, text, colour = 'white') => g.popups.push({ x, y, text
 const gainRelic = (g, id) => {
   if (!id) {
     g.score += 250
-    showToast(g, 'AN EMPTY CHEST', 'YOU HAVE FOUND EVERYTHING THERE IS.')
+    g.gold += 8
     return
   }
+  meet(g, 'relic', id)
   const p = g.player
   const found = RELIC_BY_ID[id]
   p.relics.add(id)
@@ -553,19 +713,76 @@ const gainXp = (g, amount) => {
 
 const dropLoot = (g, e, base) => {
   const c = centre(e)
-  for (let i = 0; i < base; i++) {
+  const count = base * R.lootScale
+  for (let i = 0; i < count; i++) {
     g.pickups.push({
       kind: 'coin', x: c.x - 2, y: c.y - 2, w: 5, h: 5,
       vx: (Math.random() - 0.5) * 80, vy: -60 - Math.random() * 60,
     })
   }
   if (Math.random() < 0.12) g.pickups.push({ kind: 'heart', x: c.x - 3, y: c.y - 3, w: 7, h: 6, vx: 0, vy: -90 })
-  if (Math.random() < R.bombDropChance) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
+  if (Math.random() < (g.player.bombs === 0 ? R.bombMercy : R.bombDropChance)) g.pickups.push({ kind: 'bomb', x: c.x - 3, y: c.y - 3, w: 7, h: 7, vx: 0, vy: -90 })
 }
 
+const offerRelics = g => {
+  const picks = [nextRelic(g), nextRelic(g)].filter(Boolean)
+  if (picks.length === 0) return
+  openMenu(g, {
+    page: 'offer',
+    layout: 'cards',
+    back: false,
+    title: '',
+    items: picks.map(id => ({
+      card: { icon: RELIC_BY_ID[id].icon, name: RELIC_BY_ID[id].name, text: RELIC_BY_ID[id].text, sub: '' },
+      run: gm => {
+        gm.menus.pop()
+        gm.relicPool.push(...picks.filter(other => other !== id))
+        gainRelic(gm, id)
+        gm.player.wasJump = true
+      },
+    })),
+  })
+}
+
+const onWardenKilled = (g, e) => {
+  const room = g.rooms[keyOf(g.x, g.y)]
+  const p = g.player
+  openArena(g, room)
+  room.sealed = false
+  room.cleared = true
+  g.score += ENEMY_DEFS[e.kind].value
+  g.kills += 1
+  if (e.lastSource !== 'player') g.environmentKills += 1
+  g.pulse = 1
+  g.shake = Math.max(g.shake, 14)
+  burst(g, centre(e).x, centre(e).y, 'white', 60)
+  if (e.kind === 'core') {
+    g.ending = { life: R.endingTime }
+    p.iframes = R.endingTime + 1
+    return
+  }
+  const ring = g.wardenAt[keyOf(g.x, g.y)]
+  if (g.wardens[ring]) g.wardens[ring].dead = true
+  g.seals += 1
+  p.hp = P.hp
+  g.score += R.wardenBonus * g.seals
+  gainXp(g, g.nextLevel - g.xp)
+  showReveal(g, 'seal', e.kind)
+  offerRelics(g)
+}
+
+const killXp = (g, environmental) =>
+  (environmental ? R.environmentXp : 1) * (1 + Math.min(R.chainXpCap, g.chain - 1) * R.chainXpStep)
+
 const onKill = (g, e) => {
+  if (e.partOf || e.silent) return
   onDeath(g, e)
+  if (e.prop) return
   knownNotes.add(`killed:${e.kind}`)
+  if (e.warden) {
+    onWardenKilled(g, e)
+    return
+  }
   const c = centre(e)
   killFx(g, e)
   g.hitstop = Math.max(g.hitstop, TUNING.feel.killStop)
@@ -579,15 +796,17 @@ const onKill = (g, e) => {
   const environmental = e.lastSource !== 'player'
   if (hasRelic(p, 'battery') && environmental) p.skills.forEach(s => { s.ready = 0 })
   if (hasRelic(p, 'sack')) spillMatter(g, e, 3)
-  g.chain = g.chainTime > 0 ? g.chain + 1 : 1
+  const gained = environmental ? R.worldChain : 1
+  const before = g.chainTime > 0 ? g.chain : 0
+  g.chain = before + gained
   g.chainTime = hasRelic(p, 'chain') ? Infinity : R.chainWindow
-  if (hasRelic(p, 'skull') && g.chain % R.skullChain === 0) p.hp = Math.min(P.hp, p.hp + 1)
+  if (hasRelic(p, 'skull') && Math.floor(g.chain / R.skullChain) > Math.floor(before / R.skullChain)) p.hp = Math.min(P.hp, p.hp + 1)
   g.chainPeak = Math.max(g.chainPeak, g.chain)
-  const points = def.value * g.chain * (environmental ? 2 : 1)
+  const points = def.value * g.chain * (environmental ? R.worldScore : 1)
   g.score += points
   g.kills += 1
   if (environmental) g.environmentKills += 1
-  const earned = hasRelic(p, 'gem') ? (environmental ? R.worldXpSworn : 0) : (environmental ? R.environmentXp : 1)
+  const earned = hasRelic(p, 'gem') ? (environmental ? killXp(g, true) * 2 : 0) : killXp(g, environmental)
   gainXp(g, earned)
   xpMotes(g, c, earned)
   addPopup(g, c.x, c.y - 6, g.chain > 1 ? `${points} X${g.chain}` : String(points), environmental ? 'charge' : 'white')
@@ -661,7 +880,7 @@ const assisted = (g, p, aim) => {
   let best = null
   let bestAngle = p.assist
   for (const e of g.enemies) {
-    if (e.friendly || e.ally) continue
+    if (e.friendly || e.ally || e.intangible || e.plated || e.stowed || e.asleep) continue
     const c = centre(e)
     const dx = c.x - from.x
     const dy = c.y - from.y
@@ -733,6 +952,7 @@ const finishRun = (g, phase) => {
   clearRun()
   g.phase = phase
   g.phaseTime = 0
+  if (phase === 'dead' && !g.quick && g.gold > 0) save.ghost = { key: keyOf(g.x, g.y), coins: Math.ceil(g.gold * R.ghostShare) }
   g.newBest = !g.quick && recordRun({
     score: g.score,
     chainPeak: g.chainPeak,
@@ -747,11 +967,6 @@ const collectCards = (g, p) => {
   for (const c of g.cards) if (c.declined && !overlap(p, c)) c.declined = false
   const touched = g.cards.find(c => overlap(p, c) && !c.declined)
   if (!touched) return
-  if (touched.kind === 'core') {
-    g.score += R.coreBonus + p.hp * 100
-    finishRun(g, 'cleared')
-    return
-  }
   if (touched.kind === 'chest') {
     g.cards = g.cards.filter(c => c !== touched)
     gainRelic(g, touched.relic)
@@ -796,9 +1011,61 @@ const openAltar = (g, altar) => {
   })
 }
 
+const openTinker = (g, p) => openMenu(g, {
+  page: 'offer',
+  layout: 'cards',
+  back: false,
+  title: '',
+  items: [
+    ...[...p.relics].slice(0, 3).map(id => ({
+      card: { icon: RELIC_BY_ID[id].icon, name: RELIC_BY_ID[id].name, text: 'SWAP', sub: '' },
+      run: gm => {
+        gm.menus.pop()
+        const next = nextRelic(gm)
+        p.relics.delete(id)
+        gm.relicPool.push(id)
+        gainRelic(gm, next)
+      },
+    })),
+    { card: { name: 'NOT NOW', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
+  ],
+})
+
+const openBloodletter = g => openMenu(g, {
+  page: 'offer',
+  layout: 'cards',
+  back: false,
+  title: '',
+  items: [
+    {
+      card: { icon: 'heart', name: `${R.bloodPrice} HEARTS`, text: 'ONE LEVEL', sub: '' },
+      run: gm => {
+        gm.menus.pop()
+        gm.player.hp -= R.bloodPrice
+        gm.pendingOffers += 1
+        gm.pulse = 1
+      },
+    },
+    { card: { name: 'NOT NOW', text: '', sub: '' }, run: gm => { gm.menus.pop() } },
+  ],
+})
+
 const talkToInhabitants = (g, p) => {
   for (const e of g.enemies) {
-    if (!e.friendly || e.spent || !overlap(p, e)) continue
+    if (!e.friendly || e.prop || e.spent || !overlap(p, e)) continue
+    if (e.kind === 'cartographer') {
+      e.spent = true
+      g.charted = true
+      g.pulse = 1
+    }
+    if (e.kind === 'tinker' && p.relics.size > 0 && g.relicPool.length > 0) {
+      e.spent = true
+      openTinker(g, p)
+    }
+    if (e.kind === 'bloodletter' && p.hp > R.bloodPrice) {
+      e.spent = true
+      openBloodletter(g)
+    }
     if (e.kind === 'hermit' && availableUpgrades(p).length > 0) {
       e.spent = true
       openOffer(g, ['upgrade'], 'THE HERMIT TEACHES')
@@ -863,24 +1130,35 @@ const usePickups = (g, p, dt) => {
       g.gold += 1
       coinMote(g, c.x, c.y)
     } else if (c.kind === 'bomb') p.bombs += 1
-    else p.hp = Math.min(P.hp, p.hp + 1)
+    else if (c.kind === 'skull') {
+      g.gold += c.coins
+      g.ghost = null
+      burst(g, c.x, c.y, 'charge', 16)
+    } else p.hp = Math.min(P.hp, p.hp + 1)
   }
   g.pickups = g.pickups.filter(c => !c.taken)
 }
 
 const stepCore = (g, dt) => {
-  for (const card of g.cards) {
-    if (card.kind !== 'core') continue
-    const dx = g.player.x - card.x
-    const dy = g.player.y - card.y
-    const length = Math.max(1, Math.hypot(dx, dy))
-    card.x += (dx / length) * R.corePull * dt
-    card.y += (dy / length) * R.corePull * dt
-  }
   if (!g.world.overloaded || Math.random() > TUNING.world.overloadCrumble * dt) return
   const x = 1 + Math.floor(Math.random() * 26)
   const y = 1 + Math.floor(Math.random() * 26)
   if (matAt(g.world, x, y) === M.ROCK && !props(matAt(g.world, x, y + 1)).solid) setCell(g.world, x, y, M.SAND)
+}
+
+const stepEnding = (g, dt) => {
+  g.ending.life -= dt
+  g.player.iframes = 1
+  g.shake = Math.max(g.shake, 6)
+  g.pulse = Math.max(g.pulse, 0.6)
+  if (Math.random() < dt * 8) {
+    const x = 2 + Math.floor(Math.random() * 24)
+    const y = 2 + Math.floor(Math.random() * 20)
+    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'fire', 12)
+  }
+  if (g.ending.life > 0) return
+  g.score += R.coreBonus + g.player.hp * 100
+  finishRun(g, 'cleared')
 }
 
 const LOCK_HINTS = {
@@ -957,13 +1235,37 @@ const unsealRoom = (g, room) => {
   g.pulse = 1
 }
 
+const sealArena = (g, room) => {
+  room.sealed = true
+  for (const [x, y] of room.arena.seals) setCell(g.world, x, y, M.BEDROCK)
+  g.shake = Math.max(g.shake, 8)
+}
+
+const rewardClean = (g, room) => {
+  const p = g.player
+  const c = centre(p)
+  const coins = R.cleanCoins + room.ring
+  for (let i = 0; i < coins * R.lootScale; i++) {
+    g.pickups.push({ kind: 'coin', x: c.x - 2, y: c.y - 14, w: 5, h: 5, vx: (Math.random() - 0.5) * 90, vy: -70 - Math.random() * 50 })
+  }
+  g.chain = Math.max(1, g.chain + 1)
+  g.chainPeak = Math.max(g.chainPeak, g.chain)
+  g.chainTime = Math.max(g.chainTime, R.cleanChain)
+  g.cleanClears += 1
+  g.pulse = Math.max(g.pulse, 0.6)
+  burst(g, c.x, c.y, 'charge', 14)
+}
+
 const stepRoomEvents = (g, dt) => {
   const room = g.rooms[keyOf(g.x, g.y)]
-  const foesLeft = g.enemies.some(e => !e.friendly && !e.ally && !e.spawned)
+  const p = g.player
+  if (p.hp < g.roomHp) room.hurtHere = true
+  g.roomHp = p.hp
+  const foesLeft = g.enemies.some(e => !e.friendly && !e.ally && !e.spawned && !e.partOf)
   if (foesLeft) room.hadFoes = true
   if (room.hadFoes && !foesLeft && !room.healed) {
     room.healed = true
-    const p = g.player
+    if (!room.hurtHere) rewardClean(g, room)
     if (p.hp < P.hp) {
       p.hp = Math.min(P.hp, p.hp + TUNING.feel.roomClearHeal)
       const c = centre(p)
@@ -971,6 +1273,7 @@ const stepRoomEvents = (g, dt) => {
     }
     roomClearFx(g)
   }
+  if (room.arena) stepArena(g, room, dt, sealArena)
   if (room.event === 'arena' && !room.cleared) {
     const hostile = g.enemies.some(e => !e.friendly && !e.ally)
     const inside = g.player.x > 32 && g.player.x < WORLD_PX - 40 && g.player.y > 8 && g.player.y < WORLD_PX - 24
@@ -1010,12 +1313,32 @@ const stepFirstRoom = (g, dt) => {
   knownNotes.add('met:spitter')
 }
 
+const stepMercy = (g, p, dt) => {
+  const room = g.rooms[keyOf(g.x, g.y)]
+  g.mercyClock = (g.mercyClock ?? 0) - dt
+  if (g.mercyClock > 0 || p.bombs > 0 || room.sealed || keyOf(g.x, g.y) === keyOf(...g.map.start)) return
+  g.mercyClock = R.mercyEvery
+  const from = { x: cell(p.x + p.w / 2), y: cell(p.y + p.h - 1) }
+  const { open, locked } = exitsFrom(g.world, room.doors, from)
+  if (open.length > 0) {
+    room.boxedIn = 0
+    return
+  }
+  room.boxedIn = (room.boxedIn ?? 0) + 1
+  if (room.boxedIn < 2 && locked.length === 0) return
+  if (g.pickups.some(c => c.kind === 'bomb')) return
+  g.pickups.push({ kind: 'bomb', x: p.x, y: p.y - 10, w: 7, h: 7, vx: 0, vy: -60 })
+  g.mercyBombs = (g.mercyBombs ?? 0) + 1
+}
+
 const useDoors = (g, p) => {
-  const { doors } = g.rooms[keyOf(g.x, g.y)]
-  if (doors.right && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, 'right')
-  else if (doors.left && p.x <= 0.5) walkThrough(g, 'left')
-  else if (doors.down && p.y + p.h >= WORLD_PX - 0.5) walkThrough(g, 'down')
-  else if (doors.up && p.y <= 0.5) walkThrough(g, 'up')
+  const room = g.rooms[keyOf(g.x, g.y)]
+  if (room.sealed) return
+  const open = dir => room.doors[dir] && (room.links[dir]?.lock !== 'seal' || g.seals >= R.wardenRings.length)
+  if (open('right') && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, 'right')
+  else if (open('left') && p.x <= 0.5) walkThrough(g, 'left')
+  else if (open('down') && p.y + p.h >= WORLD_PX - 0.5) walkThrough(g, 'down')
+  else if (open('up') && p.y <= 0.5) walkThrough(g, 'up')
 }
 
 const stepPlayer = (g, input, dt) => {
@@ -1097,6 +1420,7 @@ const stepPlayer = (g, input, dt) => {
   p.wasJumpFeel = input.jump
   move(world, p, dt)
   pushOutOfSolid(world, p)
+  if (hitsSolid(world, p)) unbury(world, p)
   stepMotionFeel(g, p, input, dt, wasGrounded, falling, swimming)
   stepDash(g, p, dt)
   if (p.slam && p.grounded) {
@@ -1113,6 +1437,15 @@ const stepPlayer = (g, input, dt) => {
       p.iframes = Math.max(p.iframes, 0.15)
     }
   }
+  if (falling > R.stompSpeed) {
+    const under = { x: p.x, y: p.y + p.h - 2, w: p.w, h: 4 }
+    const spiny = g.enemies.find(e => e.kind === 'urchin' && overlap(under, e))
+    if (spiny) {
+      hurt(g, spiny, ENEMY_DEFS.urchin.hp * 4)
+      p.vy = -R.stompBounce
+      p.iframes = Math.max(p.iframes, 0.2)
+    }
+  }
   recordTrail(p, dt)
 
   p.shotReady -= dt
@@ -1124,6 +1457,7 @@ const stepPlayer = (g, input, dt) => {
   p.stun -= dt
 
   applyHazards(g, p, dt)
+  stepMercy(g, p, dt)
   collectCards(g, p)
   talkToInhabitants(g, p)
   buyWares(g, p)
@@ -1165,7 +1499,7 @@ const stepEnemies = (g, dt) => {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
     STEPPERS[e.kind](g, e, dt)
-    if (e.kind !== 'worm') pushOutOfSolid(g.world, e)
+    if (e.kind !== 'worm' && !e.free) pushOutOfSolid(g.world, e)
     clampToRoom(e)
     e.iframes -= dt
     e.stun -= dt
@@ -1179,7 +1513,7 @@ const stepEnemies = (g, dt) => {
     }
     stepElite(g, e, dt)
     applyHazards(g, e, dt)
-    if (e.friendly || e.stun > 0) continue
+    if (e.friendly || e.stun > 0 || e.asleep || e.intangible || e.stowed) continue
     if (e.ally) {
       const foe = g.enemies.find(o => o !== e && !o.friendly && !o.ally && overlap(e, o))
       if (foe) {
@@ -1210,10 +1544,19 @@ const stepShots = (g, dt) => {
     s.x += s.vx * dt
     s.y += s.vy * dt
     s.life -= dt
-    const victim = g.enemies.find(e => overlap(s, e) && !e.ally && !s.passed?.has(e))
+    const victim = g.enemies.find(e => overlap(s, e) && !e.ally && !e.intangible && !e.stowed && !s.passed?.has(e))
     if (victim) {
       const blocked = victim.shielded && victim.stun <= 0 && Math.sign(s.vx) === -victim.facing
-      if (blocked) {
+      if (victim.plated) {
+        const c = centre(victim)
+        const d = Math.max(1, Math.hypot(s.x - c.x, s.y - c.y))
+        const speed = Math.hypot(s.vx, s.vy)
+        s.vx = ((s.x - c.x) / d) * speed
+        s.vy = ((s.y - c.y) / d) * speed
+        s.x += s.vx * dt * 2
+        s.y += s.vy * dt * 2
+        burst(g, s.x, s.y, 'pale', 3)
+      } else if (blocked) {
         s.vx *= -1
         burst(g, s.x, s.y, 'pale', 3)
       } else {
@@ -1263,6 +1606,12 @@ const landFireball = (g, f) => {
     f.age = -1
     return
   }
+  if (f.lava) {
+    for (const dx of [0, 1, -1]) puff(g.world, x + dx, y - 1, M.LAVA, [0, 0])
+    burst(g, f.x + 2, f.y + 2, 'fire', 6)
+    f.age = -1
+    return
+  }
   if (f.comet) explode(g.world, x, y, 1)
   for (const [dx, dy] of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) {
     ignite(g.world, x + dx, y + dy)
@@ -1295,9 +1644,9 @@ const stepFireballs = (g, dt) => {
       hurt(g, g.player, 1, 'world', 'SHOT')
       f.age = -1
     } else if (f.friendly || f.age > TUNING.fireball.friendlyAfter) {
-      const victim = g.enemies.find(e => !e.friendly && overlap(f, e))
+      const victim = g.enemies.find(e => !e.friendly && !e.intangible && !e.stowed && !(f.fromWarden && (e.warden || e.partOf)) && overlap(f, e))
       if (victim) {
-        hurt(g, victim, 2, f.friendly ? 'player' : 'world')
+        hurt(g, victim, 2, f.friendly && !f.fromWorld ? 'player' : 'world')
         landFireball(g, f)
       }
     }
@@ -1311,7 +1660,7 @@ const stepFlung = (g, dt) => {
     f.age += dt
     f.vy += F.gravity * dt
     const blocked = moveAxis(g.world, f, 'x', f.vx * dt) || moveAxis(g.world, f, 'y', f.vy * dt)
-    const victim = g.enemies.find(e => overlap(f, e))
+    const victim = g.enemies.find(e => e !== f.thrower && !e.stowed && !e.intangible && !(f.thrower?.warden && e.partOf) && overlap(f, e))
     if (victim) {
       hurt(g, victim, F.damage)
       victim.stun = Math.max(victim.stun, F.stun)
@@ -1370,6 +1719,10 @@ const reset = g => {
 }
 
 export const restart = reset
+export const jumpTo = (g, x, y) => {
+  enterRoom(g, x, y)
+  placeAtDoor(g)
+}
 export const depthHere = g => depthFor(g, g.ring)
 export const newRun = reset
 export const startFromTitle = reset
@@ -1384,6 +1737,7 @@ export const continueRun = g => {
     return
   }
   const fresh = createRun(g.depthOverride)
+  applyOmen(saved.omen ?? null)
   saved.taught = new Set()
   const known = ({ kind }) => SKILLS[kind] || !ALL_SKILLS_EVER.has(kind)
   const rooms = Object.fromEntries(Object.entries(saved.rooms).map(([key, room]) => {
@@ -1392,7 +1746,7 @@ export const continueRun = g => {
   }))
   saved.cardPool = saved.cardPool.filter(kind => SKILLS[kind])
   const player = { ...saved.player, skills: saved.player.skills.filter(known).slice(0, P.skillSlots), upgrades: new Set(saved.player.upgrades), relics: new Set(saved.player.relics), wasJump: true }
-  Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter })
+  Object.assign(g, fresh, saved, { rooms, player, menus: [], flung: [], phase: 'playing', toast: null, best: save.best, starter: fresh.starter, known: knownFrom(saved.secrets ?? []) })
   enterRoom(g, saved.x, saved.y)
   g.shownDepth = g.depth
 }
@@ -1429,6 +1783,11 @@ export const step = (g, input, realDt) => {
   stepFx(g, realDt, dt)
   const { pausePressed, skillsPressed } = edges(g, input)
   if (g.door) return
+  if (g.reveal) {
+    g.reveal.life -= realDt
+    if (g.reveal.life <= 0) g.reveal = g.revealQueue.shift() ?? null
+    return
+  }
   if (g.phase === 'title') stepTitle(g, dt)
   if (g.phase === 'dead' || g.phase === 'cleared') {
     g.phaseTime += dt
@@ -1447,6 +1806,8 @@ export const step = (g, input, realDt) => {
     g.pause -= dt
     return
   }
+  if (g.phase !== 'playing') return
+  if (g.ending) stepEnding(g, dt)
   if (g.phase !== 'playing') return
   if (g.hitstop > 0) {
     g.hitstop -= dt

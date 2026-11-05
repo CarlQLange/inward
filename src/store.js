@@ -1,7 +1,12 @@
 const KEY = 'block-run-save'
 const OLD_BEST_KEY = 'block-run-best'
 
+const RUN_VERSION = 2
+
 const DEFAULTS = {
+  version: 2,
+  found: [],
+  ghost: null,
   best: 0,
   bestChain: 0,
   runs: 0,
@@ -20,6 +25,7 @@ const read = () => {
       ...DEFAULTS,
       ...saved,
       best: Math.max(saved.best ?? 0, oldBest),
+      found: Array.isArray(saved.found) ? saved.found : [],
       settings: { ...DEFAULTS.settings, ...saved.settings },
     }
   } catch {
@@ -43,7 +49,7 @@ const RUN_KEY = 'block-run-current'
 
 export const saveRun = run => {
   try {
-    localStorage.setItem(RUN_KEY, JSON.stringify(run))
+    localStorage.setItem(RUN_KEY, JSON.stringify({ ...run, version: RUN_VERSION }))
   } catch {
     return
   }
@@ -51,7 +57,8 @@ export const saveRun = run => {
 
 export const loadRun = () => {
   try {
-    return JSON.parse(localStorage.getItem(RUN_KEY))
+    const run = JSON.parse(localStorage.getItem(RUN_KEY))
+    return run?.version === RUN_VERSION ? run : null
   } catch {
     return null
   }

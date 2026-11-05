@@ -52,7 +52,31 @@ const hurtPlayer = (g, p, cause) => {
   if (p.relics.has('plate')) explode(g.world, cell(here.x), cell(here.y), 1)
 }
 
+const hurtWarden = (g, e, amount, source) => {
+  const fromWorld = source !== 'player'
+  if (e.hp <= 0 || e.asleep || e.shield > 0 || (fromWorld && e.iframes > 0)) return
+  e.hp -= (e.stun > 1 ? 2 : 1) * amount * (fromWorld ? TUNING.enemies.warden.world : 1)
+  e.sinceHit = 0
+  if (fromWorld) {
+    e.iframes = TUNING.enemyIframes
+    e.worldDamage = (e.worldDamage ?? 0) + amount * TUNING.enemies.warden.world
+  } else e.gunDamage = (e.gunDamage ?? 0) + amount
+  e.flash = TUNING.feel.enemyFlash
+  e.lastSource = source
+  const c = centre(e)
+  burst(g, c.x, c.y, 'pale', 3)
+}
+
 export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
+  if (e.partOf) {
+    const body = g.enemies.find(o => o.warden)
+    if (body) hurtWarden(g, body, amount, source)
+    return
+  }
+  if (e.warden) {
+    hurtWarden(g, e, amount, source)
+    return
+  }
   if (e.iframes > 0 || e.hp <= 0) return
   if (e === g.player) {
     hurtPlayer(g, e, cause)

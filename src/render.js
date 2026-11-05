@@ -1,6 +1,7 @@
 import { BLOCK, ORIGIN, ROOM, TUNING, VIEW } from './config.js'
 import { M, props } from './materials.js'
 import { burningAt, chargedAt, matAt } from './world.js'
+import { drawBossBar, drawReveal } from './overlay.js'
 import { SPRITES } from './sprites.js'
 import { drawText, textWidth } from './font.js'
 import { drawMenus, drawToast } from './screens.js'

@@ -27,6 +27,11 @@ options, so snapshot localStorage in sessionStorage first and restore it afterwa
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
+`node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
+rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
+lists the flags, such as `--god`, `--found rand`, `--career` and `--warden bellows --gun`. The bot
+walks badly, so read its time-per-run numbers as an upper bound and its deaths as pessimistic.
+
 Regenerate the sprite atlases with
 `uv run --with pillow --with numpy --with scipy python art/process_art.py`.
 
@@ -174,6 +179,11 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Runs save at every door and on pausing, with Continue on the title. Death clears it.
 - Lava, water that gives off gas when charged, steam that rains back down, moss that
   creeps along wet rock. Foes gain health with each ring.
+
+- Each run shuffles regions into bands (rings 0-1, 2-3, 4-5, 6), with the outer band set by the starter
+  room. Three Wardens at rings 1, 3 and 5 break seals that open the Core, a three-phase final boss. One
+  omen per run once found. Everything nameable is gated by a persistent found set, with one or two secrets
+  planted per run and a brief reveal when met. Hanging lamps give the gun a way to set things off.
 
 Not built: a design pass on archetypes, and tuning for a long run, which has never been
 played end to end by a person. The starting room is always on the top edge.

@@ -5,6 +5,8 @@ import { FORKS, SKILL_DETAILS, formOf, owns } from './skills.js'
 import { tintedIcon } from './skillart.js'
 import { SPRITES, creatureFrames } from './sprites.js'
 import { knownNotes, save } from './store.js'
+import { almanac } from './discover.js'
+import { drawWardenMarks } from './overlay.js'
 import { drawText, textWidth, wrapText } from './font.js'
 import { cardFor } from './menus.js'
 import { CORE_RING, keyOf, ringOf } from './map.js'
@@ -201,6 +203,8 @@ const MATERIAL_ORDER = [
 ]
 const TAGS = [['burn', 'BURNS'], ['conduct', 'CONDUCTS'], ['blast', 'EXPLODES'], ['melt', 'MELTS'], ['freeze', 'FREEZES'], ['fall', 'FALLS'], ['cool', 'COOLS'], ['bubble', 'SPLITS'], ['grow', 'GROWS'], ['rain', 'RAINS'], ['dissolve', 'DISSOLVES']]
 
+const knownReactions = () => [...knownNotes].filter(note => !/^(seen|met|killed):/.test(note))
+
 const noteLines = () => {
   const materials = MATERIAL_ORDER.filter(m => knownNotes.has(`seen:${m}`)).map(m => ({
     tile: m,
@@ -260,6 +264,7 @@ const drawSummary = (ctx, g, menu) => {
     [g.kills, 'KILLS'],
     [g.environmentKills, 'BY THE WORLD'],
     [`X${g.chainPeak}`, 'CHAIN'],
+    [`${almanac(knownReactions()).found}/${almanac().total}`, 'FOUND'],
   ]
   rows.forEach(([value, name], i) => {
     const y = ORIGIN.y + 76 + rise + i * 10
@@ -303,7 +308,7 @@ const drawCards = (ctx, g, menu, cards) => {
   })
 }
 
-const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW }
+const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: '#7fe0e8', scrap: '#b08a60', any: YELLOW, seal: '#ffffff' }
 const STEPS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }
 const MAP_RINGS = ['#1c3a22', '#1e3f26', '#20442a', '#22492e', '#254f32', '#285536', '#2c5c3a', '#31643f']
 
@@ -322,7 +327,7 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
       if (!room) continue
       for (const [dir, link] of Object.entries(room.links)) {
         const [dx, dy] = STEPS[dir]
-        const lock = link.lock && room.doors[dir] && lockStands(room, dir)
+        const lock = link.lock && room.doors[dir] && (link.lock === 'seal' ? g.seals < 3 : lockStands(room, dir))
         ctx.fillStyle = lock ? LOCK_COLOURS[link.lock] : GREEN
         const px = left + x * pitch + (cellSize - 1) / 2 + dx * (pitch / 2 + (cellSize - 1) / 4)
         const py = top + y * pitch + (cellSize - 1) / 2 + dy * (pitch / 2 + (cellSize - 1) / 4)
@@ -330,6 +335,7 @@ export const drawMapGrid = (ctx, g, left, top, pitch) => {
       }
     }
   }
+  drawWardenMarks(ctx, g, left, top, pitch)
 }
 
 const LOCK_CELL = {

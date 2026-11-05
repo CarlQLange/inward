@@ -2,10 +2,10 @@ import { BLOCK, ROOM } from './config.js'
 
 const at = (x, row) => ({ x: x * BLOCK, row })
 
-const blank = () => Array.from({ length: ROOM }, (_, y) =>
+export const blank = () => Array.from({ length: ROOM }, (_, y) =>
   Array.from({ length: ROOM }, (_, x) => (x === 0 || y === 0 || x === ROOM - 1 || y === ROOM - 1 ? '#' : 'R')))
 
-const paint = (grid, x0, y0, x1, y1, tile) => {
+export const paint = (grid, x0, y0, x1, y1, tile) => {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = tile
 }
 
