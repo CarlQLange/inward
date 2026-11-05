@@ -6,25 +6,26 @@ import { RELIC_BY_ID } from './relics.js'
 const R = TUNING.run
 
 const MAKES = {
-  bolt: ['charge'], ember: ['fire', 'gas'], frost: ['ice', 'stun'], hammer: ['rubble', 'falling'], seed: ['moss'], spring: ['water'], acid: ['acid'],
+  bolt: ['charge'], ember: ['fire', 'gas'], frost: ['ice', 'stun'], hammer: ['rubble', 'falling'], seed: ['moss', 'fuel'], spring: ['water', 'pouring'], acid: ['acid'],
   melt: ['lava', 'steam'], alchemy: ['variety', 'acid'], well: ['crowd'], swap: ['crowd'], stop: ['stun'], charm: ['allyKill'], decoy: ['drawn'], drone: ['coin'],
   rod: ['charge'], mine: ['blast', 'blastKill'], roar: ['stun'], mirror: ['returned'],
-  'repel.salvage': ['scrap'], 'mason.iron': ['metal'], 'mason.rubble': ['falling', 'rubble'], 'acid.rust': ['scrap'], 'acid.ferment': ['gas'], 'spring.oil': ['acid'],
-  'spring.slush': ['ice'], 'bolt.split': ['gas'], 'hammer.tremor': ['falling'], 'hammer.fuse': ['blast', 'blastKill'], 'frost.shatter': ['blast', 'blastKill'],
-  'seed.tinder': ['blast', 'blastKill'], 'melt.flash': ['blast', 'steam'], 'roar.rime': ['ice', 'stun'], 'alchemy.vapour': ['gas'], 'mine.gas': ['gas'], 'decoy.gas': ['gas'],
-  'ember.napalm': ['fire'], 'melt.forge': ['lava'],
+  'repel.salvage': ['scrap'], 'mason.iron': ['metal'], 'mason.rubble': ['falling', 'rubble'], 'acid.rust': ['scrap'], 'acid.ferment': ['gas', 'fuel'], 'spring.oil': ['acid', 'fuel'],
+  'spring.slush': ['ice'], 'bolt.split': ['gas', 'fuel'], 'hammer.tremor': ['falling'], 'hammer.fuse': ['blast', 'blastKill'], 'frost.shatter': ['blast', 'blastKill'],
+  'seed.tinder': ['blast', 'blastKill'], 'melt.flash': ['blast', 'steam'], 'roar.rime': ['ice', 'stun'], 'alchemy.vapour': ['gas', 'fuel'], 'mine.gas': ['gas', 'fuel'], 'decoy.gas': ['gas', 'fuel'],
+  'ember.napalm': ['fire'], 'melt.forge': ['lava'], 'acid.rain': ['pouring'], 'spring.font': ['pouring'],
+  flask: ['pouring'], 'flask.leech': ['water'], wick: ['fire', 'blast'], 'wick.tow': ['blastKill'],
   float: ['falling', 'stun', 'air', 'worldKill'], 'float.flip': ['falling', 'worldKill'],
   link: ['worldKill', 'stun'], 'link.cable': ['fire', 'charge'], 'link.stake': ['fire', 'charge'],
 }
 
 const REGION_FOOD = [
-  ['moss', 'fire', 'gas', 'rubble'],
-  ['water', 'charge', 'rubble', 'mud'],
-  ['fire', 'gas', 'moss', 'acid', 'mud'],
+  ['moss', 'fire', 'gas', 'rubble', 'fuel'],
+  ['water', 'charge', 'rubble', 'mud', 'pouring'],
+  ['fire', 'gas', 'moss', 'acid', 'mud', 'fuel'],
   ['metal', 'scrap', 'charge', 'falling', 'blast'],
-  ['lava', 'water', 'steam', 'metal', 'scrap', 'glass'],
+  ['lava', 'water', 'steam', 'metal', 'scrap', 'glass', 'pouring'],
   ['ice', 'falling', 'water', 'snow'],
-  ['blast', 'blastKill', 'gas', 'acid', 'glass'],
+  ['blast', 'blastKill', 'gas', 'acid', 'glass', 'fuel'],
 ]
 
 const BAND_OF_RING = [0, 0, 1, 1, 2, 2, 3]

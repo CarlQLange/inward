@@ -75,6 +75,7 @@ const worker = async () => {
   const REACH = {
     bolt: 150, repel: 56, ember: 110, frost: 48, hammer: 22, gust: 70, blink: 200, grapple: 125, dash: 60, mason: 40, seed: 60, spring: 50,
     acid: 110, melt: 56, alchemy: 48, well: 90, swap: 105, stop: 90, charm: 110, decoy: 120, drone: 150, rod: 70, mine: 50, roar: 60, mirror: 0, rewind: 0,
+    flask: 110, wick: 120,
     float: 80, link: 120,
   }
   const WHEN = {
@@ -104,12 +105,44 @@ const worker = async () => {
     return best
   }
 
+  const liquidNear = (g, me, reach) => {
+    const [cx, cy] = [cell(me.x), cell(me.y)]
+    const span = Math.ceil(reach / BLOCK)
+    for (let y = cy - span; y <= cy + span; y++) {
+      for (let x = cx - span; x <= cx + span; x++) {
+        if (Math.hypot(x - cx, y - cy) * BLOCK <= reach && props(matAt(g.world, x, y)).liquid) return { x, y }
+      }
+    }
+    return null
+  }
+
+  const HOLDING = {
+    flask: (g, s, wants, me, foe) => {
+      const p = g.player
+      const have = p.flask?.cells ?? 0
+      const F = TUNING.skills.flask
+      const drinkable = liquidNear(g, me, F.reach) || (p.upgrades.has('flask.leech') && foe && distance(middle(foe), me) < F.leechReach)
+      if (s.pouring) return wants
+      if (s.holding) return have < F.most && Boolean(drinkable)
+      return (have > 0 && wants) || (have < F.most && Boolean(drinkable))
+    },
+    wick: (g, s, wants, me, foe) => {
+      if (!s.holding) return wants
+      const fuse = g.effects.find(f => f.kind === 'wick' && f.laying)
+      if (!fuse || !foe) return false
+      const head = fuse.cells[Math.max(0, (fuse.trail ? fuse.cells.length : Math.floor(fuse.laid)) - 1)]
+      return Math.hypot((head[0] + 0.5) * BLOCK - middle(foe).x, (head[1] + 0.5) * BLOCK - middle(foe).y) > 14
+    },
+  }
+
   const cast = (g, bot, input, me, foe) => {
     g.player.skills.forEach((s, slot) => {
       const key = ['skill', 'skill2', 'skill3'][slot]
       const wants = WHEN[s.kind] ? WHEN[s.kind](g, foe, bot, me) : Boolean(foe) && distance(middle(foe), me) < REACH[s.kind] && lineClear(g.world, me, middle(foe))
       const hand = skills.handOf?.(g.player, s.kind) ?? { type: 'tap' }
-      if (hand.type === 'stream') {
+      if (hand.type === 'hold') {
+        input[key] = HOLDING[s.kind](g, s, wants, me, foe)
+      } else if (hand.type === 'stream') {
         input[key] = wants
       } else if (hand.type === 'swell') {
         const holding = (s.swell ?? 0) > 0
@@ -146,7 +179,8 @@ const worker = async () => {
     const from = { x: cell(me.x), y: cell(p.y + p.h - 1) }
     const { parent, near } = exitsFrom(g.world, room.doors, from)
     const hungry = feed?.dietOf && !bot.opts.nofood ? p.skills.filter(s => s.ready > 0.4).map(s => s.kind) : []
-    const food = hungry.length ? foodNear(g, p, me, hungry) : null
+    const dry = p.skills.some(s => s.kind === 'flask') && !(p.flask?.cells > 0) && !bot.opts.nofood
+    const food = dry ? liquidNear(g, me, 13 * BLOCK) : hungry.length ? foodNear(g, p, me, hungry) : null
     const c = food ? { x: food.x * BLOCK, y: food.y * BLOCK } : foe ? middle(foe) : me
     const goal = near({ x: cell(c.x), y: cell(c.y) }, food ? 1.5 : 3.5)
     return goal === undefined ? null : pathTo(parent, goal)

@@ -7,7 +7,7 @@ import { heartCap, slotsOf } from './keystones.js'
 import { drawMapGrid } from './screens.js'
 import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
-import { FORKS, formOf } from './skills.js'
+import { FORKS, contentsOf, formOf } from './skills.js'
 import { feedColour, pipsOf, waitingOf } from './feed.js'
 import { tintedIcon } from './skillart.js'
 import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
@@ -83,6 +83,16 @@ const drawPips = (ctx, g, skill, x, y) => {
   }
 }
 
+const drawContents = (ctx, g, skill, x, y, w, h) => {
+  const held = contentsOf(g.player, skill)
+  if (!held) return
+  const level = Math.max(1, Math.round(h * held.amount))
+  ctx.fillStyle = held.colour
+  ctx.fillRect(x, y + h - level, w, level)
+  ctx.fillStyle = WHITE
+  ctx.fillRect(x, y + h - level, w, 1)
+}
+
 const drawSkillSlot = (ctx, g, slot) => {
   const top = ORIGIN.y + slot * slotGap(g.player)
   const skill = g.player.skills[slot]
@@ -115,6 +125,7 @@ const drawSkillSlot = (ctx, g, slot) => {
     ctx.fillRect(SLOT_X + 1, top + SLOT - 2 - Math.round((SLOT - 3) * skill.swell), 2, Math.round((SLOT - 3) * skill.swell))
   }
   drawPips(ctx, g, skill, SLOT_X + 2, top + 2)
+  drawContents(ctx, g, skill, SLOT_X + SLOT - 4, top + 2, 2, SLOT - 4)
   if (flash > 0) {
     ctx.fillStyle = `rgba(255, 255, 255, ${flash * 5})`
     ctx.fillRect(SLOT_X, top, SLOT, SLOT)
@@ -307,6 +318,7 @@ const drawSkillButton = (ctx, g, b, held) => {
   }
   const pips = pipsOf(g.player, skill)
   if (pips) drawPips(ctx, g, skill, Math.round(b.x) - pips.most * 2, Math.round(b.y) - b.r + 2)
+  drawContents(ctx, g, skill, Math.round(b.x) + 9, Math.round(b.y) - 8, 2, 16)
 }
 
 const drawActionButton = (ctx, g, b, held) => {
