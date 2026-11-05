@@ -90,7 +90,7 @@ const worldLights = (g, time) => {
 const omenOf = g => String(g.omen?.id ?? g.omen ?? '').toLowerCase()
 
 export const ambientOf = g => {
-  if (g.ambient !== undefined) return g.ambient
+  if (g.ambient !== undefined && g.ambient < 1) return g.ambient
   return omenOf(g) === 'blackout' ? 0.12 : null
 }
 
