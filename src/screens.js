@@ -412,7 +412,7 @@ export const drawMenus = (ctx, g) => {
   if (!menu) return
   menu.hits = []
   PAGES[menu.page](ctx, g, menu)
-  if (menu.page !== 'title' && menu.page !== 'almanac') drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
+  if (!['title', 'almanac', 'controls', 'records'].includes(menu.page)) drawPromptRow(ctx, ['confirm', ...(menu.back || menu.cancel ? ['back'] : [])], ORIGIN.x + ROOM_PX / 2, ORIGIN.y + ROOM_PX - 16, 5)
 }
 
 const drawToastPrompts = (ctx, prompts, y) => {

@@ -1,14 +1,13 @@
-# Core (working name)
+# Inward (the folder is still called core)
 
 A side-view roguelike Metroidvania, inspired by Game Boy era visuals, with
 emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-A full run works on a 15×15 map of rings around the core. Carl has played an earlier
-version and called it really cool, and asked for an easier start and more menus. The
-ring map, locks, bombs, saves and newest materials haven't been played by a person. The folder name is a placeholder: rename
-it before the first release.
+A full run works on a 15×15 map of rings around the core. The name on the title screen,
+Inward, is an agent's suggestion that Carl hasn't confirmed. Rename the folder before the
+first release if it stays.
 
 ## Running and testing
 
@@ -58,6 +57,16 @@ was turn-based and resolved cascades instantly. This one plays in real time, so
 effects must spread across blocks visibly and be readable without text.
 
 ## Design decisions Carl has made
+
+**What the game is now** (his brief for finishing it)
+
+- Every run should feel similar but completely different, and each should bring one or two
+  discoveries, never more. Every inhabitant, enemies included, has a distinct silhouette.
+- Very few words on screen. A finished game, not a demo, with lots of depth from a simple core
+  loop. Removing what doesn't work is part of polishing.
+- Controller support. Full animations for most creatures rather than two or three frames.
+- Upgrades must evolve a skill into something that plays differently. He rejected "further",
+  "wider" and "the same but slightly better" outright.
 
 **The reveal**
 
@@ -141,8 +150,8 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   Whichever device was touched last drives the on-screen glyphs and the aim. Controller: A
   jump, RT or X shoot, B Y RB skills, LB bomb, LT look, Start, Select map, right stick free
   aim. Carl called the earlier keys a nightmare. None of this has been tried on a real pad.
-- Eight hearts, and each hit costs one. Hurt feedback names the cause, and the first time
-  also explains it. Holding Shift or LT shows what hurts, burns, conducts or explodes.
+- Eight hearts, and each hit costs one. The hero's red scarf is health and hits tear it. A hit shows a
+  cause pictogram. Holding Shift or LT shows what hurts, burns, conducts or explodes, without labels.
 - Foes warn before attacking. Clearing a room heals one heart.
 - 27 relics, from chests, altars, mimics and the shop. They change rules rather than numbers:
   your gun, your movement, what can hurt you, and what pays (fire immunity makes fire a toy,
@@ -152,7 +161,7 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Materials: rock, moss, peat, wood, metal, scrap, sand, ash, water, oil, ice, lava, acid,
   vine, brick, smoke, steam, methane, and volatile crystal.
 - Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
-  (electrifies water), worm (digs), guardian (stomps loose the ceiling), turret, bomber, imp
+  (electrifies water), worm (digs), turret, bomber, imp
   (freezes water), ember bat (lights things), slime (leaves acid), shield crab, nest, mimic,
   gasbag. Foes can be charmed and then fight each other.
 - Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
@@ -160,22 +169,18 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - In the core room rock burns and conducts, and the core drifts toward you.
 - Rooms generate on entry, check they can be crossed, and lean toward your skills, easing
   off with depth.
-- Title screen with the first room burning behind it, pause menu, skills page with
-  each tree, controls, options (shader strength, screen shake, forget everything),
-  records, and an end-of-run summary.
-- Field notes that persist across runs and only list what you've witnessed: materials
-  and what they did, creatures and their trait once you've killed one.
+- A title room spelled out in conducting metal, one pause screen combining map, skills and
+  relics, and an Almanac grid of everything, with unfound things shown as silhouettes.
 - With full slots, a new skill opens a replacement choice. The dropped skill stays in
   the room as a card and keeps its upgrades, so you can swap back.
 - First-room safety net: if the peat wall still stands with no fire and no spitter
   left, another spitter drops in.
-- The title says CORE, which is a placeholder like the folder name.
 
 - The map: rings are loops, one edge of each inner ring is broken so some routes dead-end,
   and gates lead inward. Outer gates are often open, inner ones nearly always locked, by
   peat, metal gate, brickwork, ice or scrap. Outer locks lean toward your skills. Each ring
   always has one gate that's open or peat with a spitter beside it.
-- Bombs (F) open any lock. You start with one, and they drop and are sold.
+- Bombs open any lock. You start with one, and they drop and are sold.
 - Runs save at every door and on pausing, with Continue on the title. Death clears it.
 - Lava, water that gives off gas when charged, steam that rains back down, moss that
   creeps along wet rock. Foes gain health with each ring.
@@ -185,8 +190,11 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   omen per run once found. Everything nameable is gated by a persistent found set, with one or two secrets
   planted per run and a brief reveal when met. Hanging lamps give the gun a way to set things off.
 
-Not built: a design pass on archetypes, and tuning for a long run, which has never been
-played end to end by a person. The starting room is always on the top edge.
+- Winning makes the room crumble and drains the colour back to four-shade green. If nothing can
+  reach an exit, a bomb drops, and if that can't help a vine and a path get carved.
+
+Not built: a design pass on archetypes. Balance has only been tested by a bot that doesn't dodge,
+and no person has played a full run. The starting room is always on the top edge.
 
 ## Ideas Carl is happy with so far
 
@@ -214,4 +222,4 @@ These came from design discussion and haven't been tested.
 
 ## Open questions
 
-- The name.
+- The name. Inward is on the title screen, unconfirmed.
