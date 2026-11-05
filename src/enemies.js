@@ -3,6 +3,7 @@ import { M, props } from './materials.js'
 import { burningAt, energize, explode, ignite, matAt, pour, puff, setCell } from './world.js'
 import { cell, cellsUnder, centre, hitsSolid, inWater, move, overlap, solidAt, WORLD_PX } from './physics.js'
 import { burst, hurt } from './combat.js'
+import { chipsAt, splash } from './fx.js'
 import { decoyFor } from './effects.js'
 import { zap } from './skills.js'
 import { anchorOf } from './cast.js'
@@ -291,7 +292,7 @@ const worm = (g, e, dt) => {
     if (m === M.VOLATILE) ignite(g.world, x, y)
     else if (DIGS.has(m)) {
       setCell(g.world, x, y, M.EMPTY)
-      burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'pale', 3)
+      chipsAt(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, m, 2)
     }
   }
 }
@@ -771,12 +772,12 @@ const discharge = (g, e, c) => {
   g.pulse = Math.max(g.pulse, 0.5)
 }
 
-const VATS = { tank: [M.WATER, 'frost'], carboy: [M.ACID, 'heal'], ladle: [M.LAVA, 'fire'] }
+const VATS = { tank: [M.WATER, '#6fd0e0'], carboy: [M.ACID, '#c8ff5a'], ladle: [M.LAVA, '#ff9a2e'] }
 
 const spill = (g, e, c) => {
   const [liquid, colour] = VATS[e.kind]
   pour(g.world, cell(c.x), cell(e.y + e.h + 1), liquid, E.vat[e.kind])
-  burst(g, c.x, e.y + e.h, colour, 8)
+  splash(g, c.x, e.y + e.h, 60, colour)
 }
 
 export const onDeath = (g, e) => {

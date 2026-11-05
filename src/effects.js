@@ -3,6 +3,7 @@ import { M, props } from './materials.js'
 import { energize, explode, ignite, matAt, puff, setCell } from './world.js'
 import { WORLD_PX, cell, centre, forEachCell, hitsSolid, moveAxis, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
+import { MATERIAL_COLOURS, drop } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, freezeWaterAround, hammerLands, hammerStrikes, heat, hostile, lay, orbitFires, owns,
   recordPast, releaseMatter, returnedShot, ring, setAblaze, shoutFront, smash, strike, zap,
@@ -242,7 +243,7 @@ const stepWisp = (g, f, dt) => {
     f.clock = 0.08
     ignite(g.world, cell(c.x), cell(c.y))
     ignite(g.world, cell(c.x), cell(c.y + 6))
-    g.particles.push({ x: c.x, y: c.y, vx: 0, vy: -30, life: 0.3, colour: 'fire' })
+    burst(g, c.x, c.y, 'fire', 1)
   }
   const foe = hostile(g).find(e => overlap(e, f))
   if (foe) {
@@ -276,7 +277,7 @@ const stepGlide = (g, f) => {
     const m = matAt(g.world, x, y)
     if (m === M.EMPTY || props(m).gas || props(m).liquid) {
       setCell(g.world, x, y, M.RIME, props(M.RIME).startLife)
-      g.particles.push({ x: (x + 0.5) * BLOCK, y: y * BLOCK, vx: -p.vx * 0.2, vy: 10, life: 0.3, colour: '#bff2ff' })
+      burst(g, (x + 0.5) * BLOCK, y * BLOCK, '#bff2ff', 1)
     }
   }
 }
@@ -529,7 +530,7 @@ const stepRod = (g, f, dt) => {
       }
     })
   }
-  burst(g, top.x, top.y, f.magnet ? 'hurt' : 'charge', 4)
+  burst(g, top.x, top.y, f.magnet ? 'magnet' : 'charge', 4)
   if (partner) zap(g, mid, f.partner)
   if (f.magnet) {
     const scrap = []
@@ -608,7 +609,7 @@ const stepMirror = (g, f) => {
     if (f.maw) {
       b.age = -1
       f.swallowed += 1
-      burst(g, centre(p).x, centre(p).y, 'hurt', 4)
+      burst(g, centre(p).x, centre(p).y, 'magnet', 4)
       continue
     }
     b.vx *= -1.2
@@ -777,7 +778,7 @@ const stepGeyser = (g, f, dt) => {
       setCell(g.world, f.cx, y, f.liquid)
       f.height += 1
     }
-    g.particles.push({ x: (f.cx + 0.5) * BLOCK, y: y * BLOCK, vx: (Math.random() - 0.5) * 60, vy: -80, life: 0.4, colour: '#f4f8f2' })
+    drop(g, (f.cx + 0.5) * BLOCK, y * BLOCK, (Math.random() - 0.5) * 60, -80, MATERIAL_COLOURS[f.liquid]?.[0] ?? '#6fd0e0')
   }
   launchColumn(g, f, f.floor - f.height)
 }
@@ -876,7 +877,7 @@ const stepContagion = (g, f, dt) => {
       setCell(g.world, x + dx, y + dy, f.to)
       f.laid += 1
       next.push([x + dx, y + dy])
-      g.particles.push({ x: (x + dx + 0.5) * BLOCK, y: (y + dy + 0.5) * BLOCK, vx: 0, vy: -20, life: 0.3, colour: '#8ae04a' })
+      burst(g, (x + dx + 0.5) * BLOCK, (y + dy + 0.5) * BLOCK, '#8ae04a', 1)
     }
   }
   f.frontier = next
@@ -976,7 +977,7 @@ const stepAblaze = (g, e, dt) => {
   }
   ignite(g.world, cell(c.x), cell(e.y + e.h + 2))
   ignite(g.world, cell(c.x), cell(c.y))
-  if (Math.random() < dt * 14) g.particles.push({ x: c.x, y: e.y, vx: (Math.random() - 0.5) * 30, vy: -40, life: 0.3, colour: 'fire' })
+  if (Math.random() < dt * 14) burst(g, c.x, e.y, 'fire', 1)
   e.ablazeClock += dt
   if (e.ablazeClock > E.torchEvery) {
     e.ablazeClock = 0
@@ -1011,7 +1012,7 @@ const stepCreatures = (g, dt) => {
     if (e.ally > 0) stepAlly(g, e, dt)
     if (e.goat > 0) e.goat -= dt
   }
-  for (const f of g.flung) if (f.charged && Math.random() < dt * 30) g.particles.push({ x: f.x + Math.random() * 8, y: f.y + Math.random() * 8, vx: 0, vy: 0, life: 0.1, colour: 'charge' })
+  for (const f of g.flung) if (f.charged && Math.random() < dt * 30) burst(g, f.x + Math.random() * 8, f.y + Math.random() * 8, 'charge', 1)
 }
 
 const stepHeldTime = g => {

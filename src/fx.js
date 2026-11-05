@@ -1,32 +1,35 @@
-import { BLOCK, HUD_ANCHORS, ORIGIN, ROOM, TUNING } from './config.js'
+import { BLOCK, HUD_ANCHORS, ORIGIN, TUNING } from './config.js'
 import { rumble as padRumble } from './pad.js'
 import { isTouchLayout } from './layout.js'
 import { M, props } from './materials.js'
 import { matAt } from './world.js'
-import { centre, liquidAtPx, solidAt } from './physics.js'
+import { centre } from './physics.js'
 import { SCARF_RED, heroFired, heroOf, stepHero } from './hero.js'
+import { rand, rnd } from './dice.js'
+import { dustPuff, keepColour, spawn, stepParticles } from './particles.js'
+import { stepMarks } from './marks.js'
+import {
+  MATERIAL_COLOURS, ashAt, blastDebris, breakAt, burstOf, dropOf, dustOf, emberAt, emitWorld, followBolts, followProjectiles,
+  hitOf, hurtMatter, hushCell, impactAt, killOf, muzzleOf, splashAt, swimBubble, watchWorld, wetAt,
+} from './matter.js'
 
-const MAX_PARTICLES = 290
-const THIN_ABOVE = 170
+export { MATERIAL_COLOURS, setPixelSource } from './matter.js'
+export { drawParticles } from './particles.js'
+export { drawMarks } from './marks.js'
+
 const MAX_RINGS = 6
 const MAX_SCORCH = 14
 const F = TUNING.feel
 
-const rand = (lo, hi) => lo + Math.random() * (hi - lo)
-const pick = list => list[Math.floor(Math.random() * list.length)]
 const red = `rgb(${SCARF_RED.join(',')})`
+keepColour(red)
 
-export const MATERIAL_COLOURS = {
-  [M.ROCK]: ['#8a9c3e', '#5e6e30'], [M.MOSS]: ['#a8c84a', '#6f8f30'], [M.PEAT]: ['#7a5a2a', '#54401e'],
-  [M.WOOD]: ['#9d7a3e', '#c49a54'], [M.METAL]: ['#a4a9ac', '#d8dcde'], [M.SCRAP]: ['#b6a080', '#7f7058'],
-  [M.SAND]: ['#e2d28c', '#b8a868'], [M.BEDROCK]: ['#4a5a50', '#343f38'], [M.ICE]: ['#bff2ff', '#ffffff'],
-  [M.BRICK]: ['#7a8a50', '#566238'], [M.VOLATILE]: ['#f07ae0', '#ffc0f4'], [M.GATE]: ['#b6bbbd', '#e0e4e6'],
-  [M.WATER]: ['#6fd0e0', '#bff2ff'], [M.OIL]: ['#a06ab0', '#5a3a66'], [M.LAVA]: ['#ff9a2e', '#ffe84a'], [M.ACID]: ['#c8ff5a', '#7fd030'],
-}
-
-const SPARKY = new Set([M.METAL, M.GATE, M.SCRAP, M.VOLATILE])
 const COLOURS = { hurt: '#ff5a4a', heal: '#7dff8a', white: '#f4f8f2', pale: '#c9d4c0', fire: '#ff9a2e', charge: '#ffe84a', magnet: '#6fd0ff', frost: '#bff2ff', gas: '#c79ae0' }
 const paint = colour => COLOURS[colour] ?? colour
+const liquidColourAt = (g, x, y) => {
+  const mat = matAt(g.world, Math.floor(x / BLOCK), Math.floor(y / BLOCK))
+  return props(mat).liquid ? MATERIAL_COLOURS[mat][0] : '#6fd0e0'
+}
 
 export const createFx = () => ({
   rings: [],
@@ -54,82 +57,34 @@ export const createFx = () => ({
   lastKill: null,
 })
 
-const add = (g, particle) => {
-  if (g.particles.length > THIN_ABOVE && Math.random() < 0.45) return
-  if (g.particles.length < MAX_PARTICLES) g.particles.push(particle)
+export const spark = (g, x, y, vx, vy, colour, life = rand(0.14, 0.34)) => spawn(g, 'spark', x, y, vx, vy, life, paint(colour), '#ffffff')
+
+export const debris = (g, x, y, vx, vy, colour, size = 1, life = rand(0.7, 1.6)) => {
+  spawn(g, 'chip', x, y, vx, vy, life, paint(colour), paint(colour), size).turn = rand(-14, 14)
 }
 
-export const spark = (g, x, y, vx, vy, colour, life = rand(0.14, 0.34)) =>
-  add(g, { kind: 'spark', x, y, vx, vy, life, max: life, colour: paint(colour) })
+export const ember = (g, x, y, colour = '#ff9a2e') => emberAt(g, x, y, colour)
 
-export const debris = (g, x, y, vx, vy, colour, size = 1, life = rand(0.7, 1.6)) =>
-  add(g, { kind: 'debris', x, y, vx, vy, life, max: life, colour: paint(colour), size })
+export const smoke = (g, x, y, vx = 0, vy = rand(-16, -6), colour = '#8c9884') => dustPuff(g, x, y, vx, vy, colour, rand(0.35, 0.9))
 
-export const ember = (g, x, y, colour = '#ff9a2e') => {
-  const life = rand(0.5, 1.3)
-  add(g, { kind: 'ember', x, y, vx: rand(-8, 8), vy: rand(-34, -14), life, max: life, colour, seed: Math.random() * 9 })
-}
+export const ash = (g, x, y, colour) => ashAt(g, x, y, colour)
 
-export const smoke = (g, x, y, vx = 0, vy = rand(-16, -6), colour = '#8c9884') => {
-  const life = rand(0.35, 0.9)
-  add(g, { kind: 'smoke', x, y, vx, vy, life, max: life, colour })
-}
+export const drop = (g, x, y, vx, vy, colour) => dropOf(g, x, y, vx, vy, paint(colour))
 
-export const drop = (g, x, y, vx, vy, colour) =>
-  add(g, { kind: 'drop', x, y, vx, vy, life: 1.2, max: 1.2, colour: paint(colour) })
+export const bubble = (g, x, y) => swimBubble(g, x, y)
 
-export const bubble = (g, x, y) => {
-  const life = rand(0.8, 1.6)
-  add(g, { kind: 'bubble', x, y, vx: 0, vy: rand(-26, -14), life, max: life, colour: '#bff2ff', seed: Math.random() * 9 })
-}
-
-export const burstSparks = (g, x, y, colour, count, speed = 70) => {
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = rand(speed * 0.3, speed * 1.2)
-    spark(g, x, y, Math.cos(a) * v, Math.sin(a) * v, colour)
-  }
-}
+export const burstSparks = (g, x, y, colour, count, speed = 70) => burstOf(g, x, y, paint(colour), count, speed)
 
 export const chipsAt = (g, x, y, material, count) => {
-  const colours = MATERIAL_COLOURS[material] ?? ['#c9d4c0']
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = rand(25, 95)
-    debris(g, x, y, Math.cos(a) * v, Math.sin(a) * v - 30, pick(colours), Math.random() < 0.25 ? 2 : 1, rand(0.5, 1.4))
-  }
+  hushCell(g, x, y)
+  breakAt(g, x, y, material, count)
 }
 
-export const dustAt = (g, x, y, count) => {
-  for (let i = 0; i < count; i++) smoke(g, x, y - 1, rand(-26, 26), rand(-14, -3))
-}
+export const dustAt = (g, x, y, count) => dustOf(g, x, y, count)
 
-export const impact = (g, x, y, material, vx, vy) => {
-  const d = Math.hypot(vx, vy) || 1
-  const backX = -vx / d
-  const backY = -vy / d
-  const colours = MATERIAL_COLOURS[material] ?? ['#c9d4c0']
-  const sparks = SPARKY.has(material) ? 6 : 2
-  for (let i = 0; i < sparks; i++) {
-    const spread = rand(-0.9, 0.9)
-    const v = rand(50, 150)
-    spark(g, x, y, (backX + spread * backY) * v, (backY - spread * backX) * v, SPARKY.has(material) ? '#ffe84a' : '#f4f8f2')
-  }
-  if (SPARKY.has(material)) return
-  for (let i = 0; i < 3; i++) {
-    const spread = rand(-1, 1)
-    const v = rand(25, 80)
-    debris(g, x, y, (backX + spread * backY) * v, (backY - spread * backX) * v - 20, pick(colours), 1, rand(0.3, 0.9))
-  }
-  smoke(g, x + backX * 2, y + backY * 2, backX * 8, backY * 8 - 5)
-}
+export const impact = (g, x, y, material, vx, vy) => impactAt(g, x, y, material, vx, vy)
 
-export const splash = (g, x, y, speed, colour = '#6fd0e0') => {
-  const count = Math.min(16, 4 + Math.abs(speed) / 14)
-  for (let i = 0; i < count; i++) drop(g, x + rand(-3, 3), y, rand(-46, 46), -rand(30, 60 + Math.abs(speed) * 0.5), colour)
-  g.ripples.push({ x, y, age: 0, power: Math.min(1, Math.abs(speed) / 160 + 0.3) })
-  if (g.ripples.length > 6) g.ripples.shift()
-}
+export const splash = (g, x, y, speed, colour) => splashAt(g, x, y, speed, paint(colour ?? liquidColourAt(g, x, y)))
 
 export const addLight = (g, x, y, radius, [r, gr, b], life) => {
   g.lights.push({ x, y, radius, r, g: gr, b, life, max: life })
@@ -182,12 +137,7 @@ export const shotFx = (g, p, aim) => {
   heroFired(p, aim)
   const h = heroOf(p)
   const from = h.tip
-  for (let i = 0; i < 3; i++) {
-    const spread = rand(-0.6, 0.6)
-    const v = rand(60, 140)
-    spark(g, from.x + aim.x * 2, from.y + aim.y * 2, (aim.x + spread * aim.y) * v, (aim.y - spread * aim.x) * v, '#fff3b4', rand(0.05, 0.14))
-  }
-  smoke(g, from.x + aim.x * 3, from.y + aim.y * 3, aim.x * 12, aim.y * 12 - 4, '#a9b6b2')
+  muzzleOf(g, from.x, from.y, aim)
   addLight(g, from.x, from.y, 26, [1, 0.85, 0.5], 0.07)
   punch(g, -aim.x * 0.35, -aim.y * 0.35)
   rumble(g, 0.08)
@@ -195,38 +145,18 @@ export const shotFx = (g, p, aim) => {
 
 export const wallHitFx = (g, s, material) => impact(g, s.x, s.y, material, s.vx, s.vy)
 
-let pixelSource = () => []
-export const setPixelSource = source => { pixelSource = source }
-
-const shatter = (g, e) => {
-  const c = centre(e)
-  const blast = e.heavy ? 1.6 : 1
-  for (const { x, y, colour } of pixelSource(e)) {
-    const dx = x - c.x
-    const dy = y - c.y
-    const d = Math.hypot(dx, dy) || 1
-    const v = rand(30, 130) * blast
-    debris(g, x, y, (dx / d) * v + (e.vx ?? 0) * 0.4, (dy / d) * v - rand(30, 90), colour, Math.random() < 0.3 ? 2 : 1, rand(1, 2.6))
-  }
-}
+export const woundFx = (g, e) => hitOf(g, e)
 
 export const hitFx = (g, e) => {
-  const c = centre(e)
   g.aberr = Math.max(g.aberr, 0.2)
   shakeTo(g, 1.7)
   rumble(g, 0.15)
-  for (let i = 0; i < 5; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = rand(40, 110)
-    spark(g, c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, Math.random() < 0.5 ? '#ffffff' : 'pale')
-  }
+  hitOf(g, e)
 }
 
 export const killFx = (g, e) => {
   const c = centre(e)
-  shatter(g, e)
-  burstSparks(g, c.x, c.y, '#ffffff', 8, 100)
-  for (let i = 0; i < 3; i++) smoke(g, c.x + rand(-4, 4), c.y + rand(-4, 4))
+  killOf(g, e)
   const p = centre(g.player)
   const d = Math.hypot(c.x - p.x, c.y - p.y) || 1
   punch(g, ((c.x - p.x) / d) * 1.1, ((c.y - p.y) / d) * 1.1)
@@ -241,6 +171,12 @@ export const killFx = (g, e) => {
     slowMo(g, 0.45, 0.3)
   }
   g.lastKill = { x: c.x, y: c.y }
+}
+
+export const fallFx = (g, e) => {
+  const c = centre(e)
+  killOf(g, e)
+  burstOf(g, c.x, c.y, '#ffffff', 44, 90)
 }
 
 export const roomClearFx = g => {
@@ -263,11 +199,7 @@ export const hurtFx = (g, p, cause) => {
   g.aberr = 0.7
   punch(g, -p.facing * 1.5 * (CAUSE_KICK[cause] ?? 1), -0.8)
   zoomPunch(g, c.x, c.y, 0.025)
-  for (let i = 0; i < 9; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = rand(30, 110)
-    spark(g, c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, i % 2 ? red : '#ffffff', rand(0.2, 0.4))
-  }
+  hurtMatter(g, c, cause, red)
   g.popups.push({ x: c.x, y: p.y - 14, icon: cause, life: 1.1, colour: 'hurt', scale: 2 })
 }
 
@@ -280,8 +212,6 @@ export const blastFx = (g, { x, y, reach }) => {
   g.aberr = Math.max(g.aberr, heavy ? 0.7 : 0.35)
   addRing(g, px, py, 190 + reach * 55, 3 + reach * 2.2, 0.32 + reach * 0.06, 6 + reach)
   addLight(g, px, py, 40 + reach * 22, [1, 0.72, 0.36], 0.28)
-  burstSparks(g, px, py, '#ffe84a', 8 + reach * 5, 130 + reach * 30)
-  burstSparks(g, px, py, '#ff9a2e', 5 + reach * 4, 90)
   const around = []
   for (let dy = -reach - 1; dy <= reach + 1; dy++) {
     for (let dx = -reach - 1; dx <= reach + 1; dx++) {
@@ -289,15 +219,7 @@ export const blastFx = (g, { x, y, reach }) => {
       if (props(m).solid && m !== M.BEDROCK) around.push(m)
     }
   }
-  const chunks = 6 + reach * 7
-  for (let i = 0; i < chunks; i++) {
-    const a = Math.random() * Math.PI * 2
-    const v = rand(50, 120 + reach * 40)
-    const colours = MATERIAL_COLOURS[pick(around.length ? around : [M.ROCK])] ?? ['#8a9c3e']
-    debris(g, px + rand(-6, 6), py + rand(-6, 6), Math.cos(a) * v, Math.sin(a) * v - 50, pick(colours), Math.random() < 0.4 ? 2 : 1, rand(0.8, 2))
-  }
-  for (let i = 0; i < 3 + reach * 3; i++) ember(g, px + rand(-10, 10), py + rand(-10, 10))
-  for (let i = 0; i < 3 + reach * 2; i++) smoke(g, px + rand(-10, 10), py + rand(-10, 10), rand(-22, 22), rand(-26, -4), '#747a72')
+  blastDebris(g, px, py, reach, around)
   const scorches = (g.world.scorches ??= [])
   scorches.push({ x: Math.round(px), y: Math.round(py), size: Math.min(2, reach) })
   if (scorches.length > MAX_SCORCH) scorches.shift()
@@ -328,7 +250,7 @@ export const levelBurstDone = g => {
     for (let i = 0; i < 28; i++) {
       const a = (i / 28) * Math.PI * 2
       const v = i % 2 ? 150 : 95
-      spark(g, c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, i % 2 ? '#7dff8a' : '#ffffff', 0.42)
+      spawn(g, 'spark', c.x, c.y, Math.cos(a) * v, Math.sin(a) * v, 0.42, i % 2 ? '#7dff8a' : '#ffffff', '#ffffff').hits = 1
     }
     return false
   }
@@ -339,7 +261,7 @@ export const levelBurstDone = g => {
 
 const launchMote = (g, x, y, target, colour) => {
   if (g.motes.length > 60) return
-  const a = Math.random() * Math.PI * 2
+  const a = rnd() * Math.PI * 2
   const v = rand(40, 110)
   g.motes.push({ x: x + ORIGIN.x, y: y + ORIGIN.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: rand(-0.06, 0), target, colour })
 }
@@ -373,96 +295,11 @@ const stepMotes = (g, dt) => {
   g.motes = g.motes.filter(m => !m.done)
 }
 
-const hitsWorld = (g, x, y) => solidAt(g.world, x, y)
-
-const STEPPERS = {
-  plain: (g, p, dt) => {
-    p.x += p.vx * dt
-    p.y += p.vy * dt
-    p.vy += 200 * dt
-  },
-  spark: (g, p, dt) => {
-    p.vx *= 1 - 3.2 * dt
-    p.vy = p.vy * (1 - 3.2 * dt) + 170 * dt
-    p.x += p.vx * dt
-    p.y += p.vy * dt
-    if (hitsWorld(g, p.x, p.y)) p.life = 0
-  },
-  debris: (g, p, dt) => {
-    if (p.rest && hitsWorld(g, p.x, p.y + 1)) return
-    p.rest = false
-    const wet = liquidAtPx(g.world, p.x, p.y)
-    p.vy = Math.min(wet ? 26 : 300, p.vy + (wet ? 80 : 420) * dt)
-    const nx = p.x + p.vx * dt
-    if (hitsWorld(g, nx, p.y)) p.vx *= -0.45
-    else p.x = nx
-    const ny = p.y + p.vy * dt
-    if (hitsWorld(g, p.x, ny)) {
-      if (p.vy > 0 && Math.abs(p.vy) < 36) {
-        p.rest = true
-        p.vx = 0
-        p.vy = 0
-      } else {
-        p.vy *= -0.42
-        p.vx *= 0.65
-      }
-    } else p.y = ny
-  },
-  ember: (g, p, dt) => {
-    p.seed += dt * 6
-    p.x += (p.vx + Math.sin(p.seed) * 12) * dt
-    p.y += p.vy * dt
-    p.vy *= 1 - dt * 0.6
-  },
-  smoke: (g, p, dt) => {
-    p.vx *= 1 - 3 * dt
-    p.vy *= 1 - 1.2 * dt
-    p.x += p.vx * dt
-    p.y += p.vy * dt
-  },
-  drop: (g, p, dt) => {
-    p.vy += 340 * dt
-    p.x += p.vx * dt
-    p.y += p.vy * dt
-    if (p.vy > 0 && (hitsWorld(g, p.x, p.y) || liquidAtPx(g.world, p.x, p.y))) p.life = 0
-  },
-  bubble: (g, p, dt) => {
-    p.seed += dt * 7
-    p.x += Math.sin(p.seed) * 10 * dt
-    p.y += p.vy * dt
-    if (!liquidAtPx(g.world, p.x, p.y)) p.life = 0
-  },
-}
-
-const stepParticles = (g, dt) => {
-  for (const p of g.particles) {
-    STEPPERS[p.kind ?? 'plain'](g, p, dt)
-    p.life -= dt
-  }
-  g.particles = g.particles.filter(p => p.life > 0)
-  if (g.particles.length > MAX_PARTICLES) g.particles.splice(0, g.particles.length - MAX_PARTICLES)
-}
-
 const splashShots = g => {
   for (const s of g.shots) {
-    if (s.wet || !liquidAtPx(g.world, s.x, s.y)) continue
+    if (s.wet || !wetAt(g, s.x, s.y)) continue
     s.wet = true
     splash(g, s.x, s.y, 40)
-  }
-}
-
-const emitWorld = g => {
-  const w = g.world
-  const size = ROOM * ROOM
-  const samples = 26
-  for (let n = 0; n < samples; n++) {
-    const i = Math.floor(Math.random() * size)
-    const x = i % ROOM
-    const y = Math.floor(i / ROOM)
-    if (w.burn[i] > 0 && Math.random() < 0.2) ember(g, (x + Math.random()) * BLOCK, y * BLOCK, Math.random() < 0.3 ? '#ffe84a' : '#ff9a2e')
-    else if (w.mat[i] === M.LAVA && matAt(w, x, y - 1) !== M.LAVA && Math.random() < 0.12) ember(g, (x + Math.random()) * BLOCK, y * BLOCK, '#ffd24a')
-    else if (w.mat[i] === M.ACID && Math.random() < 0.06) ember(g, (x + Math.random()) * BLOCK, y * BLOCK, '#c8ff5a')
-    else if (w.charge[i] > 0 && w.mat[i] === M.WATER && Math.random() < 0.1) spark(g, (x + Math.random()) * BLOCK, (y + Math.random()) * BLOCK, rand(-30, 30), rand(-60, 10), '#ffe84a', 0.12)
   }
 }
 
@@ -474,8 +311,8 @@ const stepHeroSide = (g, dt) => {
   const grounded = was.wasGrounded
   const h = stepHero(g, p, dt)
   if (g.phase !== 'playing') return
-  if (h.stance === 'swim' && Math.random() < dt * 2.4) bubble(g, p.x + 3 + p.facing * 3, p.y + 4)
-  if (h.stance === 'cling' && Math.random() < dt * 22) spark(g, p.x + (p.facing > 0 ? p.w : 0), p.y + p.h - 2, -p.facing * 12, -20, 'pale', 0.14)
+  if (h.stance === 'swim' && rnd() < dt * 2.4) bubble(g, p.x + 3 + p.facing * 3, p.y + 4)
+  if (h.stance === 'cling' && rnd() < dt * 22) dustPuff(g, p.x + (p.facing > 0 ? p.w : 0), p.y + p.h - 2, -p.facing * 12, -20, '#8c9884', 0.14)
   if (!grounded && p.grounded && fell > 235) {
     const c = p.x + p.w / 2
     shakeTo(g, 2.6)
@@ -504,6 +341,8 @@ const stepDeath = (g, realDt) => {
   g.aberr = 0.5
   addRing(g, c.x, c.y, 200, 5, 0.5, 8)
   addLight(g, c.x, c.y, 60, [1, 0.3, 0.25], 0.6)
+  hurtMatter(g, c, g.player.lastCause, red)
+  hurtMatter(g, c, null, red)
 }
 
 const decayCamera = (g, realDt) => {
@@ -558,63 +397,14 @@ export const stepFx = (g, realDt, dt) => {
   if (held) return
   stepParticles(g, dt)
   stepHeroSide(g, dt)
-  if (g.world) emitWorld(g)
+  if (g.world) {
+    stepMarks(g, dt)
+    watchWorld(g)
+    emitWorld(g)
+    followProjectiles(g, dt)
+    followBolts(g)
+  }
   if (g.phase === 'playing') splashShots(g)
-}
-
-const drawSpark = (ctx, p) => {
-  const x = Math.round(p.x)
-  const y = Math.round(p.y)
-  ctx.fillStyle = p.colour
-  ctx.fillRect(x, y, 1, 1)
-  const speed = Math.hypot(p.vx, p.vy)
-  if (speed < 30 || p.life < p.max * 0.3) return
-  const tail = Math.min(4, speed / 40)
-  for (let i = 1; i <= tail; i++) ctx.fillRect(Math.round(p.x - (p.vx / speed) * i), Math.round(p.y - (p.vy / speed) * i), 1, 1)
-}
-
-const drawDebris = (ctx, p, clock) => {
-  if (p.life < 0.3 && Math.floor(clock * 22) % 2) return
-  ctx.fillStyle = p.max - p.life < 0.05 ? '#ffffff' : p.colour
-  ctx.fillRect(Math.round(p.x), Math.round(p.y) - p.size + 1, p.size, p.size)
-}
-
-const drawEmber = (ctx, p) => {
-  if (Math.sin(p.seed * 3) < -0.75) return
-  ctx.fillStyle = p.life < p.max * 0.35 ? '#a03a18' : p.colour
-  ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1)
-}
-
-const SMOKE_DOTS = [
-  [[0, 0], [1, 0]],
-  [[0, 0], [1, 0], [0, 1], [1, 1]],
-  [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]],
-  [[-1, 0], [1, 0], [0, -1], [2, 1]],
-  [[-2, 1], [2, -1]],
-]
-
-const drawSmoke = (ctx, p) => {
-  const stage = Math.min(SMOKE_DOTS.length - 1, Math.floor((1 - p.life / p.max) * SMOKE_DOTS.length))
-  const x = Math.round(p.x)
-  const y = Math.round(p.y)
-  ctx.fillStyle = p.colour
-  for (const [dx, dy] of SMOKE_DOTS[stage]) ctx.fillRect(x + dx, y + dy, 1, 1)
-}
-
-const drawDot = (ctx, p) => {
-  ctx.fillStyle = p.colour
-  ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1)
-}
-
-const drawPlain = (ctx, p) => {
-  ctx.fillStyle = paint(p.colour)
-  ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1)
-}
-
-const DRAWERS = { plain: drawPlain, spark: drawSpark, debris: drawDebris, ember: drawEmber, smoke: drawSmoke, drop: drawDot, bubble: drawDot }
-
-export const drawParticles = (ctx, g) => {
-  for (const p of g.particles) DRAWERS[p.kind ?? 'plain'](ctx, p, g.fxClock)
 }
 
 export const drawMotes = (ctx, g) => {

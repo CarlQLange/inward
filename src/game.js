@@ -10,7 +10,7 @@ import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
 import { SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, landSlam, muzzle, openFork, pourAcid, recordTrail, releaseMatter, ring, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { dust } from './feel.js'
-import { beginDoor, blastFx, coinMote, createFx, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
+import { beginDoor, blastFx, chipsAt, coinMote, createFx, fallFx, impact, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
@@ -774,7 +774,7 @@ const onWardenKilled = (g, e) => {
   if (e.lastSource !== 'player') g.environmentKills += 1
   g.pulse = 1
   g.shake = Math.max(g.shake, 14)
-  burst(g, centre(e).x, centre(e).y, 'white', 60)
+  fallFx(g, e)
   if (e.kind === 'core') {
     g.ending = { life: R.endingTime }
     p.iframes = R.endingTime + 1
@@ -1635,10 +1635,10 @@ const stepShots = (g, dt) => {
         s.vy = ((s.y - c.y) / d) * speed
         s.x += s.vx * dt * 2
         s.y += s.vy * dt * 2
-        burst(g, s.x, s.y, 'pale', 3)
+        impact(g, s.x, s.y, M.METAL, -s.vx, -s.vy)
       } else if (blocked) {
         s.vx *= -1
-        burst(g, s.x, s.y, 'pale', 3)
+        impact(g, s.x, s.y, M.METAL, -s.vx, -s.vy)
       } else {
         hurt(g, victim, 1, 'player')
         if (!victim.heavy) {
@@ -1689,7 +1689,7 @@ const landFireball = (g, f) => {
   }
   if (f.lava) {
     for (const dx of [0, 1, -1]) puff(g.world, x + dx, y - 1, M.LAVA, [0, 0])
-    burst(g, f.x + 2, f.y + 2, 'fire', 6)
+    splash(g, f.x + 2, f.y + 2, 70, '#ff9a2e')
     f.age = -1
     return
   }
@@ -1749,7 +1749,7 @@ const stepFlung = (g, dt) => {
     if (!f.safe && f.age > F.friendlyAfter && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
     if (blocked) {
       settleFlung(g, f)
-      burst(g, f.x + 4, f.y + 4, 'pale', 6)
+      chipsAt(g, f.x + 4, f.y + 4, M.SCRAP, 5)
       f.age = -1
     }
   }
