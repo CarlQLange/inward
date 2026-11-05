@@ -92,10 +92,22 @@ const liftScrap = (g, magnet) => {
   }
 }
 
-export const stepMagnets = (g, dt) => {
+const found = new WeakMap()
+
+const magnetsNow = (g, dt) => {
   const w = g.world
-  if (!w.charged) return
-  const magnets = magnetsOf(w)
+  const seen = found.get(w) ?? { clock: 0, list: [] }
+  found.set(w, seen)
+  seen.clock -= dt
+  if (seen.clock > 0) return { list: seen.list, fresh: false }
+  seen.clock = L.magnetEvery
+  seen.list = magnetsOf(w)
+  return { list: seen.list, fresh: true }
+}
+
+export const stepMagnets = (g, dt) => {
+  if (!g.world.charged) return
+  const { list: magnets, fresh } = magnetsNow(g, dt)
   if (!magnets.length) return
   const reach = L.magnetReach * BLOCK
   for (const e of g.enemies) {
@@ -112,9 +124,7 @@ export const stepMagnets = (g, dt) => {
     const near = nearest(magnets, at, reach)
     if (near) pull(f, at, near, dt)
   }
-  g.magnetClock = (g.magnetClock ?? 0) - dt
-  if (g.magnetClock > 0) return
-  g.magnetClock = L.magnetEvery
+  if (!fresh) return
   for (const magnet of magnets) {
     liftScrap(g, magnet)
     if (Math.random() < 0.5) burstSparks(g, magnet.x, magnet.y, 'magnet', 3)
