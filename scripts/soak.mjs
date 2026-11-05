@@ -162,7 +162,7 @@ const worker = async ({ opts, from, to }) => {
     const from = { x: cell(middle(p).x), y: cell(p.y + p.h - 1) }
     const { parent, near, anchors, open: exitsOpen, locked: exitsLocked } = exitsFrom(g.world, room.doors, from)
     const isStart = keyOf(g.x, g.y) === keyOf(...g.map.start)
-    if (!room.sealed && !isStart && exitsOpen.length === 0 && exitsLocked.length === 0 && g.time - bot.enteredAt > 2 && !bot.softRooms.has(room)) {
+    if (!p.upside && !room.sealed && !isStart && exitsOpen.length === 0 && exitsLocked.length === 0 && g.time - bot.enteredAt > 2 && !bot.softRooms.has(room)) {
       bot.softRooms.add(room)
       bot.softlocks += 1
       stats.softlockRooms.push(`${room.layout}@${room.ring}:${room.event ?? '-'}:${Object.keys(room.doors).join('')}:${room.cleared ? 'after' : 'fresh'}`)
