@@ -88,7 +88,7 @@ export const TUNING = {
     bolt: { every: 1.8, energy: 44, fenceLife: 6, fenceEvery: 0.45, fenceDamage: 1, fenceStun: 0.7, fenceMost: 150, globeSpeed: 34, globeLife: 5.5, globeEvery: 0.4, globeReach: 56, nailLife: 5, nailEvery: 0.9, nailWarn: 0.3, nailDamage: 2, leydenTime: 2.4, leydenMost: 4, leydenReach: 120, forms: { 'bolt.globe': 3.2, 'bolt.nail': 2.8, 'bolt.leyden': 2.2 } },
     repel: { every: 1.1, currentEnergy: 30, currentStun: 1.2, reach: 56, width: 10, recoilReach: 26, fling: 240, recoil: 300, shove: 220, shoveTime: 0.45, gather: 90, orbitMost: 7, orbitRadius: 15, orbitEvery: 0.08, lodeReach: 130, lodePull: 300, salvageCells: 2 },
     ember: { every: 1.5, speed: 150, lift: 70, wispSpeed: 54, wispLife: 6, wispSeek: 90, torchTime: 6, torchEvery: 1.2, jetEvery: 0.07, jetTime: 1.6, jetSpeed: 200, jetLift: 20, jetWispEvery: 9, jetNapalmEvery: 5, forms: { 'ember.jet': 4 } },
-    frost: { every: 2, reach: 48, width: 14, freeze: 2.5, floeSpeed: 170, floeLift: 60, glideTime: 3.2, forms: { 'frost.floe': 2.6, 'frost.glide': 6 } },
+    frost: { every: 2, reach: 48, width: 14, freeze: 2.5, snowDepth: 8, floeSpeed: 170, floeLift: 60, glideTime: 3.2, forms: { 'frost.floe': 2.6, 'frost.glide': 6 } },
     hammer: { every: 0.7, reach: 2, hurlSpeed: 190, hurlReach: 96, tremorHeight: 8, forms: { 'hammer.hurl': 1.2 } },
     gust: { every: 1.1, reach: 72, width: 16, shove: 200, lungs: 30, twisterSpeed: 40, twisterLife: 4.5, twisterHeight: 44, twisterLift: 150, kiteTime: 1.5, kiteThrust: 780, kiteSteer: 420, kiteHover: 0.55, kiteMost: 170, kiteEvery: 0.14, forms: { 'gust.twister': 4.5, 'gust.kite': 3.6 } },
     blink: { every: 2, reach: 72, anchorLife: 14, lanceDamage: 2, ghostLife: 3, ghostRange: 130 },

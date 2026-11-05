@@ -6,7 +6,7 @@ import { burst, hurt } from './combat.js'
 import { MATERIAL_COLOURS, chipsAt, drop, fuseSpark, ripple, splash } from './fx.js'
 import {
   BREAKS, blowCell, boreCell, charmOne, crackWorld, foesOnSegment, footCell, freezeWaterAround, hammerCell, hammerLands, hammerStrikes, heat, hostile, lay, lightFuse, muzzle,
-  orbitFires, owns, prey, recordPast, releaseMatter, ring, ringBell, setAblaze, settleFuse, shardAt, shoutFront, smash, spend, spill, stepCascade, stepRoots, strike, turnToGlass, zap,
+  orbitFires, owns, prey, recordPast, releaseMatter, ring, ringBell, setAblaze, settleFuse, shardAt, shoutFront, smash, spend, snowDown, spill, stepCascade, stepRoots, strike, turnToGlass, zap,
 } from './skills.js'
 import { endFloat, stepFloat } from './float.js'
 import { endLink, stepLink } from './link.js'
@@ -139,7 +139,7 @@ const LANDS = {
       for (let dx = -2; dx <= 2; dx++) {
         const m = matAt(g.world, x + dx, y + dy)
         if (m === M.LAVA) setCell(g.world, x + dx, y + dy, M.ROCK)
-        else if (m === M.WATER && owns(p, 'frost.snow')) setCell(g.world, x + dx, y + dy, M.SNOW)
+        else if (m === M.WATER && owns(p, 'frost.snow')) snowDown(g, x + dx, y + dy)
         else if (m === M.ROCK && owns(p, 'frost.brittle') && Math.random() < 0.5) setCell(g.world, x + dx, y + dy, M.SAND)
         else if (g.world.burn[(y + dy) * ROOM + x + dx] > 0) g.world.burn[(y + dy) * ROOM + x + dx] = 0
       }

@@ -504,13 +504,16 @@ const freezeFoe = (g, p, e) => {
   e.frozen = S.frost.freeze
 }
 
-const frozenWater = p => (owns(p, 'frost.snow') ? M.SNOW : M.ICE)
+export const snowDown = (g, x, y) => {
+  for (let row = y; row < y + S.frost.snowDepth && matAt(g.world, x, row) === M.WATER; row++) setCell(g.world, x, row, M.SNOW)
+}
 
 const chill = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
   if (m === M.WATER) {
     tallyRule(g.world, 'freeze', M.WATER)
-    setCell(g.world, x, y, frozenWater(p))
+    if (owns(p, 'frost.snow')) snowDown(g, x, y)
+    else setCell(g.world, x, y, M.ICE)
   } else if (m === M.LAVA) {
     tallyRule(g.world, 'cool', M.LAVA)
     setCell(g.world, x, y, M.ROCK)
