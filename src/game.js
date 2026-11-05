@@ -2202,7 +2202,7 @@ export const step = (g, input, realDt) => {
     return
   }
   g.looking = input.look === true && g.phase === 'playing' && g.menus.length === 0
-  const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g) * stepTempo(g, input)
+  const dt = (g.looking ? realDt * TUNING.feel.lookSlow : realDt) * timeScale(g) * stepTempo(g, input) * TUNING.feel.tempo
   g.time += dt
   stepEffects(g, dt)
   stepFx(g, realDt, dt)
@@ -2279,7 +2279,7 @@ export const step = (g, input, realDt) => {
     stepRoomEvents(g, dt)
   }
   stepLockHints(g, dt)
-  stepPlayer(g, input, dt)
+  stepPlayer(g, input, dt / TUNING.feel.tempo)
   if (g.phase !== 'playing') return
   stepShots(g, dt)
   stepEffectList(g, stopped ? 0 : dt)

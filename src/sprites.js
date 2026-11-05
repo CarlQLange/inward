@@ -38,6 +38,7 @@ const ICON_INDEX = {
   icons2: { blink: 0, grapple: 1, dash: 2, rewind: 3, mason: 4, melt: 5, alchemy: 6, well: 7, swap: 8, stop: 9, charm: 10, decoy: 11, drone: 12, rod: 13, mine: 14, roar: 15 },
   icons3: { mirror: 0, echo: 1, pact: 2, fireboots: 3, rubber: 4, gills: 5, springs: 6, claws: 7, feather: 8, coinmagnet: 9, sack: 10, hands: 11, battery: 12, plate: 13, phoenix: 14, incendiary: 15 },
   icons4: { shock: 0, frostshot: 1, pierce: 2, spread: 3, ricochet: 4, stomp: 5, chest: 6, altar: 7, gem: 8, skull: 9, crown: 10, acidskull: 11, wind: 12, dice: 13, eye: 14, chain: 15 },
+  icons5: { flask: 0, wick: 1, float: 2, link: 3, lens: 4, chime: 5, clay: 6, burrow: 7, snowflake: 8, shard: 9, boot: 10, horseshoe: 11, sprout: 12, hoop: 13, icecube: 14, snail: 15 },
 }
 
 const SIGN_NAMES = [
@@ -165,7 +166,7 @@ const loadCast = async () => {
 }
 
 export const loadSprites = async () => {
-  const sheets = ['tiles', 'tiles2', 'signs', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4']
+  const sheets = ['tiles', 'tiles2', 'signs', 'creatures', 'creatures2', 'icons', 'icons2', 'icons3', 'icons4', 'icons5']
   const loaded = Object.fromEntries(await Promise.all(sheets.map(async name => [name, await loadImage(assetUrl(`${name}.png`))])))
   const { tiles, creatures, creatures2 } = loaded
   for (const [name, indices] of Object.entries(TILE_INDEX)) {

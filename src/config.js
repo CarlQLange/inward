@@ -314,6 +314,7 @@ export const TUNING = {
     warden: { world: 3, stuck: 30, pace: { 1: 1.5, 3: 1.2, 5: 1, 7: 1 } },
   },
   feel: {
+    tempo: 0.88,
     hurtStop: 0.1,
     hitStop: 0.03,
     killStop: 0.065,
