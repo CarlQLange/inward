@@ -21,6 +21,7 @@ const ACID = '#8ae04a'
 const LEAF = '#4f9c3a'
 const LEAF_LIGHT = '#8ad05a'
 const STONE = '#c9d4c0'
+const SKY = '#d8ecff'
 const MUD = '#8e7c60'
 const MUD_DARK = '#5c4c3a'
 const MUD_LIGHT = '#b8a684'
@@ -300,11 +301,6 @@ const ART = {
       dot(ctx, f.x + 1, f.y + 1, 1, 1, WHITE)
     } else dot(ctx, f.x, f.y, f.w, f.h, f.colour)
   },
-  fuse: (ctx, g, f) => {
-    dot(ctx, f.x - 2, f.y - 2, 5, 5, '#2a2a2a')
-    dot(ctx, f.x - 1, f.y - 4, 1, 2, FIRE)
-    if (Math.floor(g.time * 12) % 2) dot(ctx, f.x - 1, f.y - 1, 3, 3, BLOOD)
-  },
   hurl: (ctx, g, f) => hammerHead(ctx, f, MAGNET),
   orbit: (ctx, g, f) => {
     for (const t of f.tiles ?? []) {
@@ -356,14 +352,6 @@ const ART = {
     ctx.lineWidth = 1
     ctx.strokeRect(Math.round(e.x) - 0.5, Math.round(e.y) - 0.5, e.w + 1, e.h + 1)
   },
-  pane: (ctx, g, f) => {
-    const half = S.mirror.paneHalf
-    const across = { x: -f.ny, y: f.nx }
-    for (let d = -half; d <= half; d++) {
-      const sheen = (d + Math.floor(g.time * 30)) % 9 === 0
-      dot(ctx, f.x + across.x * d, f.y + across.y * d, 2, 2, sheen ? WHITE : COLD)
-    }
-  },
   flytrap: (ctx, g, f) => {
     const [x, y] = [Math.round(f.x), Math.round(f.y + BLOCK / 2)]
     dot(ctx, x - 1, y - 12, 2, 12, LEAF)
@@ -392,11 +380,6 @@ const ART = {
     for (const [dx, dy, w, h] of [[-9, -3, 18, 5], [-6, -6, 12, 4], [-4, 2, 8, 2]]) dot(ctx, f.x + dx, f.y + dy, w, h, '#4e8a32')
     for (let i = 0; i < 4; i++) dot(ctx, f.x - 8 + Math.random() * 16, f.y - 5 + Math.random() * 8, 1, 1, ACID)
   },
-  tether: (ctx, g, f) => {
-    if (!f.from || !f.to) return
-    dotted(ctx, f.from, f.to, f.b || f.point ? GAS : '#7d5f8e', f.b || f.point ? 2 : 4, g.time * 20)
-    circle(ctx, f.from.x, f.from.y, 6, GAS, 8)
-  },
   wraith: (ctx, g, f) => {
     ctx.globalAlpha = 0.55
     dot(ctx, f.x, f.y + 4, f.w, f.h - 4, MAGNET)
@@ -407,34 +390,22 @@ const ART = {
     const across = { x: -f.aim.y, y: f.aim.x }
     for (let d = -12; d <= 12; d++) dot(ctx, f.x + across.x * d - f.aim.x * Math.abs(d) * 0.5, f.y + across.y * d - f.aim.y * Math.abs(d) * 0.5, 1, 2, WHITE)
   },
-  rod: (ctx, g, f) => {
-    const top = { x: f.x + 4, y: f.y + 1 }
-    if (f.magnet) circle(ctx, top.x, top.y, ((g.time * 50) % S.rod.pullReach), BLOOD, 18)
-    if (f.partner) dotted(ctx, { x: top.x, y: f.y + 9 }, f.partner, CHARGE, 2, g.time * 40)
-    if (f.grounded) dot(ctx, f.x + 1, f.y + 15, 6, 1, CHARGE)
-    if (f.arcs) dot(ctx, top.x - 1, top.y - 3, 3, 2, WHITE)
-  },
   mine: (ctx, g, f) => {
     if (f.wire) dotted(ctx, f.anchor, f.wire, Math.floor(g.time * 4) % 2 ? WHITE : BLOOD, 3)
-    const colour = f.cryo ? COLD : f.gas ? GAS : f.rider ? BLOOD : null
+    const colour = f.cryo ? COLD : f.launch ? SKY : f.rider ? BLOOD : null
     if (colour) dot(ctx, f.x + 1, f.y + 1, 4, 4, colour)
+    if (f.launch) [0, 2].forEach(k => chevron(ctx, f.x + 3, f.y - 2 - k * 2 - (Math.floor(g.time * 6) % 2), [0, -1], SKY))
     if (f.rider && Math.floor(g.time * 14) % 2) circle(ctx, f.x + 3, f.y + 3, 6, BLOOD, 8)
   },
-  decoy: (ctx, g, f) => {
-    if (f.clone) dot(ctx, f.x + 8, f.y + 5, 4, 1, MAGNET)
-    if (f.runner) dot(ctx, f.x + 1 + Math.round(Math.sin(g.time * 20) * 2), f.y + 16, 6, 1, WHITE)
-    if (f.double) {
-      const bob = Math.round(Math.sin(g.time * 6))
-      dot(ctx, f.x + 1, f.y - 4 + bob, 6, 1, STONE)
-      dot(ctx, f.x + 1, f.y - 4 + bob, 1, 2, STONE)
-      dot(ctx, f.x + 6, f.y - 5 + bob, 1, 2, STONE)
-      dotted(ctx, { x: f.x + 4, y: f.y + 8 }, { x: g.player.x + 3, y: g.player.y + 8 }, STONE, 6, g.time * 12)
-    }
-    if (f.gas) dot(ctx, f.x + 3, f.y + 4, 2, 2, GAS)
-  },
   drone: (ctx, g, f) => {
-    const colour = f.sapper ? BLOOD : f.mole ? WHITE : f.magpie ? CHARGE : f.sentry ? MAGNET : null
+    const colour = f.gull ? SKY : f.mole ? WHITE : f.magpie ? CHARGE : f.sentry ? MAGNET : null
     if (colour) dot(ctx, f.x + 2, f.y + 2, 4, 4, colour)
+    if (f.gull) {
+      const flap = Math.floor(g.time * 10) % 2
+      dot(ctx, f.x - 3, f.y + 1 + flap, 4, 1, SKY)
+      dot(ctx, f.x + 7, f.y + 1 + flap, 4, 1, SKY)
+      if (f.load) dot(ctx, f.x + 1, f.y + 9, 6, 6, MATERIAL_COLOURS[f.load]?.[0] ?? STONE)
+    }
     if (f.sentry) {
       dot(ctx, f.x + 1, f.y + 8, 1, 4, MAGNET)
       dot(ctx, f.x + 6, f.y + 8, 1, 4, MAGNET)
@@ -445,7 +416,6 @@ const ART = {
       dot(ctx, f.x + 8, f.y + 1, 2, 1, CHARGE)
       if (f.carrying) dot(ctx, f.x + 2, f.y + 9, 3, 3, CHARGE)
     }
-    if (f.sapper && Math.floor(g.time * 12) % 2) circle(ctx, f.x + 4, f.y + 4, 8, BLOOD, 8)
     if (f.mole) for (let i = 0; i < 3; i++) dot(ctx, f.x + f.aim.x * (6 + i * 2), f.y + f.aim.y * (6 + i * 2), 1, 1, WHITE)
   },
   anchor: (ctx, g, f) => {
@@ -457,20 +427,28 @@ const ART = {
     }
     dot(ctx, x - 1, y - 1, 2, 2, WHITE)
   },
-  mirror: (ctx, g, f) => {
-    if (f.parry) {
-      const p = g.player
-      ctx.strokeStyle = WHITE
-      ctx.lineWidth = 1
-      const grow = Math.round((1 - f.life / S.mirror.parryLife) * 4)
-      ctx.strokeRect(Math.round(p.x) - 6.5 - grow, Math.round(p.y) - 6.5 - grow, p.w + 13 + grow * 2, p.h + 13 + grow * 2)
-    }
-    if (!f.maw) return
-    const p = g.player
-    ctx.strokeStyle = BLOOD
-    ctx.lineWidth = 1
-    ctx.strokeRect(Math.round(p.x) - 7.5, Math.round(p.y) - 7.5, p.w + 15, p.h + 15)
-    for (let i = 0; i < f.swallowed; i++) dot(ctx, p.x + i * 3 - 2, p.y - 10, 2, 2, BLOOD)
+  fence: (ctx, g, f) => {
+    const posts = [f.a, f.b].filter(Boolean)
+    posts.forEach(post => {
+      dot(ctx, post.x - 1, post.y - 4, 2, 7, STONE)
+      dot(ctx, post.x - 2, post.y - 5, 4, 1, Math.floor(g.time * 8) % 2 ? FIRE : WHITE)
+    })
+    if (!f.b) return
+    const fading = f.life < 1 && Math.floor(g.time * 12) % 2
+    dotted(ctx, { x: f.a.x, y: f.a.y - 4 }, { x: f.b.x, y: f.b.y - 4 }, fading ? WHITE : FIRE, 2, g.time * 40)
+  },
+  pillar: (ctx, g, f) => {
+    const top = (f.floor - f.laid) * BLOCK
+    for (let k = 0; k < 3; k++) chevron(ctx, f.x * BLOCK + 4, top - 3 - k * 3 - (Math.floor(g.time * 20) % 3), [0, -1], k ? STONE : WHITE)
+  },
+  cascade: (ctx, g, f) => {
+    const r = S.alchemy.cascadeRadius * BLOCK * (0.6 + 0.4 * (1 - f.clock / S.alchemy.cascadeEvery))
+    circle(ctx, (f.x + 0.5) * BLOCK, (f.y + 0.5) * BLOCK, r, MATERIAL_COLOURS[f.mat]?.[0] ?? FIRE, 28)
+  },
+  tossed: (ctx, g, f) => {
+    const e = f.foe
+    if (e.grounded) return
+    for (let i = 1; i < 4; i++) dot(ctx, e.x + e.w / 2 - e.vx * i * 0.015, e.y + e.h + i * 3, 1, 2, SKY)
   },
   rope: (ctx, g, f) => {
     if (!f.from || !f.to) return
@@ -583,6 +561,12 @@ const drawLungs = (ctx, g) => {
   })
 }
 
+const puppetStrings = (ctx, g, e) => {
+  const hand = { x: e.x + e.w / 2, y: Math.max(2, e.y - 14) }
+  ;[-0.3, 0, 0.3].forEach(k => dotted(ctx, hand, { x: e.x + e.w / 2 + e.w * k, y: e.y }, WHITE, 2, g.time * 10))
+  dot(ctx, hand.x - 3, hand.y, 7, 1, WHITE)
+}
+
 const drawCreatureStates = (ctx, g) => {
   for (const e of g.enemies) {
     if (e.ablaze > 0) {
@@ -591,7 +575,7 @@ const drawCreatureStates = (ctx, g) => {
       ctx.drawImage(frame, Math.round(e.x + e.w / 2 - 6), Math.round(e.y - 1), 6, 6)
     }
     if (e.ally && e.plague) dot(ctx, e.x + e.w / 2 - 1, e.y - 4, 2, 2, ACID)
-    if (e.ally && e.pact) dot(ctx, e.x + e.w / 2 - 2, e.y - 4, 4, 1, WHITE)
+    if (e.ally && e.puppet) puppetStrings(ctx, g, e)
     if (e.ally && e.bond) dotted(ctx, { x: e.x + e.w / 2, y: e.y + e.h / 2 }, { x: g.player.x + 3, y: g.player.y + 8 }, MAGNET, 4, g.time * 16)
     if (e.coat) {
       const colour = liquidOf(e.coat.mat)

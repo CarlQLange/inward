@@ -9,9 +9,9 @@ import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, miredAtPx, move, moveAxi
 import { LOOSE_EVENTS, stepMagnets } from './loose.js'
 import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
-import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, seatEnemy, settleFooting } from './enemies.js'
+import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, puppeted, seatEnemy, settleFooting, steerPuppet } from './enemies.js'
 import { swim } from './earth.js'
-import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
+import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
 import { feedEvent, stepFeeds, stepHand } from './feed.js'
 import { composeOffer } from './offers.js'
 import { dust } from './feel.js'
@@ -36,7 +36,8 @@ const K = R.keystones
 const DEEP = R.deep
 const FLOAT = TUNING.skills.float
 const ALL_SKILLS = Object.keys(SKILLS)
-const ALL_SKILLS_EVER = new Set([...ALL_SKILLS, 'echo', 'pact'])
+const ALL_SKILLS_EVER = new Set([...ALL_SKILLS, 'echo', 'pact', 'decoy', 'rod', 'mirror'])
+const ALL_FORMS = new Set(Object.values(TREES).flat().map(f => f.id))
 
 const shuffled = list => list.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 
@@ -79,9 +80,9 @@ const depthFor = (g, ring) => {
 
 const LOCK_OPENERS = {
   peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick', 'burrow', 'lens'],
-  gate: ['bolt', 'rod', 'acid', 'blink', 'melt', 'wick'],
+  gate: ['bolt', 'acid', 'blink', 'melt', 'wick'],
   brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
-  ice: ['ember', 'hammer', 'melt', 'roar', 'blink', 'alchemy', 'wick', 'lens', 'chime'],
+  ice: ['ember', 'hammer', 'melt', 'blink', 'alchemy', 'wick', 'lens', 'chime'],
   scrap: ['repel', 'hammer', 'well', 'grapple', 'acid', 'blink'],
 }
 const LOCKS = Object.keys(LOCK_OPENERS)
@@ -280,12 +281,7 @@ const settleFlung = (g, f) => {
   const spot = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, -2]].find(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
   if (!spot) return
   setCell(g.world, x + spot[0], y + spot[1], f.mat ?? M.SCRAP)
-  if (f.shrapnel) {
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2
-      g.shots.push({ x: f.x + 4, y: f.y + 4, w: 2, h: 2, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, life: 0.3 })
-    }
-  }
+  if (f.live) energize(g.world, x + spot[0], y + spot[1], TUNING.skills.repel.currentEnergy)
 }
 
 const leaveRoom = g => {
@@ -915,11 +911,6 @@ const feedOnKill = (g, e, c, environmental) => {
   const ally = g.enemies.filter(o => o.ally > 0 && o !== e).map(o => [Math.hypot(centre(o).x - c.x, centre(o).y - c.y), o]).filter(([d]) => d < TUNING.feed.allyReach).sort((a, b) => a[0] - b[0])[0]?.[1]
   if (!ally) return
   feedEvent(g, 'allyKill', c.x, c.y)
-  if (ally.pact) {
-    ally.ally = TUNING.skills.charm.time
-    ally.hp = Math.max(ally.hp, ENEMY_DEFS[ally.kind].hp)
-    ring(g, centre(ally).x, centre(ally).y, '#f4f8f2', 10, 50)
-  }
 }
 
 const onKill = (g, e) => {
@@ -1775,6 +1766,7 @@ const stepEnemies = (g, dt) => {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
     if (e.floated > 0) driftFoe(g, e, dt)
+    else if (puppeted(e)) steerPuppet(g, e, dt)
     else STEPPERS[e.kind](g, e, dt)
     stepMutations(g, e, dt)
     if (e.kind !== 'worm' && !e.free) nudgeOutOfSolid(g.world, e)
@@ -1953,8 +1945,8 @@ const stepFlung = (g, dt) => {
     const victim = g.enemies.find(e => e !== f.thrower && !e.stowed && !e.intangible && !(f.thrower?.warden && e.partOf) && overlap(f, e))
     if (victim) {
       victim.flungBy = f.by
-      hurt(g, victim, f.damage ?? F.damage, 'world', f.cause)
-      victim.stun = Math.max(victim.stun, F.stun)
+      hurt(g, victim, f.damage ?? F.damage, 'world', f.live ? 'CHARGE' : f.cause)
+      victim.stun = Math.max(victim.stun, f.live ? TUNING.skills.repel.currentStun : F.stun)
       if (f.shard) f.life = 0
     }
     if (!f.safe && f.age > (f.armed ?? F.friendlyAfter) && overlap(f, g.player)) hurt(g, g.player, F.damage, 'world', 'CRUSHED')
@@ -2066,7 +2058,7 @@ export const continueRun = g => {
   }))
   saved.cardPool = saved.cardPool.filter(kind => SKILLS[kind])
   const relics = new Set(saved.player.relics.filter(id => RELIC_BY_ID[id]))
-  const player = { ...saved.player, skills: saved.player.skills.filter(known).slice(0, slotsOf({ keystones })), upgrades: new Set(saved.player.upgrades), relics, keystones, wasJump: true }
+  const player = { ...saved.player, skills: saved.player.skills.filter(known).slice(0, slotsOf({ keystones })), upgrades: new Set(saved.player.upgrades.filter(id => ALL_FORMS.has(id))), relics, keystones, wasJump: true }
   const secrets = (saved.secrets ?? []).filter(isCatalogued)
   Object.assign(g, fresh, saved, {
     rooms, player, omens, secrets,

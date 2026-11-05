@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Forces a loadout and a region, drives it with a bot, and reports what it did.
 //   node scripts/builds.mjs                                 every skill alone in every region, plus the bare gun
-//   node scripts/builds.mjs --pairs ember+gust,bolt+rod     named pairs in every region
+//   node scripts/builds.mjs --pairs ember+gust,bolt+repel   named pairs in every region
 //   node scripts/builds.mjs --pairs all --rooms 2           every pair, a sweep
 //   node scripts/builds.mjs --pairs ember:jet:torch+gust    forms follow the skill, separated by colons
 //   node scripts/builds.mjs --forms                         each skill's four finished forms in every region
@@ -74,15 +74,15 @@ const worker = async () => {
 
   const REACH = {
     bolt: 150, repel: 56, ember: 110, frost: 48, hammer: 22, gust: 70, blink: 200, grapple: 125, dash: 60, mason: 40, seed: 60, spring: 50,
-    acid: 110, melt: 56, alchemy: 48, well: 90, swap: 105, stop: 90, charm: 110, decoy: 120, drone: 150, rod: 70, mine: 50, roar: 60, mirror: 0, rewind: 0,
+    acid: 110, melt: 56, alchemy: 48, well: 90, swap: 105, stop: 90, charm: 110, drone: 150, mine: 50, roar: 60, rewind: 0,
     flask: 110, wick: 120,
     float: 80, link: 120,
     clay: 110, burrow: 0,
     lens: 160, chime: 110,
   }
   const WHEN = {
-    rewind: (g, foe, bot) => g.time - bot.lastHit < 1.5,
-    mirror: (g, foe, bot, me) => g.fireballs.some(b => !b.friendly && distance(b, me) < 42),
+    rewind: (g, foe, bot, me) => g.time - bot.lastHit < 1.5 || (g.player.upgrades.has('rewind.return') && g.fireballs.filter(b => !b.friendly && distance(b, me) < 60).length >= 2),
+    mason: (g, foe, bot, me) => Boolean(foe) && (g.player.upgrades.has('mason.pillar') ? distance(middle(foe), me) < 100 : distance(middle(foe), me) < REACH.mason && lineClear(g.world, me, middle(foe))),
     stop: (g, foe, bot, me) => g.enemies.filter(targetable).filter(e => distance(middle(e), me) < 100).length >= 2,
     blink: (g, foe, bot, me) => foe && distance(middle(foe), me) > 80,
     drone: (g, foe) => Boolean(foe) && g.effects.filter(f => f.kind === 'drone').length < 2,
