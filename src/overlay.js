@@ -4,21 +4,36 @@ import { RELIC_BY_ID } from './relics.js'
 import { nameOf } from './discover.js'
 import { SPRITES, creatureFrames } from './sprites.js'
 import { drawText, textWidth } from './font.js'
+import { CAUSE_ICONS, drawPictogram } from './pictograms.js'
+import { SCHOOLS } from './wards.js'
 
 const ROOM_PX = ROOM * BLOCK
-const REVEAL_COLOURS = { skill: '#f5e663', relic: '#ffb347', foe: '#ff6a5a', inhabitant: '#7dff8a', event: '#c78bff', warden: '#ff3a3a', omen: '#6fd0e0', seal: '#ffffff' }
+const REVEAL_COLOURS = { skill: '#f5e663', relic: '#ffb347', foe: '#ff6a5a', inhabitant: '#7dff8a', event: '#c78bff', warden: '#ff3a3a', omen: '#6fd0e0', seal: '#ffffff', keystone: '#ffe84a', mutation: '#ff5a4a' }
 const EVENT_ICONS = { arena: 'skull', chest: 'chest', flood: 'gills', gasworks: 'ember', collapse: 'hammer', vault: 'chest', nest: 'seed', altar: 'altar' }
 
 export const revealArt = ({ kind, id }) => {
   if (kind === 'skill') return SPRITES.icons[id]
   if (kind === 'relic') return SPRITES.icons[RELIC_BY_ID[id]?.icon]
+  if (kind === 'keystone') return SPRITES.icons[`key_${id}`]
+  if (kind === 'mutation') return SPRITES.icons[`mut_${id}`]
   if (kind === 'omen') return SPRITES.icons[`omen_${id}`]
   if (kind === 'event') return SPRITES.icons[EVENT_ICONS[id]]
   if (kind === 'seal') return SPRITES.icons.seal_broken
   return creatureFrames(artKind(id))[0]?.[0] ?? null
 }
 
+const drawFoeWards = (ctx, g) => {
+  for (const e of g.enemies) {
+    if (e.ward) drawPictogram(ctx, CAUSE_ICONS[e.ward], e.x + e.w / 2, Math.max(6, e.y - 7), SCHOOLS[e.ward])
+    if (e.stalkTo) {
+      ctx.strokeStyle = '#c79ae0'
+      ctx.strokeRect(Math.round(e.stalkTo.x) + 0.5, Math.round(e.stalkTo.y) + 0.5, e.w, e.h)
+    }
+  }
+}
+
 export const drawBossBar = (ctx, g) => {
+  drawFoeWards(ctx, g)
   const boss = g.boss
   if (!boss || !boss.maxHp) return
   const width = ROOM_PX - 24
@@ -27,6 +42,48 @@ export const drawBossBar = (ctx, g) => {
   ctx.fillRect(11, 3, width + 2, 5)
   ctx.fillStyle = boss.shield > 0 ? '#ffffff' : boss.stun > 0 ? '#f5e663' : '#ff3a3a'
   ctx.fillRect(12, 4, Math.round(width * share), 3)
+  drawWards(ctx, g, boss)
+}
+
+const auraPoint = (e, t) => {
+  const a = t * Math.PI * 2
+  return { x: e.x + e.w / 2 + Math.cos(a) * (e.w / 2 + 6), y: e.y + e.h / 2 + Math.sin(a) * (e.h / 2 + 6) }
+}
+
+const drawAura = (ctx, g, e, school, index) => {
+  const flash = (e.wardHit ?? 0) > 0
+  ctx.fillStyle = flash ? '#ffffff' : SCHOOLS[school]
+  const dots = 18 + Math.round((e.w + e.h) / 6)
+  for (let i = 0; i < dots; i++) {
+    if ((i + index) % 3 === 2 && !flash) continue
+    const { x, y } = auraPoint(e, i / dots + g.time * (index ? -0.12 : 0.12))
+    const size = flash || i % 3 === 0 ? 2 : 1
+    ctx.fillRect(Math.round(x), Math.round(y), size, size)
+  }
+}
+
+const wornSpot = (e, index) => ({ x: e.x + e.w / 2 + (index - 0.5) * 12 * (e.wards.length - 1), y: Math.max(16, e.y - 12) })
+
+const drawReading = (ctx, g, e, school) => {
+  const t = 1 - e.reading / TUNING.run.wards.readTime
+  const from = { x: g.player.x + g.player.w / 2, y: g.player.y + 4 }
+  const to = wornSpot(e, 0)
+  const flight = Math.min(1, t * 1.6)
+  const eased = flight * flight * (3 - 2 * flight)
+  const scale = t < 0.62 ? 2 : Math.max(1, Math.round(3 - (t - 0.62) * 6))
+  drawPictogram(ctx, CAUSE_ICONS[school], from.x + (to.x - from.x) * eased, from.y + (to.y - from.y) * eased, SCHOOLS[school], scale)
+}
+
+const drawWards = (ctx, g, e) => {
+  e.wards?.forEach(({ school }, index) => {
+    drawAura(ctx, g, e, school, index)
+    drawPictogram(ctx, CAUSE_ICONS[school], ROOM_PX - 10 - index * 11, 14, SCHOOLS[school])
+    if (e.reading > 0 && index === 0) drawReading(ctx, g, e, school)
+    else {
+      const { x, y } = wornSpot(e, index)
+      drawPictogram(ctx, CAUSE_ICONS[school], x, y + Math.round(Math.sin(g.time * 4)), (e.wardHit ?? 0) > 0 ? '#ffffff' : SCHOOLS[school])
+    }
+  })
 }
 
 const RAYS = 16

@@ -65,7 +65,9 @@ const render = () => {
   const { shaders } = save.settings
   const limit = { full: 1, soft: 0.5, off: 0.25 }[shaders]
   const pulse = { full: 1, soft: 0.4, off: 0 }[shaders]
-  present(source, { ...state, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse, stop: state.timeStop > 0 ? 1 : 0 })
+  const summary = state.menus.at(-1)?.page === 'summary' ? state.menus.at(-1) : null
+  const desat = summary ? Math.min(state.desat, Math.max(0.3, 1 - summary.age * 0.7)) : state.desat
+  present(source, { ...state, desat, depth: Math.min(state.shownDepth, limit), pulse: state.pulse * pulse, stop: state.timeStop > 0 ? 1 : state.held ? 0.3 : 0 })
 }
 
 let last = performance.now()

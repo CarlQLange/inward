@@ -5,9 +5,8 @@ import { almanacColumns, isTouchLayout } from './layout.js'
 import { SKILL_NAMES, formOf } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
+import { slotsOf } from './keystones.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
-
-const P = TUNING.player
 
 export const openMenu = (g, menu) => g.menus.push({ selected: 0, armed: false, layout: 'list', back: true, age: 0, opened: g.time, ...menu })
 
@@ -63,7 +62,7 @@ const openOptions = g => openMenu(g, {
           {
             label: 'FORGET',
             run: gc => {
-              Object.assign(save, { best: 0, bestChain: 0, runs: 0, coresReached: 0, deepest: 0, worldKills: 0, found: [], ghost: null })
+              Object.assign(save, { best: 0, bestChain: 0, runs: 0, coresReached: 0, deepest: 0, worldKills: 0, deepestLoop: 0, hall: [], last: null, found: [], ghost: null })
               knownNotes.clear()
               persist()
               closeMenu(gc)
@@ -126,6 +125,16 @@ export const openPause = g => openMenu(g, {
 export const openSkills = openPause
 export const openMap = openPause
 
+export const openChoice = (g, { bank, deeper, stop, go }) => openMenu(g, {
+  page: 'choice',
+  layout: 'cards',
+  back: false,
+  delay: TUNING.run.choiceDelay,
+  bank,
+  deeper,
+  items: [{ id: 'stop', run: stop }, { id: 'deeper', run: go }],
+})
+
 export const openSummary = g => openMenu(g, {
   page: 'summary',
   back: false,
@@ -187,7 +196,7 @@ const stepPauseFocus = (g, menu, moved) => {
   const p = g.player
   if (menu.focus === 'list') {
     if (moved.left && p.skills.length > 0) menu.focus = 'skills'
-    if (moved.right && p.relics.size > 0) menu.focus = 'relics'
+    if (moved.right && p.relics.size + p.keystones.size > 0) menu.focus = 'relics'
     return false
   }
   if (menu.focus === 'skills') {
@@ -196,7 +205,7 @@ const stepPauseFocus = (g, menu, moved) => {
     if (moved.down) menu.slot = cycle(menu.slot, 1, p.skills.length)
     return true
   }
-  const count = p.relics.size
+  const count = p.relics.size + p.keystones.size
   if (moved.left && menu.relic % 5 === 0) menu.focus = 'list'
   else if (moved.left) menu.relic -= 1
   if (moved.right) menu.relic = Math.min(count - 1, menu.relic + 1)
@@ -250,7 +259,7 @@ const leave = (g, menu) => {
 }
 
 const settled = (g, menu, input) => {
-  const waited = menu.layout !== 'cards' || g.time - menu.opened > TUNING.input.cardDelay
+  const waited = menu.layout !== 'cards' || g.time - menu.opened > (menu.delay ?? TUNING.input.cardDelay)
   return waited && !input.jump && !input.click && !input.confirm
 }
 
@@ -285,4 +294,4 @@ export const stepMenus = (g, input) => {
   if (g.menus.length === 0 && input.click) g.player.holdFire = true
 }
 
-export const slotsFull = p => p.skills.length >= P.skillSlots
+export const slotsFull = p => p.skills.length >= slotsOf(p)

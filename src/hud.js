@@ -3,6 +3,7 @@ import { SPRITES } from './sprites.js'
 import { SCARF_RED } from './hero.js'
 import { drawText, textWidth } from './font.js'
 import { RELIC_BY_ID } from './relics.js'
+import { heartCap, slotsOf } from './keystones.js'
 import { drawMapGrid } from './screens.js'
 import { skillAction } from './controls.js'
 import { drawPrompt, promptWidth } from './glyphs.js'
@@ -24,7 +25,7 @@ const HIT = '#ff5a4a'
 
 const SLOT = 32
 const SLOT_X = 34
-const SLOT_GAP = 42
+const slotGap = p => (slotsOf(p) > 3 ? 33 : 42)
 const SPAN = 15 * 5 + 3
 
 const readiness = new WeakMap()
@@ -44,7 +45,7 @@ const corners = (ctx, x, y, size, colour) => {
 }
 
 const drawSkillSlot = (ctx, g, slot) => {
-  const top = ORIGIN.y + slot * SLOT_GAP
+  const top = ORIGIN.y + slot * slotGap(g.player)
   const skill = g.player.skills[slot]
   if (!skill) {
     corners(ctx, SLOT_X, top, SLOT, DIM)
@@ -83,7 +84,7 @@ const drawHearts = (ctx, g, top) => {
   const pitch = 9
   const left = Math.floor((101 - max * pitch) / 2)
   const pulse = hp <= 2 && Math.floor(g.time * 6) % 2 === 0
-  for (let i = 0; i < max; i++) {
+  for (let i = 0; i < heartCap(g.player); i++) {
     const on = i < hp
     const jolt = g.hurtFlash > 0.4 ? Math.round((Math.random() - 0.5) * 3) : 0
     ctx.fillStyle = on ? (pulse ? WHITE : RED) : RED_DIM
@@ -103,8 +104,9 @@ const drawCounts = (ctx, g, top) => {
 }
 
 const drawLeft = (ctx, g) => {
-  for (let slot = 0; slot < TUNING.player.skillSlots; slot++) drawSkillSlot(ctx, g, slot)
-  const below = ORIGIN.y + TUNING.player.skillSlots * SLOT_GAP + 4
+  const slots = slotsOf(g.player)
+  for (let slot = 0; slot < slots; slot++) drawSkillSlot(ctx, g, slot)
+  const below = ORIGIN.y + slots * slotGap(g.player) + 4
   drawHearts(ctx, g, below)
   drawCounts(ctx, g, below + 10)
   drawHitNote(ctx, g, 50, below + 34)
@@ -123,13 +125,23 @@ const rollScore = (g, dt = 1 / 60) => {
   return Math.round(g.shownScore)
 }
 
+const deepMarks = g => [...g.omens.slice(1).map(id => `omen_${id}`), ...g.mutations.map(id => `mut_${id}`)]
+
+const drawMarks = (ctx, names, x, top, per = 8) => names.forEach((name, n) => {
+  ctx.drawImage(SPRITES.icons[name], x + (n % per) * 10, top + Math.floor(n / per) * 10, 9, 9)
+})
+
 const drawRelicRow = (ctx, g, x, top) => {
-  let n = 0
   ctx.imageSmoothingEnabled = false
-  for (const id of g.player.relics) {
-    ctx.drawImage(SPRITES.icons[RELIC_BY_ID[id].icon], x + (n % 8) * 10, top + Math.floor(n / 8) * 10, 9, 9)
-    n += 1
-  }
+  drawMarks(ctx, [
+    ...[...g.player.keystones].map(id => `glyph_${id}`),
+    ...deepMarks(g),
+    ...[...g.player.relics].map(id => RELIC_BY_ID[id].icon),
+  ], x, top)
+}
+
+const drawLoopFactor = (ctx, g, x, y) => {
+  if (g.loop > 0) drawText(ctx, `X${g.loop + 1}`, x, y, YELLOW)
 }
 
 const drawXp = (ctx, g, x, top) => {
@@ -153,7 +165,9 @@ const drawRight = (ctx, g) => {
   let y = ORIGIN.y + SPAN + 8
   numberRight(ctx, rollScore(g), x + SPAN, y, WHITE, 2)
   y += 13
-  numberRight(ctx, g.best, x + SPAN, y, DIM)
+  if (g.bestBeaten) numberRight(ctx, 'BEST', x + SPAN, y, Math.floor(g.time * 3) % 2 ? YELLOW : WHITE)
+  else numberRight(ctx, g.best, x + SPAN, y, DIM)
+  drawLoopFactor(ctx, g, x, y)
   y += 9
   drawXp(ctx, g, x, y)
   drawText(ctx, g.level, x, y + 6, GREEN)
@@ -208,7 +222,7 @@ const mark = (ctx, rows, cx, cy, colour, scale = 2) => {
   }))
 }
 
-const SKILL_SLOTS = { skill: 0, skill2: 1, skill3: 2 }
+const SKILL_SLOTS = { skill: 0, skill2: 1, skill3: 2, skill4: 3 }
 
 const drawSkillButton = (ctx, g, b, held) => {
   const skill = g.player.skills[SKILL_SLOTS[b.action]]
@@ -267,6 +281,7 @@ export const drawTouchControls = (ctx, g) => {
   if (!isTouchLayout()) return
   ctx.imageSmoothingEnabled = false
   const menu = g.menus.at(-1)
+  touchView.slots = slotsOf(g.player)
   if (g.phase === 'playing' && !menu) {
     drawStick(ctx)
     for (const b of touchButtons()) {
@@ -287,14 +302,15 @@ const drawTallHud = (ctx, g) => {
   const top = inset.top + 3
   const left = inset.left + 22
   const { hp } = g.player
-  for (let i = 0; i < TUNING.player.hp; i++) {
+  for (let i = 0; i < heartCap(g.player); i++) {
     ctx.fillStyle = i < hp ? (hp <= 2 && Math.floor(g.time * 6) % 2 === 0 ? WHITE : RED) : RED_DIM
     ctx.fillRect(left + i * 6, top + 1, 5, i < hp ? 4 : 2)
   }
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(SPRITES.icons.coin, left + 52, top, 7, 7)
   drawText(ctx, g.gold, left + 61, top + 1, YELLOW)
-  numberRight(ctx, rollScore(g), VIEW.w - inset.right - 4, top + 1, WHITE)
+  numberRight(ctx, rollScore(g), VIEW.w - inset.right - 4, top + 1, g.bestBeaten ? YELLOW : WHITE)
+  drawLoopFactor(ctx, g, VIEW.w - inset.right - 4 - textWidth(String(rollScore(g))) - 14, top + 1)
   const xpTop = ORIGIN.y - 4
   const width = VIEW.w - inset.left - inset.right - 8
   ctx.fillStyle = DIM
@@ -309,6 +325,7 @@ const drawTallHud = (ctx, g) => {
   drawText(ctx, g.level, inset.left + 68, below + 14, GREEN)
   drawChainCount(ctx, g, inset.left + 90, below + 2)
   drawHitNote(ctx, g, VIEW.w - inset.right - 16, below + 12)
+  drawMarks(ctx, [...[...g.player.keystones].map(id => `glyph_${id}`), ...deepMarks(g)], inset.left + 52, below + 25, 12)
 }
 
 const drawWideHud = (ctx, g) => {
@@ -316,14 +333,15 @@ const drawWideHud = (ctx, g) => {
   const left = inset.left + 22
   const top = inset.top + 4
   const { hp } = g.player
-  for (let i = 0; i < TUNING.player.hp; i++) {
+  for (let i = 0; i < heartCap(g.player); i++) {
     ctx.fillStyle = i < hp ? (hp <= 2 && Math.floor(g.time * 6) % 2 === 0 ? WHITE : RED) : RED_DIM
     ctx.fillRect(left + i * 7, top + 1, 6, i < hp ? 4 : 2)
   }
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(SPRITES.icons.coin, inset.left + 6, top + 14, 8, 8)
   drawText(ctx, g.gold, inset.left + 16, top + 16, YELLOW)
-  drawText(ctx, rollScore(g), inset.left + 6, top + 26, WHITE, 2)
+  drawLoopFactor(ctx, g, inset.left + 50, top + 16)
+  drawText(ctx, rollScore(g), inset.left + 6, top + 26, g.bestBeaten ? YELLOW : WHITE, 2)
   const col = Math.max(40, ORIGIN.x - inset.left - 14)
   ctx.fillStyle = DIM
   ctx.fillRect(inset.left + 6, top + 40, col, 3)

@@ -1,12 +1,12 @@
 const ARROW_HAND = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
   KeyZ: 'jump', KeyX: 'shoot',
-  KeyC: 'skill', KeyV: 'skill2', KeyB: 'skill3',
+  KeyC: 'skill', KeyV: 'skill2', KeyB: 'skill3', KeyN: 'skill4',
 }
 
 const MOUSE_HAND = {
   KeyW: 'up', KeyA: 'left', KeyS: 'down', KeyD: 'right',
-  KeyQ: 'skill', KeyE: 'skill2', KeyR: 'skill3',
+  KeyQ: 'skill', KeyE: 'skill2', KeyR: 'skill3', KeyT: 'skill4',
 }
 
 const EITHER_HAND = {
@@ -23,7 +23,7 @@ const EITHER_HAND = {
 
 export const KEYS = { ...ARROW_HAND, ...MOUSE_HAND, ...EITHER_HAND }
 
-export const SKILL_ACTIONS = ['skill', 'skill2', 'skill3']
+export const SKILL_ACTIONS = ['skill', 'skill2', 'skill3', 'skill4']
 
 const keycap = (label, wide) => ({ kind: 'key', label, wide })
 const mouse = button => ({ kind: 'mouse', button })
@@ -47,7 +47,7 @@ const PROMPTS = {
     aim: { kind: 'key', icon: 'arrows' },
     jump: keycap('Z'),
     shoot: keycap('X'),
-    skill: keycap('C'), skill2: keycap('V'), skill3: keycap('B'),
+    skill: keycap('C'), skill2: keycap('V'), skill3: keycap('B'), skill4: keycap('N'),
   },
   mouse: {
     ...ANY_HAND_PROMPTS,
@@ -55,7 +55,7 @@ const PROMPTS = {
     aim: mouse('move'),
     jump: { kind: 'key', icon: 'space' },
     shoot: mouse('left'),
-    skill: keycap('Q'), skill2: keycap('E'), skill3: keycap('R'),
+    skill: keycap('Q'), skill2: keycap('E'), skill3: keycap('R'), skill4: keycap('T'),
     confirm: mouse('left'),
   },
   touch: {},
@@ -68,6 +68,7 @@ const PROMPTS = {
     skill: pad(1),
     skill2: pad(3),
     skill3: pad(5),
+    skill4: pad('rstick'),
     shoot: pad(7),
     bomb: pad(4),
     look: pad(6),

@@ -51,12 +51,20 @@ export const OMENS = {
 
 const BASELINE = structuredClone(TUNING)
 
-export const applyOmen = id => {
+export const applyOmens = ids => {
   for (const [section, values] of Object.entries(BASELINE)) {
     if (typeof values === 'object') Object.assign(TUNING[section], structuredClone(values))
   }
-  for (const [section, values] of Object.entries(OMENS[id]?.tuning ?? {})) Object.assign(TUNING[section], values)
+  for (const id of ids) {
+    for (const [section, values] of Object.entries(OMENS[id]?.tuning ?? {})) Object.assign(TUNING[section], values)
+  }
 }
 
-export const omenTheme = (id, theme) => OMENS[id]?.gen?.(theme) ?? theme
-export const omenFoes = id => OMENS[id]?.foes ?? {}
+export const omenTheme = (ids, theme) => ids.reduce((shaped, id) => OMENS[id]?.gen?.(shaped) ?? shaped, theme)
+
+export const omenFoes = ids => ids.reduce((all, id) => {
+  const foes = OMENS[id]?.foes ?? {}
+  return { ...all, ...foes, hp: (all.hp ?? 1) * (foes.hp ?? 1) }
+}, {})
+
+export const omenAmbient = ids => Math.min(1, ...ids.map(id => OMENS[id]?.ambient ?? 1))

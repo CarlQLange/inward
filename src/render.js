@@ -42,9 +42,9 @@ const drawShot = (ctx, s) => {
   const uy = s.vy / speed
   const x = s.x + s.w / 2
   const y = s.y + s.h / 2
-  ctx.fillStyle = s.friendly ? '#fff3b4' : COLOURS.pale
+  ctx.fillStyle = s.colour ?? (s.friendly ? '#fff3b4' : COLOURS.pale)
   for (let i = 2; i <= 6; i++) ctx.fillRect(Math.round(x - ux * i), Math.round(y - uy * i), 1, 1)
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = s.colour ?? '#ffffff'
   ctx.fillRect(Math.round(s.x), Math.round(s.y), s.w, s.h)
 }
 

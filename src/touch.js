@@ -31,13 +31,14 @@ export const touchButtons = () => {
   const skillRow = bottom - 74
   const extras = isTall()
     ? [{ action: 'bomb', x: right - 118, y: bottom - 22, r: 12 }, { action: 'look', x: right - 118, y: bottom - 56, r: 12 }]
-    : [{ action: 'bomb', x: right - 20, y: bottom - 106, r: 12 }, { action: 'look', x: right - 52, y: bottom - 106, r: 12 }]
+    : [{ action: 'bomb', x: right - 84, y: bottom - 106, r: 12 }, { action: 'look', x: right - 52, y: bottom - 106, r: 12 }]
   return [
     { action: 'jump', x: right - 25, y: bottom - 25, r: 24 },
     { action: 'shoot', x: right - 76, y: bottom - 22, r: 22 },
     { action: 'skill', x: right - 20, y: skillRow, r: 14 },
     { action: 'skill2', x: right - 52, y: skillRow, r: 14 },
     { action: 'skill3', x: right - 84, y: skillRow, r: 14 },
+    ...(touchView.slots > 3 ? [{ action: 'skill4', x: right - 20, y: skillRow - 30, r: 14 }] : []),
     ...extras,
   ]
 }
@@ -46,7 +47,7 @@ const fingers = new Map()
 const flicked = new Set()
 let tap = null
 
-export const touchView = { stick: null, held: new Set(), aim: null }
+export const touchView = { stick: null, held: new Set(), aim: null, slots: 3 }
 
 const toView = (screen, touch) => {
   const box = screen.getBoundingClientRect()
