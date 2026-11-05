@@ -41,7 +41,9 @@ The game draws to a low-resolution 2D canvas, and a WebGL pass presents it, whic
 is where distance-from-core effects live. Tuning values live together in
 `src/config.js`. Tiles, creatures and icons are generated sheets in `art/raw/`,
 reduced to chunky atlases in `assets/`. Flames are bitmaps in code, and the player
-is drawn procedurally each frame.
+is drawn procedurally each frame. Creatures are named clips listed in `art/anim.py`;
+`creatures.js` picks a clip from the creature's state. If a body size changes, copy
+`art/proof/body-sizes.json` into the table in `cast.js`, which drives shot boxes.
 
 Presentation is separate from the simulation. `hero.js` animates and draws the player,
 `fx.js` holds particles, shake, slow motion, door slides and the moments, `creatures.js`

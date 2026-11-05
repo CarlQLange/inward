@@ -1,11 +1,11 @@
 const ART = {
-  crawler: [24, 17], spitter: [20, 21], fish: [20, 16], spore: [20, 20], bat: [26, 15], slug: [29, 17], jelly: [23, 17],
-  worm: [24, 23], turret: [22, 13], bomber: [14, 24], imp: [23, 22], emberbat: [25, 19], slime: [21, 13], crab: [21, 22],
-  nest: [14, 24], mimic: [19, 22], gasbag: [27, 24], tick: [10, 7], pillbug: [20, 14], stilt: [22, 28], snapweed: [12, 28],
-  scrapper: [23, 24], dripper: [11, 21], shade: [22, 27], urchin: [22, 22], coil: [15, 26], lantern: [23, 22],
-  mole: [19, 23], hermit: [14, 24], miner: [26, 23], cartographer: [24, 21], tinker: [22, 24], bloodletter: [15, 24],
-  bellows: [66, 62], colossus: [68, 58], crucible: [65, 68], eel: [28, 26], eelseg: [18, 20], brood: [43, 68],
-  conductor: [74, 64], core: [62, 61],
+  crawler: [23, 12], spitter: [21, 17], fish: [21, 18], spore: [20, 20], bat: [29, 19], slug: [26, 18], jelly: [17, 21],
+  worm: [17, 25], turret: [22, 13], bomber: [15, 24], imp: [22, 26], emberbat: [28, 20], slime: [22, 17], crab: [24, 18],
+  nest: [16, 24], mimic: [22, 16], gasbag: [15, 24], tick: [10, 6], pillbug: [20, 12], stilt: [27, 27], snapweed: [12, 26],
+  scrapper: [20, 24], dripper: [12, 20], shade: [20, 24], urchin: [21, 20], coil: [20, 26], lantern: [24, 21],
+  mole: [22, 24], hermit: [17, 22], miner: [22, 22], cartographer: [25, 21], tinker: [21, 24], bloodletter: [16, 24],
+  bellows: [66, 65], colossus: [69, 59], crucible: [54, 68], eel: [28, 26], eelseg: [16, 19], brood: [43, 65],
+  conductor: [48, 66], core: [64, 54],
 }
 
 const ANCHORS = {
@@ -28,7 +28,7 @@ const TOPS = {
   wall: (e, h) => e.y + e.h / 2 - h / 2,
 }
 
-export const artTop = (e, height) => TOPS[anchorOf(e.kind)](e, height)
+export const artTop = (e, height) => TOPS[e.fallen ? 'ground' : anchorOf(e.kind)](e, height)
 
 export const shotBox = e => {
   const art = ART[e.kind]

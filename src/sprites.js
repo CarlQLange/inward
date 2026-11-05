@@ -99,7 +99,12 @@ let castAliases = {}
 
 const castEntry = kind => SPRITES.cast[castAliases[kind] ?? kind]
 
-export const creatureFrames = kind => castEntry(kind)?.frames ?? []
+export const creatureClip = (kind, name) => castEntry(kind)?.clips[name]
+
+export const creatureFrames = kind => {
+  const clips = castEntry(kind)?.clips
+  return clips ? Object.values(clips)[0].frames : []
+}
 
 export const creatureAnchor = kind => castEntry(kind)?.anchor ?? 'ground'
 
@@ -116,12 +121,13 @@ const loadCast = async () => {
     fetch('assets/cast.json').then(response => response.json()),
   ])
   castAliases = aliases
-  SPRITES.cast = Object.fromEntries(Object.entries(creatures).map(([kind, { anchor, frames }]) => [kind, {
+  const cut = box => {
+    const sprite = cutBox(atlas, box)
+    return [sprite, flipped(sprite)]
+  }
+  SPRITES.cast = Object.fromEntries(Object.entries(creatures).map(([kind, { anchor, clips }]) => [kind, {
     anchor,
-    frames: frames.map(box => {
-      const sprite = cutBox(atlas, box)
-      return [sprite, flipped(sprite)]
-    }),
+    clips: Object.fromEntries(Object.entries(clips).map(([name, clip]) => [name, { ...clip, frames: clip.frames.map(cut) }])),
   }]))
 }
 

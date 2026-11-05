@@ -1,5 +1,4 @@
-import { ENEMY_DEFS } from './enemies.js'
-import { paintFrames, creatureFrames as spriteFrames } from './sprites.js'
+import { paintFrames, creatureClip } from './sprites.js'
 import { artKind, artTop } from './cast.js'
 import { setPixelSource } from './fx.js'
 
@@ -11,25 +10,107 @@ const GAS = '#c79ae0'
 const PALE = '#c9d4c0'
 const ELITE_COLOURS = { burning: FIRE, charged: CHARGE, armoured: PALE }
 
-const STRIDE = { crawler: 7, bat: 10, emberbat: 11, fish: 5, jelly: 3, gasbag: 2, slug: 2, imp: 6, coil: 6, tick: 8, stilt: 3, spore: 3, lantern: 3 }
-
 const LAMP = paintFrames(['..c...', '..c...', '.cccc.', 'cyyyyc', 'cyyyyc', '.cccc.'], { c: '#5a5a52', y: '#ffd24a' })
 const ORBIT = paintFrames(['..ss..', '.sSSs.', 'sSSSSs', 'sSSSds', '.sdds.', '..ss..'], { s: '#7a2a34', S: '#d94a5a', d: '#a03040' })
-const LOCAL_ART = { lamp: [LAMP], orbit: [ORBIT] }
+const still = frame => ({ idle: { fps: 0, loop: true, frames: [frame] } })
+const LOCAL_ART = { lamp: still(LAMP), orbit: still(ORBIT) }
 
-const framesOf = kind => LOCAL_ART[kind] ?? spriteFrames(artKind(kind))
+const clipOf = (kind, name) => LOCAL_ART[kind]?.[name] ?? creatureClip(artKind(kind), name)
 
-const frameIndex = (e, frames, time) => {
-  if (frames.length < 2) return 0
-  if (e.windup || e.lit || e.frame === 1 || e.stage === 'tell' || e.stage === 'act' || e.ball || e.loaded) return 1
-  const stride = STRIDE[e.kind]
-  return stride ? Math.floor(time * stride) % frames.length : 0
+const near = (e, g, reach) => Math.hypot(g.player.x - e.x, g.player.y - e.y) < reach
+
+const STRIKE_AT = { bat: 38, fish: 30, worm: 30 }
+
+const SPECIALS = {
+  bat: (e, g) => (!e.awake ? 'idle' : near(e, g, STRIKE_AT.bat) && 'attack'),
+  fish: (e, g) => near(e, g, STRIKE_AT.fish) && 'attack',
+  worm: (e, g) => near(e, g, STRIKE_AT.worm) && 'attack',
+  tick: e => (e.clung > 0 ? 'cling' : !e.grounded ? 'leap' : e.windup ? 'attack' : 'idle'),
+  coil: (e, g, a) => (e.windup ? 'attack' : !e.grounded ? 'leap' : g.time - (a.landed ?? -1) < 0.25 ? 'land' : 'idle'),
+  mimic: (e, g) => (!e.awake ? 'idle' : near(e, g, 22) ? 'attack' : 'move'),
+  pillbug: e => e.ball > 0 && 'ball',
+  puffer: e => e.swell > 0 && 'inflate',
+  scrapper: e => !e.loaded && !e.windup && 'empty',
+  bomber: e => e.lit > 0 && 'lit',
+  lantern: e => e.lunging > 0 && 'attack',
+  nest: e => e.cooldown < 0.5 && 'attack',
+  urchin: e => e.flash > 0 && 'attack',
+  brood: e => e.fallen && (e.grounded ? 'fallen' : 'falling'),
+  core: e => e.phase > 0 && `idle${e.phase}`,
 }
 
-const creatureArt = (e, time) => {
-  const frames = framesOf(e.kind)
-  return frames[frameIndex(e, frames, time)][e.facing > 0 ? 0 : 1]
+const MOVE_CLIPS = { bellows: { spark: 'bloat' }, crucible: { stride: 'move' }, eel: { leap: 'move' } }
+
+const FRIENDLY_REACH = 34
+
+const telling = e => Boolean(e.windup || e.aimAt || e.stage === 'tell' || e.stage === 'lunge')
+const striking = e => telling(e) || e.stage === 'act'
+
+const attackClip = e => {
+  const named = MOVE_CLIPS[e.kind]?.[e.move] ?? e.move
+  return named && clipOf(e.kind, named) ? named : 'attack'
 }
+
+const wanted = (e, g, a) => {
+  if (e.friendly && near(e, g, FRIENDLY_REACH)) return 'greet'
+  const special = SPECIALS[e.kind]?.(e, g, a)
+  if (special) return special
+  if (striking(e)) return attackClip(e)
+  return Math.hypot(e.vx ?? 0, e.vy ?? 0) > 2 ? 'move' : 'idle'
+}
+
+const FALLBACK = ['idle', 'move']
+
+const resolved = (kind, name) => [name, ...FALLBACK].find(n => clipOf(kind, n)) ?? Object.keys(LOCAL_ART[kind] ?? {})[0]
+
+const LOW = new Set(['idle', 'move', 'empty', 'idle1', 'idle2'])
+
+const PACE = 0.85
+
+const frameRate = (e, clip) => {
+  if (e.frozen > 0 || e.asleep) return 0
+  if (!clip.walk) return clip.fps * (e.stun > 0 ? 0.3 : 1)
+  const speed = Math.abs(e.vx ?? 0)
+  const [frame] = clip.frames
+  return speed < 1 ? 0 : Math.max(2.5, (speed / (frame[0].width * PACE)) * clip.frames.length)
+}
+
+const frameAt = (clip, a, chosen, tell) => {
+  const at = Math.floor(a.clipTime)
+  const last = clip.frames.length - 1
+  if (clip.loop) return at % clip.frames.length
+  if (chosen && tell && clip.hold !== undefined) return Math.min(at, clip.hold)
+  if (chosen && clip.sustain) {
+    const [from, to] = clip.sustain
+    return at <= to ? at : from + (at - from) % (to - from + 1)
+  }
+  return Math.min(at, last)
+}
+
+const stepClip = (e, a, g, dt) => {
+  const name = resolved(e.kind, wanted(e, g, a))
+  const playing = a.clip && clipOf(e.kind, a.clip)
+  const unfinished = playing && !playing.loop && LOW.has(name) && Math.floor(a.clipTime) < playing.frames.length
+  if (!unfinished && name !== a.clip) {
+    a.clip = name
+    a.clipTime = 0
+  }
+  const clip = clipOf(e.kind, a.clip)
+  const chosen = a.clip === name
+  const tell = telling(e)
+  a.clipTime += frameRate(e, clip) * dt
+  if (chosen && tell && !clip.loop && clip.hold !== undefined) a.clipTime = Math.min(a.clipTime, clip.hold + 0.99)
+  a.frame = clip.frames[frameAt(clip, a, chosen, tell)]
+  return clip
+}
+
+const artFor = e => {
+  const a = anims.get(e)
+  const frame = a?.frame ?? clipOf(e.kind, resolved(e.kind, 'idle')).frames[0]
+  return frame[e.facing > 0 ? 0 : 1]
+}
+
+const anims = new WeakMap()
 
 const silhouettes = new WeakMap()
 
@@ -76,12 +157,10 @@ const artOrigin = (e, art) => ({
 })
 
 setPixelSource(e => {
-  const art = creatureArt(e, 0)
+  const art = artFor(e)
   const { x, y } = artOrigin(e, art)
   return pixelsOf(art).map(({ dx, dy, colour }) => ({ x: x + dx, y: y + dy, colour }))
 })
-
-const anims = new WeakMap()
 
 const animOf = (e, time) => {
   if (!anims.has(e)) anims.set(e, { stretch: 0, speed: 0, grounded: e.grounded, walked: e.grounded === true, vy: 0, flash: 0, last: time })
@@ -94,37 +173,36 @@ const DAMP = 22
 const stepAnim = (e, a, time) => {
   const dt = Math.min(0.05, Math.max(0, time - a.last))
   a.last = time
+  if (e.grounded && !a.grounded) a.landed = time
   if ((e.flash ?? 0) > a.flash) a.stretch = -0.34
   a.flash = e.flash ?? 0
   if (e.grounded) a.walked = true
   if (e.grounded && !a.grounded && a.vy > 50) a.stretch = -Math.min(0.42, a.vy / 420)
   if (!e.grounded && a.grounded && e.vy < -40) {
     a.stretch = 0.32
-    a.hopper = true
   }
   a.grounded = e.grounded
   a.vy = e.vy
   a.speed += (-SPRING * a.stretch - DAMP * a.speed) * dt
   a.stretch += a.speed * dt
+  return dt
 }
 
-const poseOf = (e, a, time) => {
+const poseOf = (e, a, time, clip) => {
   if (e.frozen > 0) return { sx: 1, sy: 1, lean: 0, bob: 0 }
   const moving = Math.abs(e.vx) > 2
   const flyer = !a.walked
   const phase = time * 8 + (e.wander ?? 0)
   const windup = e.windup && e.stun <= 0 && !e.friendly
-  const swell = windup ? 0.12 + Math.sin(time * 26) * 0.04 : e.lit ? 0.14 + Math.sin(time * 40) * 0.08 : 0
-  const crouched = a.hopper && e.grounded && e.cooldown < 0.14 && e.cooldown > 0 ? -0.28 : 0
-  const airborne = !flyer && !e.grounded ? Math.max(-0.12, Math.min(0.2, -e.vy / 900)) : 0
+  const swell = windup ? 0.03 + Math.sin(time * 26) * 0.02 : e.lit ? 0.03 + Math.sin(time * 40) * 0.03 : 0
+  const airborne = !flyer && !e.grounded ? Math.max(-0.06, Math.min(0.1, -e.vy / 1800)) : 0
   const drifting = flyer && !e.heavy && Math.hypot(e.vx ?? 0, e.vy ?? 0) > 1
-  const flap = drifting ? Math.sin(phase * 1.4) * 0.07 : 0
-  const stretch = a.stretch + crouched + airborne + flap
+  const stretch = a.stretch + airborne
   return {
     sx: 1 + swell - stretch * 0.75,
     sy: 1 + swell + stretch,
     lean: Math.round(Math.max(-2, Math.min(2, (e.vx ?? 0) / 22))),
-    bob: drifting ? Math.round(Math.sin(phase) * 1.2) : moving && e.grounded ? -Math.round(Math.abs(Math.sin(phase)) * 1) : 0,
+    bob: drifting ? Math.round(Math.sin(phase) * 1.2) : moving && e.grounded && !clip.walk ? -Math.round(Math.abs(Math.sin(phase))) : 0,
   }
 }
 
@@ -149,16 +227,31 @@ const telegraphColour = (e, time) => {
   return pattern ? pattern[Math.floor(time * (e.lit ? 26 : 18)) % 4] : null
 }
 
+const STALK = '#4a7a2a'
+const STALK_SHADE = '#2a4a18'
+
+const stalk = (ctx, e, top) => {
+  const x = Math.round(e.x + e.w / 2)
+  const from = Math.round(e.anchor.y)
+  if (top <= from) return
+  ctx.fillStyle = STALK_SHADE
+  ctx.fillRect(x - 2, from, 4, top - from + 2)
+  ctx.fillStyle = STALK
+  ctx.fillRect(x - 1, from, 2, top - from + 2)
+}
+
 const drawOne = (ctx, g, e) => {
   const time = g.time
   const a = animOf(e, time)
-  stepAnim(e, a, time)
-  const art = creatureArt(e, time)
-  const pose = poseOf(e, a, time)
+  const dt = stepAnim(e, a, time)
+  const clip = stepClip(e, a, g, dt)
+  const art = artFor(e)
+  const pose = poseOf(e, a, time, clip)
   const jitter = e.stun > 0 && e.frozen <= 0 ? Math.round(Math.sin(time * 60)) : 0
   const { x, y } = artOrigin(e, art)
   const at = x + jitter
   if (e.stowed) return
+  if (e.anchor) stalk(ctx, e, y)
   if (e.intangible) ctx.globalAlpha = 0.35
   if (e.elite || e.ally) ring(ctx, art, at, y, pose, e.ally ? GAS : ELITE_COLOURS[e.elite])
   stamp(ctx, art, at, y, pose)
