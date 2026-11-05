@@ -403,7 +403,6 @@ const shaft = (grid, c, top, bottom, ladders) => {
   for (let y = Math.max(top, 1); y <= bottom; y++) {
     for (let x = c; x <= c + 3; x++) grid[y][x] = ladders && (x === c + 1 || x === c + 2) ? 'v' : '.'
   }
-  if (ladders) return
   let side = 0
   let last = top
   const ledge = y => {
@@ -411,7 +410,7 @@ const shaft = (grid, c, top, bottom, ladders) => {
     side = side === 0 ? 3 : 0
     last = y
   }
-  for (let y = top + (top === 0 ? 4 : 3); y <= bottom - 2; y += 3) ledge(y)
+  for (let y = top + (top === 0 ? 4 : 3); y <= bottom - 1; y += 3) ledge(y)
   if (last > top && last < bottom - 2) ledge(bottom - 2)
 }
 

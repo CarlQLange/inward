@@ -356,6 +356,7 @@ const walkThrough = (g, dir) => {
     p.vy = dir === 'up' ? -P.jump : Math.max(p.vy, 0)
     p.grounded = false
     p.sinceGround = 1
+    p.jumpHeld = false
   }
 }
 

@@ -750,6 +750,7 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
   const doors = {}
   const seals = []
   const exits = []
+  const clears = []
   if (links.left) {
     for (const y of [sideRow, sideRow + 1]) for (const x of [0, 1]) { grid[y][x] = '.'; seals.push([x, y]) }
     doors.left = { row: sideRow }
@@ -763,6 +764,7 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
     grid[0][13] = grid[0][14] = '.'
     doors.up = { col: 13 }
     for (let x = 12; x <= 15; x++) seals.push([x, roof - 1])
+    for (let y = roof; y < floor; y++) for (let x = 12; x <= 15; x++) clears.push([x, y])
     let left = true
     for (let y = floor - 3; y >= 2; y -= 3) {
       exits.push([left ? 12 : 15, y])
@@ -775,7 +777,7 @@ const openDoors = (grid, links, { floor, roof, sideRow = FRAME_DOOR_ROW(floor) }
     doors.down = { col: 13 }
     for (let x = 12; x <= 15; x++) seals.push([x, floor])
   }
-  return { doors, seals, exits }
+  return { doors, seals, exits, clears }
 }
 
 const lampAt = (x, roof) => ({ kind: 'lamp', x: x * BLOCK + 1, y: roof * BLOCK })
@@ -893,7 +895,7 @@ const ARENAS = {
 
 export const buildArena = (id, links) => {
   const plan = ARENAS[id]()
-  const { doors, seals, exits } = openDoors(plan.grid, links, plan)
+  const { doors, seals, exits, clears } = openDoors(plan.grid, links, plan)
   const drains = []
   plan.grid[0].forEach((c, x) => { if (c !== '#') drains.push(x) })
   plan.grid[ROOM - 1].forEach((c, x) => { if (c !== '#') drains.push((ROOM - 1) * ROOM + x) })
@@ -908,7 +910,7 @@ export const buildArena = (id, links) => {
     enemies: [{ kind: id, x: plan.boss.x * BLOCK, row: plan.boss.row, y: plan.boss.y }, ...plan.lamps.map(x => lampAt(x, plan.roof))],
     layout: `arena-${id}`,
     spare: { x: 14 * BLOCK, y: (plan.floor - 2) * BLOCK },
-    arena: { id, seals, exits, interior, shape: plan.grid.map(row => row.join('')), lamps: plan.lamps.map(x => lampAt(x, plan.roof)), lampClock: 0, watch: 0 },
+    arena: { id, seals, exits, clears, interior, shape: plan.grid.map(row => row.join('')), lamps: plan.lamps.map(x => lampAt(x, plan.roof)), lampClock: 0, watch: 0 },
   }
 }
 
@@ -1002,7 +1004,7 @@ const settleArena = (g, arena) => {
 export const openArena = (g, room) => {
   const { arena } = room
   settleArena(g, arena)
-  for (const [x, y] of arena.seals) setCell(g.world, x, y, M.EMPTY)
+  for (const [x, y] of [...arena.seals, ...arena.clears]) setCell(g.world, x, y, M.EMPTY)
   for (const [x, y] of arena.exits) if (!props(matAt(g.world, x, y)).solid) setCell(g.world, x, y, M.ROCK)
   g.enemies.forEach(o => {
     if (!o.spawned && !o.partOf) return

@@ -144,7 +144,11 @@ const worker = async ({ opts, from, to }) => {
     const dir = chooseDirection(g, bot, bot.avoid)
     const chosen = anchors.find(a => a.dir === dir)
     const usable = chosen && (chosen.locked ? near(chosen, 4) !== undefined : parent.has(chosen.y * ROOM + chosen.x))
-    const wanted = usable || g.time - bot.enteredAt < 6 ? chosen : exitsOpen[Math.floor(Math.random() * exitsOpen.length)] ?? chosen
+    if (chosen && !usable && !room.noRoute) {
+      room.noRoute = true
+      stats.noRoute.push(`${room.layout}:${Object.keys(room.doors).join('')}`)
+    }
+    const wanted = chosen
     const errands = [...g.cards.map(c => ({ c, kind: 'card' })), ...g.wares.filter(w => w.price <= g.gold && (bot.opts.gun !== true)).map(c => ({ c, kind: 'ware' })), ...g.pickups.map(c => ({ c, kind: 'pickup' })), ...g.enemies.filter(e => e.friendly && !e.prop && !e.spent).map(c => ({ c, kind: 'talk' }))]
     const errand = errands
       .map(({ c }) => near({ x: cell(c.x + c.w / 2), y: cell(c.y + c.h - 1) }, 1.5))
@@ -183,10 +187,10 @@ const worker = async ({ opts, from, to }) => {
     const gap = !solid(g.world, ahead, here.y + 1) && Math.abs(way.x - here.x) > 1 && way.y <= here.y + 1
     const swimming = props(matAt(g.world, here.x, here.y)).liquid
     const wantsJump = rising || wall || gap || swimming
-    if (wantsJump && (p.grounded || swimming || matAt(g.world, here.x, here.y) === M.VINE)) {
-      input.jump = !bot.jumpHeld
-    } else if (bot.jumpHeld && p.vy < 0) input.jump = true
-    if (matAt(g.world, here.x, here.y) === M.VINE && rising) input.up = true
+    const onVine = matAt(g.world, here.x, here.y) === M.VINE
+    if (onVine) input[rising ? 'up' : 'down'] = way.y !== here.y
+    else if (wantsJump && (p.grounded || swimming)) input.jump = !bot.jumpHeld
+    else if (bot.jumpHeld && p.vy < 0) input.jump = true
     bot.jumpHeld = input.jump === true
   }
 
@@ -196,11 +200,14 @@ const worker = async ({ opts, from, to }) => {
     const me = { x: p.x + p.w / 2, y: p.y + 5 }
     const room = g.rooms[keyOf(g.x, g.y)]
     if (bot.room !== room) {
+      room.botVisits = (room.botVisits ?? 0) + 1
+      if (room.botVisits > 8) stats.loops[`${room.layout}:${Object.keys(room.doors).join('')}:${room.sealed ? 'sealed' : room.cleared ? 'cleared' : 'open'}`] = room.botVisits
       if (bot.opts.trace) console.log(`t=${g.time.toFixed(0)} room ${g.x},${g.y} ring ${g.ring} ${room.layout} event=${room.event} doors=${Object.keys(room.doors)} locks=${Object.entries(room.links).map(([d, l]) => `${d}:${l.lock}`)} wardens=${JSON.stringify(g.wardens)} seals=${g.seals} hp=${p.hp}`)
       bot.room = room
       bot.enteredAt = g.time
       bot.plan = null
-      bot.gaveUp = new Set()
+      room.botDone ??= new Set()
+      bot.gaveUp = room.botDone
       bot.stuckAt = g.time
     }
     const wantedLock = bot.plan?.wanted?.locked && room.links[bot.plan.wanted.dir]?.lock === 'peat'
@@ -263,6 +270,7 @@ const worker = async ({ opts, from, to }) => {
     if (g.time - bot.planAt > 0.4 || !bot.plan) {
       bot.plan = planRoom(g, bot, stats)
       bot.planAt = g.time
+      if (bot.opts.trace === 2 && room.arena) console.log(`    arena sealed=${room.sealed} cleared=${room.cleared} enemies=${g.enemies.map(e => `${e.kind}:${e.hp}:${e.asleep}`)} p=${p.x.toFixed(0)},${p.y.toFixed(0)}`)
       if (bot.opts.trace === 2) console.log(`    plan dir=${bot.plan.dir} wanted=${JSON.stringify(bot.plan.wanted)} errand=${bot.plan.errand} at ${cell(p.x)},${cell(p.y)} vy=${p.vy.toFixed(0)} reach=${bot.plan.parent.size} avoid=${[...bot.avoid]}`)
     }
     const { parent, near, wanted, errand } = bot.plan
@@ -315,7 +323,8 @@ const worker = async ({ opts, from, to }) => {
       input.jump = true
       input[Math.random() < 0.5 ? 'left' : 'right'] = true
     }
-    const overdue = g.time - bot.enteredAt > (keyOf(g.x, g.y) === keyOf(...g.map.start) ? 25 : 35)
+    const hopeless = wanted && !wanted.locked && !parent.has(wanted.y * ROOM + wanted.x) && g.time - bot.enteredAt > 10
+    const overdue = hopeless || g.time - bot.enteredAt > (keyOf(g.x, g.y) === keyOf(...g.map.start) ? 25 : 35)
     if ((stuckFor > 9 || overdue) && wanted) {
       if (bot.opts.trace) console.log(`  t=${g.time.toFixed(0)} assist ${wanted.dir} stuck=${stuckFor.toFixed(0)} overdue=${overdue} locked=${wanted.locked} goal=${goalKey} at ${from.x},${from.y} errand=${errand} reach=${parent.size}`)
       stats.assistWhy.push(`${room.layout}:${room.sealed ? 'sealed' : wanted.locked ? 'locked' : parent.has(wanted.y * ROOM + wanted.x) ? 'route' : 'noroute'}:${overdue ? 'late' : 'still'}`)
@@ -352,7 +361,7 @@ const worker = async ({ opts, from, to }) => {
     save.ghost = null
   }
 
-  const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {} })
+  const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {}, loops: {}, noRoute: [] })
 
   const playRun = (index, opts) => {
     Math.random = seededRandom(opts.seed * 1000003 + index * 7919)
@@ -476,6 +485,8 @@ const worker = async ({ opts, from, to }) => {
       assistWhy: stats.assistWhy,
       lockedOut: stats.lockedOut,
       timeIn: stats.timeIn,
+      loops: stats.loops,
+      noRoute: stats.noRoute,
       ringTime: stats.ringTime,
       failedRooms: Object.values(g.rooms).filter(r => r.passed === false).map(r => `${r.layout}@${r.ring}`),
       hits: stats.hits,
@@ -521,6 +532,9 @@ const report = (results, opts, realSeconds) => {
   line(`locked out (no bomb, no open gate, bot could not open the door): ${fmt(mean(results.map(r => r.lockedOut)))} per run`)
   line(`mercy bombs: ${fmt(mean(results.map(r => r.mercy)))} per run`)
   line(`  why: ${top(tally(results.flatMap(r => r.assistWhy)), 14)}`)
+  const rooms = results.reduce((n, r) => n + r.rooms, 0)
+  line(`wanted door not reachable by the bot's model on arrival: ${results.reduce((n, r) => n + r.noRoute.length, 0)} of ${rooms} rooms. ${top(tally(results.flatMap(r => r.noRoute)), 8)}`)
+  line(`revisit loops: ${top(merge(results.map(r => r.loops)), 10)}`)
   line(`rooms per run (p10/p50/p90): ${spread(results.map(r => r.rooms))}`)
   line(`minutes per run: ${spread(results.map(r => r.seconds / 60))}`)
   const roomSecs = results.flatMap(r => r.roomTimes.map((t, i) => t - (r.roomTimes[i - 1] ?? 0)))
