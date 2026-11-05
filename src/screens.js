@@ -411,6 +411,7 @@ const drawSummary = (ctx, g, menu) => {
   centred(ctx, score, top + 12, won ? YELLOW : WHITE, 4)
   drawBestBar(ctx, g, score, top + 36)
   if (g.newBest && age > 1.4 && Math.floor(g.time * 4) % 2 === 0) centred(ctx, 'BEST', top + 41, YELLOW)
+  if (won && g.banked && age > 1.4) drawText(ctx, `+${g.banked}`, midX() - 75, top + 40, GREEN)
   if (!won && g.player.lastCause && age > 1.2) {
     const width = textWidth(String(g.score)) * 4
     drawPictogram(ctx, CAUSE_ICONS[g.player.lastCause] ?? CAUSE_ICONS.DEFAULT, Math.max(ORIGIN.x + 8, midX() - width / 2 - 8), top + 21, RED)

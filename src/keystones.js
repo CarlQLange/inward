@@ -1,6 +1,6 @@
 import { TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { burningAt, chargedAt, energize, ignite, lavaAt, matAt, pour, puff, setCell } from './world.js'
+import { burningAt, chargedAt, energize, ignite, lavaAt, matAt, pour, setCell } from './world.js'
 import { cell, cellsUnder, centre, overlap } from './physics.js'
 import { MATERIAL_COLOURS, burstSparks, spark } from './fx.js'
 import { hurt } from './combat.js'
@@ -231,8 +231,9 @@ const STAINS = [
     if (foe) foe.stun = Math.max(foe.stun, 1.1)
   }],
   [m => STONES.has(m), (g, x, y, foe) => {
-    puff(g.world, x, y - 1, M.ASH, [1, 2])
-    if (foe) hurt(g, foe, 1, 'world', 'CRUSHED')
+    if (!foe) return
+    const above = cell(foe.y) - 2
+    if (matAt(g.world, x, above) === M.EMPTY) setCell(g.world, x, above, M.SAND)
   }],
 ]
 

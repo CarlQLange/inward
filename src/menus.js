@@ -4,7 +4,7 @@ import { almanac } from './discover.js'
 import { almanacColumns, isTouchLayout } from './layout.js'
 import { SKILL_NAMES, formOf } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
-import { SKILL_ACTIONS, skillAction } from './controls.js'
+import { SKILL_ACTIONS, device, skillAction } from './controls.js'
 import { slotsOf } from './keystones.js'
 import { continueRun, newRun, quickstart, returnToTitle, saveAndQuit, startFromTitle } from './game.js'
 
@@ -249,6 +249,11 @@ const stepPointer = (g, menu, input, pressed) => {
     return false
   }
   if (menu.page === 'pause' && pressed('click')) menu.focus = 'list'
+  if (menu.page === 'choice' && device() === 'touch' && pressed('click') && (!menu.touched || hit.index !== menu.selected)) {
+    menu.touched = true
+    menu.selected = hit.index
+    return false
+  }
   if (input.pointer !== g.menuHeld.pointer) menu.selected = hit.index
   return pressed('click') && menu.selected === hit.index
 }
