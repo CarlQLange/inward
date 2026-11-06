@@ -173,7 +173,6 @@ export const TUNING = {
     skullChain: 3,
     updraft: 170,
     scatterShots: 5,
-    scatterKick: 170,
     scatterLife: 0.22,
     leanEngine: 1.5,
     leanRegion: 0.75,

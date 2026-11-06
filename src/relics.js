@@ -13,7 +13,7 @@ export const RELICS = [
   relic('shock', 'SHOCK ROUNDS', 'SHOTS CARRY CHARGE', 'shock'),
   relic('frostshot', 'COLD ROUNDS', 'SHOTS FREEZE', 'frostshot'),
   relic('pierce', 'GHOST ROUNDS', 'SHOTS PASS THROUGH FOES AND WALLS', 'pierce'),
-  relic('spread', 'SCATTER GUN', 'FIRES A SPREAD THAT KNOCKS YOU BACK', 'spread'),
+  relic('spread', 'SCATTER GUN', 'FIRES FIVE SHORT SHOTS AT ONCE', 'spread'),
   relic('ricochet', 'RICOCHET', 'SHOTS BOUNCE', 'ricochet'),
   relic('stomp', 'IRON BOOTS', 'LANDING ON FOES HURTS THEM', 'stomp'),
   relic('gem', 'ODD GEM', 'ONLY WORLD KILLS LEVEL YOU UP', 'gem'),

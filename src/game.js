@@ -1088,13 +1088,8 @@ const turned = ({ x, y }, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * 
 const shoot = (g, p) => {
   const aim = assisted(g, p, p.aim)
   const scatter = hasRelic(p, 'spread')
-  if (scatter) {
-    for (let n = 0; n < R.scatterShots; n++) fireShot(g, p, turned(aim, (n - (R.scatterShots - 1) / 2) * 0.2), R.scatterLife)
-    p.vx -= aim.x * R.scatterKick
-    p.vy -= aim.y * R.scatterKick
-    p.drift = Math.max(p.drift, 0.15)
-    p.jumpHeld = false
-  } else fireShot(g, p, aim)
+  if (scatter) for (let n = 0; n < R.scatterShots; n++) fireShot(g, p, turned(aim, (n - (R.scatterShots - 1) / 2) * 0.2), R.scatterLife)
+  else fireShot(g, p, aim)
   shotFx(g, p, aim)
   p.shotReady = hasKeystone(p, 'fists') ? K.punchEvery : P.shotEvery * (scatter ? 3 : 1)
   if (hasKeystone(p, 'fists')) p.vx += aim.x * K.punchLunge
