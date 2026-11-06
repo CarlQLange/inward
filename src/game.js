@@ -29,6 +29,7 @@ import { KEYSTONE_BY_ID, bombReady, bombThrown, castWait, crowdedOut, hasKeyston
 import { MUTATION_BY_ID, deepKill, mutateFoe, rollMutation, stepMutations } from './deep.js'
 import { emptyTally, noteKill, outwitted, wardedAgainst } from './wards.js'
 import { driftFoe, heroPull } from './float.js'
+import { blastPockets, pocketAt, seedPockets, stepPockets } from './pockets.js'
 
 const P = TUNING.player
 const R = TUNING.run
@@ -216,6 +217,40 @@ const dressEnemy = (g, ring) => e => {
 
 const crowding = e => (e.friendly || e.prop || e.warden || e.partOf ? 0 : e.kind === 'gnat' ? 0.2 : 1)
 
+const NEST_FOES = new Set(['bat', 'emberbat', 'gnat', 'spore', 'slime', 'tick', 'crawler', 'pillbug', 'urchin', 'imp', 'gasbag', 'shade'])
+
+const broodFor = (g, ring) => count => {
+  const regions = shuffled([0, 1, 2, 3, 4, 5, 6])
+    .map(region => THEMES[region].foes.filter(kind => NEST_FOES.has(kind) && isKnown(g, 'foe', kind) && fitsRing(ring)(kind)))
+    .filter(kinds => kinds.length)
+  const kinds = regions[0] ?? ['crawler']
+  return Array.from({ length: count }, () => kinds[Math.floor(Math.random() * kinds.length)])
+}
+
+const floorUnder = (world, x, y) => {
+  for (let row = y; row < WORLD_PX / BLOCK - 1; row++) if (props(matAt(world, x, row + 1)).solid) return row + 1
+  return y + 1
+}
+
+const POCKET_HOOKS = {
+  foe: (g, kind, x, y) => {
+    const load = g.enemies.reduce((n, e) => n + crowding(e), 0)
+    if (load >= R.foeLimit[g.ring] + TUNING.pockets.foeHeadroom) return false
+    const def = ENEMY_DEFS[kind]
+    const e = dressEnemy(g, g.ring)(createEnemy({ kind, x: x - def.size[0] / 2, y: y - def.size[1] / 2 }))
+    g.enemies.push(e)
+    knownNotes.add(`met:${kind}`)
+    return true
+  },
+  chest: (g, pocket) => {
+    const relic = nextRelic(g)
+    if (!relic) return false
+    const x = pocket.x + Math.floor(pocket.w / 2)
+    g.cards.push({ kind: 'chest', x: x * BLOCK - 2, y: floorUnder(g.world, x, pocket.y + pocket.h - 1) * BLOCK - 13, w: 12, h: 12, relic })
+    return true
+  },
+}
+
 const thinFoes = (g, ring, foes) => {
   const limit = R.foeLimit[ring] * (g.omens.includes('swarm') ? 1.6 : 1)
   const kept = []
@@ -256,6 +291,9 @@ const buildRoom = (g, x, y) => {
   const world = createWorld(definition.map, ring === CORE_RING || hasKeystone(g.player, 'overload'))
   world.drains = definition.drains ?? []
   world.cold = THEMES[themeIndex]?.cold === true
+  if (!arenaId && !start && ring !== CORE_RING) {
+    world.pockets = seedPockets(world, { ring, region: themeIndex, doors: definition.doors, brood: broodFor(g, ring), relics: g.relicPool.length > 0 })
+  }
   return {
     x, y, ring, links,
     theme: themeIndex,
@@ -405,13 +443,15 @@ const packRoom = room => ({
   theme: room.theme, event: room.event, sealed: room.sealed, cleared: room.cleared, safetyNet: room.safetyNet, healed: room.healed, layout: room.layout,
   arena: room.arena, sealCells: room.sealCells, hadFoes: room.hadFoes, hurtHere: room.hurtHere, sealsOpen: room.sealsOpen,
   enemies: room.enemies, cards: room.cards, wares: room.wares, pickups: room.pickups,
-  drains: room.world.drains, world: encodeWorld(room.world),
+  drains: room.world.drains, world: encodeWorld(room.world), pockets: room.world.pockets,
 })
 
 const unpackRoom = (packed, map, overloaded) => {
   const world = restoreWorld(packed.world, packed.ring === CORE_RING || overloaded, packed.drains)
   world.cold = THEMES[packed.theme]?.cold === true
-  return { ...packed, links: map.links[keyOf(packed.x, packed.y)] ?? {}, world }
+  world.pockets = packed.pockets ?? []
+  const { pockets, ...rest } = packed
+  return { ...rest, links: map.links[keyOf(packed.x, packed.y)] ?? {}, world }
 }
 
 const storeRun = g => {
@@ -1483,6 +1523,7 @@ const stepRoomEvents = (g, dt) => {
     }
     roomClearFx(g)
   }
+  stepPockets(g, dt, POCKET_HOOKS)
   if (room.arena) stepArena(g, room, dt, sealArena)
   if (room.event === 'arena' && !room.cleared) {
     const hostile = g.enemies.some(e => !e.friendly && !e.ally)
@@ -1916,7 +1957,7 @@ const stepFireballs = (g, dt) => {
     if (m === M.WATER && !f.bomb && !f.pellet && !f.acid) {
       puff(g.world, x, y - 1, M.STEAM, TUNING.world.steamLife)
       f.age = -1
-    } else if (props(m).solid) {
+    } else if (props(m).solid || (f.bomb && pocketAt(g.world, x, y))) {
       landFireball(g, f)
     } else if (props(m).flammability && !f.pellet && !f.acid && !f.bomb) {
       ignite(g.world, x, y)
@@ -1996,6 +2037,7 @@ const handleWorldEvents = g => {
     }
     g.pulse = Math.max(g.pulse, event.type === 'blast' ? 0.12 + event.reach * 0.1 : 1)
     if (event.type === 'blast') {
+      blastPockets(g, event)
       blastFx(g, event)
       g.world.lastBlast = { ...event, at: g.time }
       feedEvent(g, 'blast', (event.x + 0.5) * BLOCK, (event.y + 0.5) * BLOCK)

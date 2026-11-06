@@ -5,6 +5,7 @@ import { save } from './store.js'
 import { createCellLayers, refreshCells } from './cells.js'
 import { depthAmount, eraAt } from './era.js'
 import { airOf, masksFor } from './backdrop.js'
+import { POCKET_SLOTS, pocketUniforms } from './pockets.js'
 import { DISPLAY, FRAME, FRAME_UNIFORMS, OPTICS, OPTICS_UNIFORMS, QUAD, QUAD_VERTEX, RING_SLOTS, RIPPLE_SLOTS, VERTEX, WORLD, WORLD_UNIFORMS } from './shaders.js'
 
 const POWER = { full: 1, soft: 0.6, off: 0 }
@@ -118,7 +119,7 @@ export const createPresenter = canvas => {
   gl.disable(gl.BLEND)
 
   const frameExtras = ['view', 'origin', 'shake', 'slideNew', 'slideOld', 'mapPos', 'zoom', 'pitColour', 'rings', 'loopTint']
-  const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks', 'front'], WORLD_UNIFORMS, ['frontOrigin', 'frontScale', 'vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide'])
+  const worldProgram = programOf(gl, WORLD, ['terrain', 'cells', 'lightMap', 'masks', 'front'], WORLD_UNIFORMS, ['frontOrigin', 'frontScale', 'vanish', 'drift', 'airBase', 'airFar', 'airNear', 'airWall', 'airSide', 'pocketBox', 'pocketState'])
   const opticsProgram = programOf(gl, OPTICS, ['worldLayer', 'cells', 'fields', 'lightMap', 'noise', 'front'], OPTICS_UNIFORMS, ['frontOrigin', 'frontScale', 'ripples', 'fogColour', 'beamColour'])
   const frameProgram = programOf(gl, FRAME, ['roomNow', 'roomOld', 'front', 'history', 'noise'], FRAME_UNIFORMS, frameExtras)
   const displayProgram = programOf(gl, DISPLAY, ['scene'], ['lcd', 'scanline'], ['view', 'room'])
@@ -182,6 +183,8 @@ export const createPresenter = canvas => {
   }
 
   const ringData = new Float32Array(RING_SLOTS * 4)
+  const pocketBoxes = new Float32Array(POCKET_SLOTS * 4)
+  const pocketStates = new Float32Array(POCKET_SLOTS * 4)
   const rippleData = new Float32Array(RIPPLE_SLOTS * 4)
 
   const bind = ({ samplers }, bound) => samplers.forEach((name, unit) => {
@@ -233,12 +236,14 @@ export const createPresenter = canvas => {
     const [hx, hy] = heroOffset(state)
     const want = [SIZE / 2 + hx * 0.16, SIZE / 2 + hy * 0.12]
     shown.vanish = state.vanish ?? shown.vanish.map((v, i) => v + (want[i] - v) * 0.08)
+    const reach = era.depth * depthAmount(state)
     passInto(worldTarget, worldProgram, {
       terrain: textures.terrain, cells: textures.cells, lightMap: textures.light, masks: textures.masks, front: textures.front,
     }, {
       ...era,
       time: state.time,
-      reach: era.depth * depthAmount(state),
+      reach,
+      pocketShow: Math.min(1, reach * 6),
       lightOn: lighting.amount,
       ambient: lighting.ambient,
       frontFloor: lighting.front,
@@ -254,6 +259,9 @@ export const createPresenter = canvas => {
     gl.uniform3fv(at.airNear, air.near)
     gl.uniform3fv(at.airWall, air.wall)
     gl.uniform3fv(at.airSide, air.side)
+    pocketUniforms(state.world, pocketBoxes, pocketStates)
+    gl.uniform4fv(at.pocketBox, pocketBoxes)
+    gl.uniform4fv(at.pocketState, pocketStates)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 

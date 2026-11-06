@@ -14,7 +14,7 @@ const argOf = (name, fallback) => {
 }
 
 const SECONDS = 25
-const RULES = ['glaze', 'fuse', 'shatter', 'soak', 'bake', 'smother', 'snow', 'throw', 'regrow', 'magnet']
+const RULES = ['glaze', 'fuse', 'shatter', 'soak', 'bake', 'smother', 'snow', 'throw', 'regrow', 'magnet', 'breach']
 const MATTER = ['sand', 'mud', 'snow', 'glass']
 
 const playRegion = async ({ theme, rooms }) => {

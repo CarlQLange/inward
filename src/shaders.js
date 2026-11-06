@@ -2,6 +2,8 @@ import { SCARF_DEEP, SCARF_RED } from './hero.js'
 import { BLOCK, ROOM } from './config.js'
 import { CELL_SHADER } from './cells.js'
 import { MASK_SIZE } from './backdrop.js'
+import { POCKET_KINDS, POCKET_SLOTS } from './pockets.js'
+import { TUNING } from './config.js'
 
 export const RING_SLOTS = 6
 export const RIPPLE_SLOTS = 4
@@ -36,7 +38,150 @@ vec3 liquidTint(float kind) {
 `
 
 export const WORLD_ERA = ['far', 'near', 'wall', 'bands', 'relief', 'unmoor', 'bend']
-export const WORLD_UNIFORMS = ['time', 'reach', 'lightOn', 'ambient', 'frontFloor', 'calm', ...WORLD_ERA]
+export const WORLD_UNIFORMS = ['time', 'reach', 'lightOn', 'ambient', 'frontFloor', 'calm', 'pocketShow', ...WORLD_ERA]
+
+const KIND_CONSTANTS = POCKET_KINDS.map((kind, i) => `const float ${kind.toUpperCase()} = ${(i + 1).toFixed(1)};`).join('\n')
+
+const POCKETS = `
+${KIND_CONSTANTS}
+uniform vec4 pocketBox[${POCKET_SLOTS}];
+uniform vec4 pocketState[${POCKET_SLOTS}];
+
+float speck(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
+bool is(float k, float id) { return abs(k - id) < 0.5; }
+bool pours(float k) { return !is(k, NEST) && !is(k, ALCOVE) && !is(k, SEAM); }
+
+vec3 contentOf(float k) {
+  if (is(k, CISTERN)) return vec3(0.12, 0.46, 0.54);
+  if (is(k, HOPPER)) return vec3(0.7, 0.55, 0.3);
+  if (is(k, SEAM)) return vec3(1.0, 0.82, 0.32);
+  if (is(k, RIME)) return vec3(0.72, 0.92, 1.0);
+  if (is(k, MARSH)) return vec3(0.56, 0.28, 0.78);
+  if (is(k, TAR)) return vec3(0.24, 0.14, 0.28);
+  if (is(k, VEIN)) return vec3(1.0, 0.46, 0.12);
+  if (is(k, SEEP)) return vec3(0.42, 0.88, 0.2);
+  if (is(k, ALCOVE)) return vec3(0.95, 0.74, 0.32);
+  return vec3(0.04, 0.03, 0.03);
+}
+
+float bubbles(vec2 at, vec4 box, float seed, float speed) {
+  float hit = 0.0;
+  for (int j = 0; j < 3; j++) {
+    float f = float(j);
+    vec2 b = box.xy + box.zw * vec2(0.22 + 0.28 * f, 0.9 - 0.8 * fract(time * speed + f * 0.37 + seed));
+    float d = length(at - b);
+    hit = max(hit, step(0.7, d) * step(d, 1.8));
+  }
+  return hit;
+}
+
+float eyes(vec2 at, vec4 box, float seed) {
+  float hit = 0.0;
+  for (int j = 0; j < 2; j++) {
+    float f = float(j);
+    vec2 c = box.xy + box.zw * vec2(0.3 + 0.4 * f, 0.4 + 0.25 * speck(vec2(seed, f)));
+    vec2 d = at - c;
+    float open = step(0.07, fract(time * (0.21 + 0.05 * f) + seed + f * 0.5));
+    hit = max(hit, open * step(abs(d.y), 1.1) * max(step(abs(d.x - 3.0), 1.6), step(abs(d.x + 3.0), 1.6)));
+  }
+  return hit;
+}
+
+vec3 intact(float k, vec2 at, vec2 q, vec2 e, float r, vec4 box, vec4 s, float seed, vec3 base, vec3 stuff, inout vec3 glow) {
+  vec2 px = floor(at);
+  float pulse = 0.7 + 0.3 * sin(time * 2.3 + seed * 5.0);
+  vec3 look = mix(base, stuff * 0.32, 0.85);
+  if (is(k, CISTERN)) {
+    look = e.y < -0.3 ? mix(base, stuff * 0.16, 0.7) : look;
+    if (abs(e.y + 0.24) < 0.14) look = mod(px.x + floor(time * 6.0), 11.0) < 1.0 ? vec3(0.75, 0.95, 1.0) : stuff * 0.75;
+  } else if (is(k, HOPPER)) {
+    look = stuff * (0.24 + 0.16 * step(0.55, speck(px + seed)));
+  } else if (is(k, SEAM)) {
+    look = base * 0.6;
+  } else if (is(k, RIME)) {
+    look = stuff * (mod(px.x - px.y, 5.0) < 1.0 ? 0.55 : 0.3);
+    if (length(e - vec2(0.3, -0.2)) < 0.25 && fract(time * 0.45 + seed) < 0.1) glow += vec3(0.9);
+  } else if (is(k, MARSH)) {
+    look = stuff * (0.24 + 0.5 * bubbles(at, box, seed, 0.22));
+  } else if (is(k, TAR)) {
+    float band = fract((q.x + q.y * 0.6) * 1.4 - time * 0.18 + seed);
+    look = stuff * 0.55 + (band < 0.16 ? (0.5 + 0.5 * cos(6.2832 * (band * 3.0 + vec3(0.0, 0.33, 0.67)))) * 0.24 : vec3(0.0));
+  } else if (is(k, NEST)) {
+    look = vec3(0.02, 0.014, 0.012);
+    glow += vec3(1.0, 0.62, 0.16) * eyes(at, box, seed) * (0.55 + 0.9 * s.w);
+  } else if (is(k, VEIN)) {
+    look = mix(base, vec3(0.16, 0.05, 0.03), 0.45);
+    float line = 0.5 + 0.5 * (abs(fract(q.x * 1.6 + seed) - 0.5) - 0.25) * (1.0 - abs(e.x) * 0.6);
+    float off = abs(q.y - line) * box.w;
+    if (off < 0.9) glow += stuff * pulse * 1.1;
+    else if (off < 2.2) look = stuff * 0.3;
+  } else if (is(k, SEEP)) {
+    float bub = bubbles(at, box, seed, 0.4);
+    look = stuff * (0.22 + 0.4 * bub);
+    glow += stuff * bub * 0.15;
+  } else if (is(k, ALCOVE)) {
+    look = vec3(0.025, 0.02, 0.02);
+    if (abs(e.x) < 0.42 && e.y > 0.45) {
+      look = stuff * 0.45;
+      glow += stuff * 0.18 * pulse;
+    }
+  }
+  if (s.y > 0.02) {
+    float a = atan(e.y, e.x) / 6.2832 + 0.5;
+    float spoke = abs(fract(a * 5.0 + seed * 0.37) - 0.5);
+    if (spoke * max(r, 0.25) < 0.04 && r < s.y * 1.35) look = pours(k) && s.y > ${TUNING.pockets.seepAt.toFixed(2)} ? stuff * 0.7 : base * 0.25;
+  }
+  if (r > 0.78 && !is(k, SEAM)) look = e.y < -0.2 ? base * 0.4 : base * 1.9 + stuff * 0.05;
+  return look;
+}
+
+vec3 pocketAt(vec2 at, vec3 base, inout vec3 glow) {
+  for (int i = 0; i < ${POCKET_SLOTS}; i++) {
+    vec4 s = pocketState[i];
+    if (s.x < 0.5) continue;
+    vec4 box = pocketBox[i];
+    vec2 q = (at - box.xy) / box.zw;
+    if (q.x < -0.25 || q.x > 1.25 || q.y < -0.25 || q.y > 2.5) continue;
+    float k = s.x;
+    float seed = float(i) * 1.618 + box.x * 0.013;
+    vec3 stuff = contentOf(k);
+    vec2 e = q * 2.0 - 1.0;
+    float rough = (speck(floor(at / 2.0) + seed) - 0.5) * 0.24;
+    float r = is(k, ALCOVE) ? (e.y > 0.0 ? abs(e.x) / 0.8 : length(vec2(e.x / 0.8, e.y))) + rough * 0.4 : length(e) + rough;
+    if (is(k, SEAM) && r < 1.3 && speck(floor(at / 2.0) + seed * 3.0) > 0.8 && (s.z < 0.5 || speck(floor(at / 2.0)) < s.w)) {
+      float twinkle = step(0.8, fract(time * 0.5 + speck(floor(at / 2.0)) * 7.0));
+      glow += stuff * (0.22 + 0.5 * twinkle);
+      return stuff * 0.4;
+    }
+    if (q.y > 1.0) {
+      float flowing = s.z > 0.5 ? step(0.001, s.w) : step(${TUNING.pockets.seepAt.toFixed(2)}, s.y);
+      float width = s.z > 0.5 ? 0.16 : 0.05;
+      float reach = s.z > 0.5 ? 1.0 + 1.4 * min(1.0, s.w * 3.0) : 1.6;
+      if (pours(k) && flowing > 0.5 && abs(q.x - 0.5) < width + 0.5 / box.z && q.y < reach) {
+        float dash = step(0.4, fract(at.y * 0.17 - time * 2.4 + seed));
+        if (is(k, VEIN)) glow += stuff * (0.25 + 0.3 * dash);
+        return mix(base, stuff * (0.35 + 0.25 * dash), 0.8);
+      }
+      if (is(k, CISTERN) && s.z < 0.5 && abs(at.x - box.x - box.z * 0.5) < 1.0) {
+        float fallAt = box.y + box.w + fract(time * 0.45 + seed) * box.w * 1.2;
+        if (abs(at.y - fallAt) < 1.0 && fract(time * 0.45 + seed) < 0.8) return stuff * 0.7;
+      }
+      continue;
+    }
+    if (r > 1.0) continue;
+    if (s.z > 0.5) {
+      float filled = step(1.0 - s.w * 0.85, q.y) * (pours(k) ? 1.0 : 0.0);
+      vec3 hole = mix(vec3(0.01, 0.008, 0.012), stuff * 0.5, filled);
+      if (is(k, VEIN)) glow += stuff * filled * 0.5;
+      if (is(k, NEST) && s.w > 0.0) glow += vec3(1.0, 0.68, 0.2) * eyes(at, box, seed);
+      if (r > 0.8) return e.y < -0.2 ? base * 0.4 : base * 1.8 + 0.015;
+      return hole * (q.y < 0.35 ? 0.5 : 1.0);
+    }
+    return intact(k, at, q, e, r, box, s, seed, base, stuff, glow);
+  }
+  return base;
+}
+`
 
 export const WORLD = `
 precision highp float;
@@ -58,6 +203,7 @@ uniform vec3 airSide;
 ${floats(WORLD_UNIFORMS)}
 ${CELL_LOOKUPS}
 ${LIQUID_TINTS}
+${POCKETS}
 
 float luma(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
 
@@ -90,7 +236,9 @@ vec3 farWall(vec2 p, vec2 dir) {
     a = mix(a, airNear, near * step(0.5, texture2D(masks, at / ${MASK_SIZE.toFixed(1)}).r));
   }
   a = mix(airBase, a, calm);
-  vec3 lit = shine(a * mix(1.0, 2.6, lightOn), back + swirl * 0.4, 0.8, ambient);
+  vec3 glow = vec3(0.0);
+  if (pocketShow > 0.01) a = mix(a, pocketAt(back, a, glow), pocketShow);
+  vec3 lit = shine(a * mix(1.0, 2.6, lightOn), back + swirl * 0.4, 0.8, ambient) + glow * pocketShow;
   if (reach > 0.001) lit *= 1.0 - texture2D(front, (back + frontOrigin) * frontScale).a * 0.5;
   return lit;
 }
