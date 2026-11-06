@@ -24,7 +24,7 @@ export const KEYSTONES = [
   keystone('salamander', 'SALAMANDER', 'FIRE AND LAVA HEAL YOU', 'WATER HURTS YOU', '#ff9a2e', [
     '....#....', '...##....', '..###.#..', '..#####..', '.#######.', '.###.###.', '.##...##.', '.###.###.', '..#####..',
   ]),
-  keystone('glutton', 'GLUTTON', 'ANY MATERIAL NEAR YOU RECHARGES SKILLS', 'SKILLS DO NOT RECHARGE WITHOUT IT', '#8ae04a', [
+  keystone('glutton', 'GLUTTON', 'ANY MATERIAL NEAR YOU RECHARGES SKILLS', 'SKILLS RECHARGE ONLY NEAR MATERIAL', '#8ae04a', [
     '..####...', '.######..', '#####....', '####..#.#', '####.....', '#####....', '.######..', '..####...', '.........',
   ]),
   keystone('powder', 'POWDER', 'FOES EXPLODE WHEN THEY DIE', 'THE BLASTS HURT YOU TOO', '#f07ae0', [

@@ -30,8 +30,8 @@ const TIE = '#ff9ad8'
 
 export const FORKS = {
   bolt: [
-    [form('bolt.globe', 'GLOBE', 'A BALL OF LIGHTNING THAT DRIFTS', MAGNET), form('bolt.nail', 'NAIL', 'STICKS, LIGHTNING STRIKES IT', WHITE)],
-    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE BOLTS, RELEASE TO FIRE ALL', CHARGE), form('bolt.fence', 'FENCE', 'LIGHTNING JOINS ITS LAST TWO STRIKES', FIRE)],
+    [form('bolt.globe', 'GLOBE', 'A BALL OF LIGHTNING THAT DRIFTS', MAGNET), form('bolt.nail', 'NAIL', 'A SPIKE THAT DRAWS LIGHTNING', WHITE)],
+    [form('bolt.leyden', 'LEYDEN', 'HOLD TO STORE BOLTS, RELEASE TO FIRE ALL', CHARGE), form('bolt.fence', 'FENCE', 'LIGHTNING ARCS BETWEEN THE LAST TWO STRIKES', FIRE)],
   ],
   repel: [
     [form('repel.orbit', 'ORBIT', 'SCRAP CIRCLES YOU', STONE), form('repel.lode', 'LODE', 'PULLS INSTEAD OF PUSHING', BLOOD)],
@@ -46,7 +46,7 @@ export const FORKS = {
     [form('frost.snow', 'SNOWFALL', 'WATER TURNS TO SNOW, NOT ICE', WHITE), form('frost.brittle', 'BRITTLE', 'FROZEN ROCK CRUMBLES', STONE)],
   ],
   hammer: [
-    [form('hammer.hurl', 'HURL', 'THROW IT, IT COMES BACK', MAGNET), form('hammer.slam', 'SLAM', 'PRESS DOWN IN THE AIR TO SLAM', BLOOD)],
+    [form('hammer.hurl', 'HURL', 'A HAMMER THAT COMES BACK WHEN THROWN', MAGNET), form('hammer.slam', 'SLAM', 'PRESS DOWN IN THE AIR TO SLAM', BLOOD)],
     [form('hammer.tremor', 'TREMOR', 'BLOCKS ABOVE FALL', STONE), form('hammer.tamp', 'TAMP', 'PACKS SAND, SNOW AND MUD SOLID', WHITE)],
   ],
   gust: [
@@ -59,7 +59,7 @@ export const FORKS = {
   ],
   grapple: [
     [form('grapple.yank', 'YANK', 'TEARS OUT BLOCKS', STONE), form('grapple.piton', 'PITON', 'LEAVES A VINE ALONG THE LINE', ACID)],
-    [form('grapple.sling', 'SLING', 'HOLD TO SWING, RELEASE TO LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS A FOE. PRESS AGAIN TO THROW IT', BLOOD)],
+    [form('grapple.sling', 'SLING', 'HOLD TO SWING, RELEASE TO LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS A FOE. PRESS AGAIN TO THROW', BLOOD)],
   ],
   dash: [
     [form('dash.ram', 'RAM', 'SMASHES THROUGH BLOCKS', STONE), form('dash.tackle', 'TACKLE', 'CARRIES A FOE', BLOOD)],
@@ -95,10 +95,10 @@ export const FORKS = {
   ],
   well: [
     [form('well.rogue', 'ROGUE', 'A DRIFTING BLACK HOLE', BLOOD), form('well.nova', 'NOVA', 'PUSHES EVERYTHING AWAY', WHITE)],
-    [form('well.grind', 'GRINDER', 'HURTS FOES AT ITS CENTRE', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
+    [form('well.grind', 'GRINDER', 'CRUSHES FOES AT THE CENTRE', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
   ],
   swap: [
-    [form('swap.shuffle', 'SHUFFLE', 'ALL FOES TRADE PLACES', GAS), form('swap.goat', 'SCAPEGOAT', 'OTHER FOES ATTACK IT', BLOOD)],
+    [form('swap.shuffle', 'SHUFFLE', 'ALL FOES TRADE PLACES', GAS), form('swap.goat', 'SCAPEGOAT', 'OTHER FOES TURN ON THE SWAPPED FOE', BLOOD)],
     [form('swap.recall', 'RECALL', 'PRESS AGAIN TO SWAP BACK', MAGNET), form('swap.ground', 'GROUND', 'THE GROUND UNDER YOU SWAPS TOO', STONE)],
   ],
   stop: [
@@ -106,8 +106,8 @@ export const FORKS = {
     [form('stop.hang', 'HANG', 'SHOTS HANG UNTIL TIME RESTARTS', WHITE), form('stop.quake', 'QUAKE', 'BREAKS ICE WHEN TIME RESTARTS', BLOOD)],
   ],
   charm: [
-    [form('charm.plague', 'PLAGUE', 'CHARM SPREADS TO FOES IT TOUCHES', ACID), form('charm.lure', 'LURE', 'ALL FOES CHASE IT', BLOOD)],
-    [form('charm.puppet', 'PUPPET', 'IT GOES WHERE YOU AIM', WHITE), form('charm.bond', 'BOND', 'CHARMED FOE TAKES YOUR HITS', MAGNET)],
+    [form('charm.plague', 'PLAGUE', 'CHARM SPREADS BY TOUCH', ACID), form('charm.lure', 'LURE', 'ALL FOES CHASE THE CHARMED FOE', BLOOD)],
+    [form('charm.puppet', 'PUPPET', 'THE CHARMED FOE GOES WHERE YOU AIM', WHITE), form('charm.bond', 'BOND', 'CHARMED FOE TAKES YOUR HITS', MAGNET)],
   ],
   drone: [
     [form('drone.gull', 'GULL', 'DROPS SAND AND SCRAP ON FOES', SKY), form('drone.mole', 'MOLE', 'CHEWS THROUGH ROCK', STONE)],
@@ -115,18 +115,18 @@ export const FORKS = {
   ],
   mine: [
     [form('mine.limpet', 'LIMPET', 'STICKS TO FOES', BLOOD), form('mine.wire', 'TRIPWIRE', 'A TRIPWIRE ACROSS A GAP', WHITE)],
-    [form('mine.launch', 'CATAPULT', 'LAUNCHES WHAT STEPS ON IT. NO BLAST', SKY), form('mine.cryo', 'CRYO', 'FREEZES INSTEAD OF EXPLODING', COLD)],
+    [form('mine.launch', 'CATAPULT', 'LAUNCHES INSTEAD OF EXPLODING', SKY), form('mine.cryo', 'CRYO', 'FREEZES INSTEAD OF EXPLODING', COLD)],
   ],
   roar: [
     [form('roar.shout', 'SHOUT', 'SENDS A SHOCKWAVE FORWARD', WHITE), form('roar.crack', 'CRACK', 'SHATTERS ROCK', STONE)],
-    [form('roar.swell', 'SWELL', 'HOLD FOR A BIGGER ROAR', BLOOD), form('roar.rime', 'RIME', 'ALSO FREEZES WHAT IT HITS', COLD)],
+    [form('roar.swell', 'SWELL', 'HOLD FOR A BIGGER ROAR', BLOOD), form('roar.rime', 'RIME', 'STUNS AND FREEZES', COLD)],
   ],
   flask: [
-    [form('flask.hose', 'HOSE', 'HOLD TO POUR IT OUT IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'THE FLASK LANDS WHOLE. SHOOT IT TO BREAK IT', WHITE)],
-    [form('flask.drip', 'DRIP', 'FOES IT HITS DRIP THE LIQUID WHERE THEY GO', ACID), form('flask.leech', 'LEECH', 'ALSO SOAKS LIQUID FROM FOES. IT HURTS THEM', BLOOD)],
+    [form('flask.hose', 'HOSE', 'HOLD TO POUR IN A STREAM', MAGNET), form('flask.bottle', 'BOTTLE', 'LANDS WITHOUT BREAKING. SHOOT TO SMASH', WHITE)],
+    [form('flask.drip', 'DRIP', 'SOAKED FOES DRIP THE LIQUID AS THEY MOVE', ACID), form('flask.leech', 'LEECH', 'ALSO DRAINS LIQUID FROM FOES, HURTING THEM', BLOOD)],
   ],
   wick: [
-    [form('wick.trail', 'TRAIL', 'LAYS THE FUSE WHERE YOU WALK', CHARGE), form('wick.sleeper', 'SLEEPER', 'THE FUSE STAYS UNLIT UNTIL SHOT OR BURNED', GAS)],
+    [form('wick.trail', 'TRAIL', 'LAYS THE FUSE WHERE YOU WALK', CHARGE), form('wick.sleeper', 'SLEEPER', 'STAYS UNLIT UNTIL SHOT OR BURNT', GAS)],
     [form('wick.tow', 'TOW', 'FOES ON THE FUSE ARE DRAGGED TO THE END', BLOOD), form('wick.kiln', 'KILN', 'THE BURNT FUSE TURNS TO BRICK', STONE)],
   ],
   float: [
@@ -138,8 +138,8 @@ export const FORKS = {
     [form('link.cable', 'CABLE', 'FIRE AND CHARGE RUN ALONG THE LINKS', MAGNET), form('link.rope', 'ROPE', 'LINKED FOES DRAG EACH OTHER', GAS)],
   ],
   clay: [
-    [form('clay.daub', 'DAUB', 'STICKS TO A FOE. IT DRIPS MUD', BLOOD), form('clay.roll', 'ROLL', 'ROLLS AND PICKS UP SAND AND SNOW', STONE)],
-    [form('clay.cast', 'CAST', 'SETS INTO BRICK WHERE IT LANDS', FIRE), form('clay.bog', 'BOG', 'TURNS SAND, ASH AND SNOW NEAR IT TO MUD', ACID)],
+    [form('clay.daub', 'DAUB', 'STICKS TO FOES. THEY DRIP MUD', BLOOD), form('clay.roll', 'ROLL', 'ROLLS AND PICKS UP SAND AND SNOW', STONE)],
+    [form('clay.cast', 'CAST', 'SETS INTO BRICK ON LANDING', FIRE), form('clay.bog', 'BOG', 'TURNS NEARBY SAND, ASH AND SNOW TO MUD', ACID)],
   ],
   burrow: [
     [form('burrow.tunnel', 'TUNNEL', 'LEAVES AN OPEN TUNNEL', WHITE), form('burrow.grind', 'GRIND', 'SWIMS THROUGH ROCK TOO, LEAVING SAND', STONE)],
@@ -151,7 +151,7 @@ export const FORKS = {
   ],
   chime: [
     [form('chime.volley', 'VOLLEY', 'SHARDS FLY AT FOES ONE BY ONE', BLOOD), form('chime.hover', 'HOVER', 'SHARDS HANG IN THE AIR UNTIL A FOE COMES NEAR', GAS)],
-    [form('chime.bell', 'BELL', 'WALLS YOU IN GLASS. PRESS AGAIN TO BREAK IT', COLD), form('chime.statue', 'STATUE', 'FOES KILLED BY ITS SHARDS TURN TO GLASS', WHITE)],
+    [form('chime.bell', 'BELL', 'WALLS YOU IN GLASS. PRESS AGAIN TO SHATTER', COLD), form('chime.statue', 'STATUE', 'FOES KILLED BY SHARDS TURN TO GLASS', WHITE)],
   ],
 }
 
@@ -2258,7 +2258,7 @@ export const SKILLS = {
 export const SKILL_NAMES = Object.fromEntries(Object.keys(SKILLS).map(k => [k, k.toUpperCase()]))
 
 export const SKILL_DETAILS = {
-  bolt: 'LIGHTNING. WATER AND METAL CARRY IT.',
+  bolt: 'LIGHTNING. CARRIED BY WATER AND METAL.',
   repel: 'PUSHES METAL, OR PUSHES YOU OFF METAL.',
   ember: 'LOBS FIRE.',
   frost: 'FREEZES WATER AND FOES.',
@@ -2281,13 +2281,13 @@ export const SKILL_DETAILS = {
   drone: 'A HELPER THAT SHOOTS.',
   mine: 'EXPLODES WHEN A FOE COMES NEAR.',
   roar: 'STUNS AND SCATTERS.',
-  flask: 'HOLD TO SOAK UP LIQUID. LET GO TO THROW IT.',
-  wick: 'HOLD TO LAY A FUSE. ITS END EXPLODES.',
+  flask: 'HOLD TO SOAK UP LIQUID. LET GO TO THROW.',
+  wick: 'HOLD TO LAY A FUSE. THE END EXPLODES.',
   float: 'THINGS IN THE BUBBLE FALL UP.',
   link: 'TIES FOES. WHAT HAPPENS TO ONE HAPPENS TO ALL.',
-  clay: 'THROWS MUD. FIRE BAKES IT INTO BRICK.',
+  clay: 'THROWS MUD THAT FIRE BAKES INTO BRICK.',
   burrow: 'HOLD TO SWIM THROUGH SAND, SNOW, MUD AND PEAT.',
-  lens: 'HOLD FOR A BEAM THAT HEATS WHAT IT HITS.',
+  lens: 'HOLD FOR A HEAT BEAM.',
   chime: 'BREAKS NEARBY GLASS AND ICE INTO FLYING SHARDS.',
 }
 
