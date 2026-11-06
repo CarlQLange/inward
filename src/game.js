@@ -1969,6 +1969,7 @@ const stepFireballs = (g, dt) => {
       const victim = g.enemies.find(e => !e.friendly && !e.intangible && !e.stowed && !(f.fromWarden && (e.warden || e.partOf)) && overlap(f, e))
       if (victim) {
         hurt(g, victim, 2, f.friendly && !f.fromWorld ? 'player' : 'world')
+        if (f.foe && f.foe !== victim.kind) victim.lastBy = f.foe
         landFireball(g, f)
       }
     }
@@ -1987,6 +1988,7 @@ const stepFlung = (g, dt) => {
     if (victim) {
       victim.flungBy = f.by
       hurt(g, victim, f.damage ?? F.damage, 'world', f.live ? 'CHARGE' : f.cause)
+      if (f.thrower && !f.thrower.warden && !f.thrower.ally) victim.lastBy = f.thrower.kind
       victim.stun = Math.max(victim.stun, f.live ? TUNING.skills.repel.currentStun : F.stun)
       if (f.shard) f.life = 0
     }

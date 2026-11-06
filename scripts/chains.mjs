@@ -26,6 +26,7 @@ const playRegion = async ({ theme, rooms }) => {
   const { createGame, jumpTo, step } = await import('../src/game.js')
   const { M, props } = await import('../src/materials.js')
   const { ringOf } = await import('../src/map.js')
+  const { THEMES } = await import('../src/generate.js')
   save.found = [...LADDER]
 
   const tally = { ticks: 0, burning: 0, charged: 0, falling: 0, acid: 0, kills: {}, rocks: 0, opened: 0, fuel: 0, conductors: 0, loose: 0, cells: 0, rooms: 0, props: {}, rules: {}, matter: {} }
@@ -37,6 +38,7 @@ const playRegion = async ({ theme, rooms }) => {
     const g = createGame(null, 'playing', 1 + n % 6)
     g.menus.length = 0
     g.bands = [theme, theme, theme, theme]
+    g.bandFoes = g.bands.map(() => [...THEMES[theme].foes].sort(() => Math.random() - 0.5).slice(0, 5))
     const spots = Object.keys(g.map.links).map(k => k.split(',').map(Number)).filter(([x, y]) => ringOf(x, y) >= 1 && ringOf(x, y) <= 5)
     const [x, y] = spots[Math.floor(Math.random() * spots.length)]
     delete g.rooms[`${x},${y}`]
