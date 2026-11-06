@@ -477,8 +477,9 @@ export const drawActors = (ctx, g, room, live) => {
     drawFlung(ctx, g.flung)
     drawEffects(ctx, time, g.effects)
   }
-  drawCreatures(ctx, g, room.enemies)
+  drawCreatures(ctx, g, room.enemies.filter(e => !e.free))
   drawOverlays(ctx, world, time)
+  drawCreatures(ctx, g, room.enemies.filter(e => e.free), false)
   if (live && room.sealed && room.sealCells) drawSeals(ctx, world, room.sealCells, g.fxClock)
   if (live && room.sealed && room.event === 'arena') drawMarks(ctx, room.enemies, g.fxClock)
   if (live) drawDoorPulse(ctx, room.doors, g.doorPulse, g.fxClock)

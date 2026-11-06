@@ -290,6 +290,102 @@ const stalk = (ctx, e, top) => {
   ctx.fillRect(x - 1, from, 2, top - from + 2)
 }
 
+const molten = (d, i) => d[i + 3] > 128 && d[i] > 180 && d[i + 1] > 60 && d[i + 2] < 110 && d[i] - d[i + 2] > 100
+
+const NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]
+
+const tips = new WeakMap()
+
+const findTip = art => {
+  const { width: w, height: h } = art
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+  ctx.canvas.width = w
+  ctx.canvas.height = h
+  ctx.drawImage(art, 0, 0)
+  const { data } = ctx.getImageData(0, 0, w, h)
+  const seen = new Uint8Array(w * h)
+  let largest = []
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] || !molten(data, start * 4)) continue
+    const blob = []
+    const queue = [start]
+    seen[start] = 1
+    while (queue.length) {
+      const at = queue.pop()
+      const [x, y] = [at % w, Math.floor(at / w)]
+      blob.push([x, y])
+      for (const [dx, dy] of NEIGHBOURS) {
+        const nx = x + dx
+        const ny = y + dy
+        const next = ny * w + nx
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[next] || !molten(data, next * 4)) continue
+        seen[next] = 1
+        queue.push(next)
+      }
+    }
+    if (blob.length > largest.length) largest = blob
+  }
+  const low = Math.max(...largest.map(([, y]) => y))
+  if (!largest.length || low < h * 0.6) return null
+  const foot = largest.filter(([, y]) => y >= low - 1).map(([x]) => x)
+  const widths = Array.from({ length: 8 }, (_, k) => largest.filter(([, y]) => y === low - 4 - k).length).filter(n => n > 0).sort((p, q) => p - q)
+  const tones = largest.map(([x, y]) => (y * w + x) * 4).map(i => [data[i], data[i + 1], data[i + 2]]).sort((p, q) => p[0] + p[1] * 2 - q[0] - q[1] * 2)
+  const tone = at => `rgb(${tones[Math.floor(at * (tones.length - 1))].join(',')})`
+  return {
+    x: foot.reduce((sum, x) => sum + x, 0) / foot.length + 0.5,
+    y: low + 1,
+    w: widths[Math.floor(widths.length / 2)] ?? 3,
+    edge: tone(0.12),
+    body: tone(0.5),
+    core: tone(0.9),
+  }
+}
+
+const tipOf = art => {
+  if (!tips.has(art)) tips.set(art, findTip(art))
+  return tips.get(art)
+}
+
+const onPose = (art, x, y, { sx, sy, lean, bob }, point) => {
+  const w = Math.max(1, Math.round(art.width * sx))
+  const h = Math.max(1, Math.round(art.height * sy))
+  const left = x + Math.round((art.width - w) / 2)
+  const top = y + art.height - h + bob
+  const waist = Math.floor(h * 0.62)
+  const srcWaist = Math.floor(art.height * 0.62)
+  const below = point.y >= srcWaist
+  return {
+    x: left + point.x * (w / art.width) + (below ? 0 : lean),
+    y: below ? top + waist + (point.y - srcWaist) * ((h - waist) / (art.height - srcWaist)) : top + point.y * (waist / srcWaist),
+  }
+}
+
+const drawPour = (ctx, g, e, art, x, y, pose) => {
+  const stream = e.stream
+  const tip = tipOf(art)
+  const from = tip ? onPose(art, x, y, pose, tip) : { x: stream.x, y: stream.top }
+  const width = Math.max(2, Math.min(6, tip?.w ?? 3))
+  const { edge = '#c8401a', body = '#ff8a24', core = '#ffe84a' } = tip ?? {}
+  const time = g.time
+  const bottom = Math.max(stream.bottom, Math.round(from.y) + 1)
+  for (let row = Math.round(from.y) - 2; row < bottom; row++) {
+    const left = Math.round(from.x - width / 2 + Math.sin(row * 0.16 - time * 9) * 0.7)
+    ctx.fillStyle = edge
+    ctx.fillRect(left - 1, row, width + 2, 1)
+    ctx.fillStyle = body
+    ctx.fillRect(left, row, width, 1)
+    ctx.fillStyle = core
+    if (width > 2) ctx.fillRect(left + 1, row, width - 2, 1)
+    if (Math.floor(row - time * 140) % 11 === 0) ctx.fillRect(left, row, width, 2)
+  }
+  for (let i = 0; i < 4; i++) {
+    const t = (time * 2.6 + i / 4) % 1
+    const side = i % 2 ? 1 : -1
+    ctx.fillStyle = i < 2 ? core : body
+    ctx.fillRect(Math.round(from.x + side * (width / 2 + 1 + t * (4 + i * 2))), Math.round(bottom - 1 - Math.sin(t * Math.PI) * (3 + i)), 1, 1)
+  }
+}
+
 const BIG_FLASH = 0.4
 
 const drawOne = (ctx, g, e) => {
@@ -310,6 +406,7 @@ const drawOne = (ctx, g, e) => {
     ctx.translate(0, y * 2 + art.height)
     ctx.scale(1, -1)
   }
+  if (e.stream) drawPour(ctx, g, e, art, at, y, pose)
   if (e.elite || e.ally) ring(ctx, art, at, y, pose, e.ally ? GAS : ELITE_COLOURS[e.elite])
   stamp(ctx, art, at, y, pose)
   ctx.globalAlpha = 1
@@ -339,7 +436,7 @@ const drawOne = (ctx, g, e) => {
   }
 }
 
-export const drawCreatures = (ctx, g, enemies) => {
-  drawRemains(ctx, g)
+export const drawCreatures = (ctx, g, enemies, remains = true) => {
+  if (remains) drawRemains(ctx, g)
   for (const e of enemies) drawOne(ctx, g, e)
 }

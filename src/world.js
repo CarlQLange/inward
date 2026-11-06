@@ -321,7 +321,7 @@ const stepLava = (w, x, y, dt) => {
     place(w, i, M.ROCK)
     return true
   }
-  return Math.random() > T.lavaFlow
+  return !openFrom(w, i, x + gx, y + gy) && Math.random() > T.lavaFlow
 }
 
 const stepAcid = (w, x, y) => {

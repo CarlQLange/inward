@@ -1930,7 +1930,7 @@ const landFireball = (g, f) => {
     return
   }
   if (f.lava) {
-    for (const dx of [0, 1, -1]) puff(g.world, x + dx, y - 1, M.LAVA, [0, 0])
+    for (const dx of f.drop ? [0] : [0, 1, -1]) puff(g.world, x + dx, y - 1, M.LAVA, [0, 0])
     splash(g, f.x + 2, f.y + 2, 70, '#ff9a2e')
     f.age = -1
     return

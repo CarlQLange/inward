@@ -339,7 +339,54 @@ const coolLava = (g, e, dt) => {
   e.cooled = e.cooled.filter(c => c.age < CRUMBLE_AFTER)
 }
 
-const SPOUT = 20
+const SPOUT = { x: 23, y: 47 }
+const POUR_EVERY = 0.26
+
+const landingRow = (world, x, from) => {
+  for (let y = Math.max(0, from); y < ROOM; y++) {
+    const p = props(matAt(world, x, y))
+    if (p.solid || p.liquid) return y
+  }
+  return ROOM
+}
+
+const streamOf = (g, e) => {
+  const x = centre(e).x + e.facing * SPOUT.x
+  const top = e.y + SPOUT.y
+  const land = landingRow(g.world, cell(x), cell(top))
+  return { x, top, bottom: land * BLOCK, land }
+}
+
+const scald = (g, e, s) => {
+  const column = { x: s.x - 2, y: s.top, w: 4, h: s.bottom - s.top }
+  for (const o of [g.player, ...g.enemies]) {
+    if (o !== e && o.hp > 0 && !o.prop && !o.fireproof && overlap(column, o)) hurt(g, o, o === g.player ? 1 : 2, 'world', 'LAVA')
+  }
+}
+
+const LADLE_FLIGHTS = [0.55, 0.7, 0.85, 1, 1.1]
+
+const clearArc = (world, from, target, flight) => {
+  const { vx, vy } = hop(from, target, flight, TUNING.fireball.gravity)
+  for (let t = 0.03; t < flight; t += 0.03) {
+    if (solidAt(world, from.x + vx * t, from.y + vy * t + 0.5 * TUNING.fireball.gravity * t * t)) return false
+  }
+  return true
+}
+
+const landsOnTop = (world, from, vx, vy) => {
+  const gravity = TUNING.fireball.gravity
+  for (let t = 0.02; t < 3; t += 0.02) {
+    const x = from.x + vx * t
+    const y = from.y + vy * t + 0.5 * gravity * t * t
+    if (solidAt(world, x, y)) return vy + gravity * t > 0 && !solidAt(world, x, y - BLOCK)
+  }
+  return false
+}
+
+const SPATTER_EASE = [1, 0.8, 0.62, 0.48, 0.36, 0.26, 0.18]
+
+const openSpot = (world, { x, y }) => [0, -8, 8, -14, 14].map(dx => ({ x: x + dx, y })).find(spot => !solidAt(world, spot.x, spot.y)) ?? { x, y }
 
 const crucibleMoves = {
   pour: {
@@ -348,12 +395,14 @@ const crucibleMoves = {
     during: (g, e, dt) => {
       e.vx = toward(centre(e).x, centre(g.player).x) * 14
       e.x += e.vx * dt
+      e.stream = streamOf(g, e)
+      scald(g, e, e.stream)
       e.pourClock = (e.pourClock ?? 0) + dt
-      if (e.pourClock < 0.09 * (e.pace ?? 1)) return
+      if (e.pourClock < POUR_EVERY * (e.pace ?? 1)) return
       e.pourClock = 0
-      const x = cell(centre(e).x + e.facing * SPOUT)
-      const y = cell(e.y + e.h + 1)
-      if (matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.LAVA)
+      const x = cell(e.stream.x)
+      if (e.stream.land <= cell(e.stream.top)) ignite(g.world, x, e.stream.land)
+      else if (matAt(g.world, x, e.stream.land - 1) === M.EMPTY) setCell(g.world, x, e.stream.land - 1, M.LAVA)
     },
     end: (g, e) => { e.vx = 0 },
   },
@@ -361,8 +410,12 @@ const crucibleMoves = {
     tell: 0.7, act: 0.6, rest: 1.2,
     start: (g, e) => {
       const them = centre(g.player)
-      const from = { x: centre(e).x, y: e.y + 2 }
-      for (const spread of [-34, 0, 34]) lob(g, from, { x: them.x + spread, y: them.y }, 1.1, { lava: true })
+      const from = openSpot(g.world, { x: centre(e).x, y: e.y - 6 })
+      for (const spread of [-34, 0, 34]) {
+        const target = { x: them.x + spread, y: them.y }
+        const flight = LADLE_FLIGHTS.find(f => clearArc(g.world, from, target, f)) ?? LADLE_FLIGHTS[0]
+        lob(g, from, target, flight, { lava: true })
+      }
     },
   },
   sweep: {
@@ -377,10 +430,11 @@ const crucibleMoves = {
     tell: 0.75, act: 0.2, rest: 1.3,
     telling: (g, e) => burst(g, centre(e).x, e.y, 'fire', 1, 50),
     start: (g, e) => {
-      const c = centre(e)
+      const from = openSpot(g.world, { x: centre(e).x, y: e.y })
       for (let i = 0; i < 7; i++) {
         const a = Math.PI * (0.08 + (i / 6) * 0.84)
-        g.fireballs.push({ x: c.x - 2, y: e.y, w: 4, h: 4, vx: Math.cos(a) * 130, vy: -Math.sin(a) * 170, age: 0, friendly: false, fromWarden: true, lava: true })
+        const ease = SPATTER_EASE.find(k => landsOnTop(g.world, from, Math.cos(a) * 130 * k, -Math.sin(a) * 170 * k)) ?? SPATTER_EASE.at(-1)
+        g.fireballs.push({ x: from.x - 2, y: from.y, w: 4, h: 4, vx: Math.cos(a) * 130 * ease, vy: -Math.sin(a) * 170 * ease, age: 0, friendly: false, fromWarden: true, lava: true, drop: true })
       }
     },
   },
@@ -406,6 +460,7 @@ const hover = (g, e, dt) => {
 }
 
 const crucible = (g, e, dt) => {
+  e.stream = null
   if (e.asleep) return
   hover(g, e, dt)
   coolLava(g, e, dt)
