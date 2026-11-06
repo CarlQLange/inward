@@ -44,6 +44,7 @@ const runMoves = (g, e, dt, moves, pick) => {
   }
   e.clock = (e.clock ?? 1) - dt
   const move_ = moves[e.move]
+  if (e.stage && !move_) e.stage = 'rest'
   if (e.stage === 'tell') {
     move_.telling?.(g, e, dt)
     if (e.clock > 0) return
@@ -56,7 +57,7 @@ const runMoves = (g, e, dt, moves, pick) => {
     Object.assign(e, { stage: 'rest', clock: move_.rest * (e.pace ?? 1) * (0.55 + 0.45 * (e.hp / e.maxHp)) })
   } else if (e.clock <= 0) {
     const next = pick(g, e)
-    Object.assign(e, { move: next, stage: 'tell', clock: moves[next].tell, windup: true })
+    if (moves[next]) Object.assign(e, { move: next, stage: 'tell', clock: moves[next].tell, windup: true })
   }
 }
 
@@ -338,20 +339,23 @@ const coolLava = (g, e, dt) => {
   e.cooled = e.cooled.filter(c => c.age < CRUMBLE_AFTER)
 }
 
+const SPOUT = 20
+
 const crucibleMoves = {
   pour: {
     tell: 0.9, act: 2, rest: 1.3,
+    telling: (g, e) => { e.facing = toward(centre(e).x, centre(g.player).x) },
     during: (g, e, dt) => {
       e.vx = toward(centre(e).x, centre(g.player).x) * 14
       e.x += e.vx * dt
       e.pourClock = (e.pourClock ?? 0) + dt
       if (e.pourClock < 0.09 * (e.pace ?? 1)) return
       e.pourClock = 0
-      const c = centre(e)
-      const x = cell(c.x)
+      const x = cell(centre(e).x + e.facing * SPOUT)
       const y = cell(e.y + e.h + 1)
       if (matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.LAVA)
     },
+    end: (g, e) => { e.vx = 0 },
   },
   ladle: {
     tell: 0.7, act: 0.6, rest: 1.2,
@@ -361,9 +365,9 @@ const crucibleMoves = {
       for (const spread of [-34, 0, 34]) lob(g, from, { x: them.x + spread, y: them.y }, 1.1, { lava: true })
     },
   },
-  stride: {
+  sweep: {
     tell: 0.5, act: 1.3, rest: 1,
-    start: (g, e) => { e.facing = centre(e).x < WORLD_PX / 2 ? 1 : -1 },
+    telling: (g, e) => { e.facing = centre(e).x < WORLD_PX / 2 ? 1 : -1 },
     during: (g, e, dt) => {
       e.x = Math.max(3 * BLOCK, Math.min(WORLD_PX - 3 * BLOCK - e.w, e.x + e.facing * 95 * dt))
       if (Math.random() < dt * 5) g.fireballs.push({ x: centre(e).x, y: e.y + e.h, w: 4, h: 4, vx: 0, vy: 40, age: 0, friendly: false, fromWarden: true, lava: true })
@@ -393,8 +397,17 @@ const crucibleMoves = {
   },
 }
 
+const SAG = 2 * BLOCK
+
+const hover = (g, e, dt) => {
+  e.home ??= e.y
+  const height = e.home + Math.sin(g.time * 1.7) * 2.5 + (e.stun > 0 ? SAG : 0)
+  e.y += (height - e.y) * Math.min(1, dt * 3)
+}
+
 const crucible = (g, e, dt) => {
   if (e.asleep) return
+  hover(g, e, dt)
   coolLava(g, e, dt)
   if (e.stage === 'rest' || e.stage === undefined) {
     const dx = centre(g.player).x - centre(e).x
@@ -410,7 +423,7 @@ const crucible = (g, e, dt) => {
     burst(g, centre(e).x, centre(e).y, 'pale', 12)
   }
   keepInside(e)
-  runMoves(g, e, dt, crucibleMoves, () => bag(e, ['pour', 'ladle', 'stride', ...lateFor(e)]))
+  runMoves(g, e, dt, crucibleMoves, () => bag(e, ['pour', 'ladle', 'sweep', ...lateFor(e)]))
 }
 
 const puffSteam = (g, x, y) => setCell(g.world, x, y, M.STEAM, 2)
@@ -956,7 +969,7 @@ const orbit = (g, e) => {
 Object.assign(ENEMY_DEFS, {
   bellows: { size: [56, 54], hp: 240, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'] },
   colossus: { size: [50, 54], hp: 270, value: 800, heavy: true, free: true, magnetic: true, warden: true, weakTo: ['CRUSHED'] },
-  crucible: { size: [24, 18], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true },
+  crucible: { size: [36, 34], hp: 200, value: 800, heavy: true, free: true, fireproof: true, warden: true },
   eel: { size: [20, 16], hp: 210, value: 800, heavy: true, free: true, insulated: true, warden: true },
   eelseg: { size: [12, 12], hp: 9999, value: 0, heavy: true, free: true, insulated: true, part: true },
   brood: { size: [34, 40], hp: 210, value: 800, heavy: true, free: true, warden: true, weakTo: ['FIRE'] },
