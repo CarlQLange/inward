@@ -32,6 +32,7 @@ const playRegion = async ({ theme, rooms }) => {
   const { createGame, jumpTo, step } = await import('../src/game.js')
   const { M, props } = await import('../src/materials.js')
   const { ringOf } = await import('../src/map.js')
+  const { THEMES } = await import('../src/generate.js')
   save.found = [...LADDER]
 
   const SPILLS = new Set([M.OIL, M.ACID, M.METHANE])
@@ -42,7 +43,7 @@ const playRegion = async ({ theme, rooms }) => {
     return true
   }
   const madeBy = (old, now, i, oldMats) => stable(old) !== stable(now) || (stable(old) && old !== now) || (old === M.EMPTY && SPILLS.has(now) && fresh(now, oldMats, i))
-  const tally = { rooms: 0, ticks: { watch: 0, play: 0 }, foeTicks: 0, chasing: 0, still: 0, minds: {}, kills: 0, byHero: 0, byFoe: 0, bitten: 0, byWorld: 0, unaware: 0, changes: 0, hits: { watch: 0, play: 0 }, foesAtStart: 0, firstHit: [] }
+  const tally = { rooms: 0, ticks: { watch: 0, play: 0 }, foeTicks: 0, chasing: 0, still: 0, minds: {}, kills: 0, byHero: 0, byFoe: 0, bitten: 0, byWorld: 0, unaware: 0, changes: 0, hits: { watch: 0, play: 0 }, foesAtStart: 0, firstHit: [], acts: {} }
   const middle = e => ({ x: e.x + e.w / 2, y: e.y + e.h / 2 })
   const counted = e => !e.friendly && !e.prop && !e.warden && !e.partOf
 
@@ -54,6 +55,7 @@ const playRegion = async ({ theme, rooms }) => {
     const g = createGame(null, 'playing', 1 + n % 5)
     g.menus.length = 0
     g.bands = [theme, theme, theme, theme]
+    g.bandFoes = g.bands.map(() => [...THEMES[theme].foes].sort(() => Math.random() - 0.5).slice(0, 5))
     const wardens = new Set(Object.values(g.wardens).map(w => `${w.x},${w.y}`))
     const spots = Object.keys(g.map.links).filter(k => !wardens.has(k)).map(k => k.split(',').map(Number)).filter(([x, y]) => ringOf(x, y) >= 1 && ringOf(x, y) <= 5)
     const [x, y] = spots[Math.floor(Math.random() * spots.length)]
@@ -63,6 +65,7 @@ const playRegion = async ({ theme, rooms }) => {
     tally.rooms++
     tally.foesAtStart += g.enemies.filter(counted).length
     const world = g.world
+    world.counts = {}
     let before = Uint8Array.from(world.mat)
     let burnBefore = Float32Array.from(world.burn)
     const seen = new Set()
@@ -124,6 +127,7 @@ const playRegion = async ({ theme, rooms }) => {
       }
     }
     if (firstHit !== null) tally.firstHit.push(firstHit)
+    for (const [tag, count] of Object.entries(world.counts)) if (tag.startsWith('life.')) tally.acts[tag.slice(5)] = (tally.acts[tag.slice(5)] ?? 0) + count
   }
   return tally
 }
@@ -165,6 +169,7 @@ else {
       `| chasing ${pct(t.chasing, t.foeTicks)} still ${pct(t.still, t.foeTicks)}${minds ? ` | ${minds}` : ''}`,
       `| kills ${t.kills}: hero ${pct(t.byHero, t.kills)} foe ${pct(t.byFoe, t.kills)} bitten ${pct(t.bitten, t.kills)} world ${pct(t.byWorld, t.kills)} unaware ${t.unaware}`,
       `| foe edits/foe-min ${(t.changes / Math.max(1e-9, t.foeTicks / 3600)).toFixed(1)}`,
+      ...(Object.keys(t.acts).length ? [`| acts/min ${Object.entries(t.acts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v / Math.max(1e-9, (t.ticks.watch + t.ticks.play) / 3600)).toFixed(1)}`).join(' ')}`] : []),
       `| hero hits/min watch ${perMin(t.hits.watch, t.ticks.watch)} play ${perMin(t.hits.play, t.ticks.play)} first hit ${median === undefined ? '-' : `${median.toFixed(1)}s`}`,
     ].join(' ')
   }

@@ -45,6 +45,7 @@ const worker = async ({ opts, from, to }) => {
   const { CORE_RING, keyOf, ringOf } = await import('../src/map.js')
   const { doorGoal, exitsFrom, pathTo } = await import('../src/reach.js')
   const { heartCap } = await import('../src/keystones.js')
+  const { deathsOf } = await import('../src/lives.js')
 
   const TICK = 1 / 60
   const BLOCK = 8
@@ -557,6 +558,7 @@ const worker = async ({ opts, from, to }) => {
       wardens: wardenLog,
       levelRooms: levelAt,
       roomTimes: roomsAt,
+      creatures: { ...deathsOf(g) },
       tickMean: tickSamples ? tickTotal / tickSamples : 0,
       tickMax,
     }
@@ -615,6 +617,8 @@ const report = (results, opts, realSeconds) => {
   const kills = results.reduce((n, r) => n + r.kills, 0)
   const world = results.reduce((n, r) => n + r.worldKills, 0)
   line(`kills: ${kills} (${fmt(mean(results.map(r => r.kills)))} per run), by the world ${world} (${kills ? ((100 * world) / kills).toFixed(0) : 0}%), by the gun and direct skills ${kills - world}`)
+  const lives = merge(results.map(r => r.creatures))
+  line(`creature deaths: ${lives.all ?? 0}, killed by other creatures ${lives.all ? ((100 * lives.foe) / lives.all).toFixed(0) : 0}%, by the world ${lives.all ? ((100 * lives.world) / lives.all).toFixed(0) : 0}%, without ever noticing the hero ${lives.all ? ((100 * lives.unaware) / lives.all).toFixed(0) : 0}%`)
   line(`level reached: ${spread(results.map(r => r.level))}. rooms per level-up: ${spread(results.flatMap(r => r.levelRooms.map((v, i) => v - (r.levelRooms[i - 1] ?? 0))))}`)
   line(`score: ${spread(results.map(r => r.score))}. peak chain: ${spread(results.map(r => r.chainPeak))}. clean rooms per run: ${fmt(mean(results.map(r => r.clean)))}`)
   line(`seals broken: ${top(tally(results.map(r => `${r.seals}`)), 4)}`)

@@ -1,7 +1,9 @@
-import { paintFrames, creatureClip } from './sprites.js'
+import { SPRITES, paintFrames, creatureClip } from './sprites.js'
 import { artKind, artTop } from './cast.js'
 import { WORLD_PX, solidAt } from './physics.js'
 import { setPixelSource } from './fx.js'
+import { remainsOf } from './lives.js'
+import { TUNING } from './config.js'
 
 const HURT = '#ff5a4a'
 const FIRE = '#ff9a2e'
@@ -64,6 +66,7 @@ const attackClip = e => {
 
 const wanted = (e, g, a) => {
   if (e.friendly && near(e, g, FRIENDLY_REACH)) return 'greet'
+  if (e.eating > 0 && clipOf(e.kind, 'attack')) return 'attack'
   const special = SPECIALS[e.kind]?.(e, g, a)
   if (special) return special
   if (striking(e)) return attackClip(e)
@@ -232,9 +235,48 @@ const ring = (ctx, art, x, y, pose, colour) => {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) stamp(ctx, mask, x + dx, y + dy, pose)
 }
 
+const warned = e => (e.windup || e.startle > 0) && e.stun <= 0 && !e.friendly
+
 const telegraphColour = (e, time) => {
-  const pattern = e.lit ? [FIRE, null, '#ffffff', null] : e.windup && e.stun <= 0 && !e.friendly ? [HURT, null, '#ffffff', null] : null
+  const pattern = e.lit ? [FIRE, null, '#ffffff', null] : warned(e) ? [HURT, null, '#ffffff', null] : null
   return pattern ? pattern[Math.floor(time * (e.lit ? 26 : 18)) % 4] : null
+}
+
+const drawBurning = (ctx, e, art, at, y, pose, time) => {
+  const beat = Math.floor(time * 12 + (e.wander ?? 0) * 3)
+  ctx.globalAlpha = 0.3 + (beat % 2) * 0.12
+  stamp(ctx, silhouette(art, FIRE), at, y, pose)
+  ctx.globalAlpha = 1
+  const tongues = Math.max(1, Math.round(art.width / 9))
+  for (let i = 0; i < tongues; i++) {
+    const flame = SPRITES.flames[(beat + i) % SPRITES.flames.length]
+    const x = Math.round(at + ((i + 0.5) / tongues) * art.width - 4)
+    ctx.drawImage(flame, x, Math.round(y + art.height * 0.45 - 8 - ((beat + i) % 2)))
+  }
+}
+
+const DEAD = '#141414'
+
+
+const drawRemains = (ctx, g) => {
+  const R = TUNING.enemies.lives.remains
+  for (const r of remainsOf(g)) {
+    const frames = clipOf(r.kind, resolved(r.kind, 'idle'))?.frames
+    if (!frames) continue
+    const art = frames[0][r.facing > 0 ? 0 : 1]
+    const h = Math.max(2, Math.round(art.height * (0.35 + 0.35 * (r.meat / R.meat))))
+    const x = Math.round(r.x + r.w / 2 - art.width / 2)
+    const bottom = Math.round(r.y + r.h)
+    ctx.globalAlpha = Math.min(1, (R.life - r.age) / 4)
+    ctx.save()
+    ctx.translate(0, bottom * 2 - h)
+    ctx.scale(1, -1)
+    ctx.drawImage(art, x, bottom - h, art.width, h)
+    ctx.globalAlpha *= 0.55
+    ctx.drawImage(silhouette(art, DEAD), x, bottom - h, art.width, h)
+    ctx.restore()
+    ctx.globalAlpha = 1
+  }
 }
 
 const STALK = '#4a7a2a'
@@ -300,6 +342,7 @@ const drawOne = (ctx, g, e) => {
     stamp(ctx, silhouette(art, FROST), at, y, pose)
     ctx.globalAlpha = 1
   }
+  if (e.alight > 0) drawBurning(ctx, e, art, at, y, pose, time)
   if (e.upside) ctx.restore()
   if (e.aimAt && e.stun <= 0) {
     ctx.fillStyle = HURT
@@ -315,5 +358,6 @@ const drawOne = (ctx, g, e) => {
 }
 
 export const drawCreatures = (ctx, g, enemies) => {
+  drawRemains(ctx, g)
   for (const e of enemies) drawOne(ctx, g, e)
 }
