@@ -30,7 +30,8 @@ half a second first. The page opens on the title screen, and `game.restart()` sk
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
 lists the flags, such as `--god`, `--found rand`, `--career`, `--warden bellows --gun` and, to reach and pass the
 Core, `--god --express --deeper --loops 2`. The bot walks badly, so read its time-per-run numbers as an upper bound
-and its deaths as pessimistic.
+and its deaths as pessimistic. Its own count of rooms with no reachable exit includes moments the bot is mid-jump;
+`--mercy` stops the bot teleporting out, so the game's rescue has to free it, and reports how long that took.
 `node scripts/builds.mjs` forces a loadout and a region and reports kills per minute, time to clear, hearts
 lost, casts and time fed, for single skills, named pairs (`--pairs ember+gust`), every pair or finished forms.
 Its bot never dodges or sets up a combo on purpose, so its numbers are comparative.
@@ -284,8 +285,8 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
 - Score with chains. Kills by the world score double and give triple experience.
 - In the core room rock burns and conducts, and the core drifts toward you.
-- Rooms generate on entry, check they can be crossed, and lean toward your skills, easing
-  off with depth.
+- Rooms generate on entry, check they can be crossed, grow a vine out of any low spot you could fall into
+  but not climb out of, and lean toward your skills, easing off with depth.
 - A title room spelled out in conducting metal, one pause screen combining map, skills and
   relics, and an Almanac grid of everything, with unfound things shown as silhouettes.
 - With full slots, a new skill opens a replacement choice. The dropped skill stays in

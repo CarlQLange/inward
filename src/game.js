@@ -1596,6 +1596,7 @@ const stepMercy = (g, p, dt) => {
   room.boxedIn = (room.boxedIn ?? 0) + 1
   if (locked.length === 0 && room.boxedIn >= R.boxedInLimit) {
     carveEscape(g, p, anchors)
+    g.escapes = [...(g.escapes ?? []), `${room.layout}@${room.ring}:${room.cleared ? 'after' : 'fresh'}`]
     room.boxedIn = 0
     return
   }

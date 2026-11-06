@@ -10,6 +10,8 @@
 //          --deeper always takes the deeper option, --stop always banks, otherwise the bot picks at random
 //          --express warps to the next Warden, --loops N stops going deeper after N loops, --keystone id forces one
 //          --skills float:tilt+link starts every run holding those skills and forms
+//          --slow times every tick and lists those over 20ms
+//          --mercy holds the bot's teleport while it is boxed in, so the game's own rescue has to free it
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir, cpus } from 'node:os'
@@ -163,8 +165,14 @@ const worker = async ({ opts, from, to }) => {
     const from = { x: cell(middle(p).x), y: cell(p.y + p.h - 1) }
     const { parent, near, anchors, open: exitsOpen, locked: exitsLocked } = exitsFrom(g.world, room.doors, from)
     const isStart = keyOf(g.x, g.y) === keyOf(...g.map.start)
+    bot.boxedSince ??= new Map()
+    if (bot.boxedSince.has(room) && exitsOpen.length + exitsLocked.length > 0) {
+      stats.boxed.push(g.time - bot.boxedSince.get(room))
+      bot.boxedSince.delete(room)
+    }
     if (!p.upside && !room.sealed && !isStart && exitsOpen.length === 0 && exitsLocked.length === 0 && g.time - bot.enteredAt > 2 && !bot.softRooms.has(room)) {
       bot.softRooms.add(room)
+      bot.boxedSince.set(room, g.time)
       bot.softlocks += 1
       stats.softlockRooms.push(`${room.layout}@${room.ring}:${room.event ?? '-'}:${Object.keys(room.doors).join('')}:${room.cleared ? 'after' : 'fresh'}`)
       if (stats.softMaps.length < 2) stats.softMaps.push(`reach ${parent.size} anchors ${JSON.stringify(anchors)}\n${asciiRoom(g, room, from)}`)
@@ -361,6 +369,7 @@ const worker = async ({ opts, from, to }) => {
     }
     const hopeless = wanted && !wanted.locked && !parent.has(wanted.y * ROOM + wanted.x) && g.time - bot.enteredAt > 10
     const overdue = hopeless || g.time - bot.enteredAt > (keyOf(g.x, g.y) === keyOf(...g.map.start) ? 25 : 35)
+    if (bot.opts.mercy && bot.boxedSince?.has(room)) return input
     if ((stuckFor > 9 || overdue) && wanted) {
       if (bot.opts.trace) console.log(`  t=${g.time.toFixed(0)} assist ${wanted.dir} stuck=${stuckFor.toFixed(0)} overdue=${overdue} locked=${wanted.locked} goal=${goalKey} at ${from.x},${from.y} errand=${errand} reach=${parent.size}`)
       stats.assistWhy.push(`${room.layout}:${room.sealed ? 'sealed' : wanted.locked ? 'locked' : parent.has(wanted.y * ROOM + wanted.x) ? 'route' : 'noroute'}:${overdue ? 'late' : 'still'}`)
@@ -407,7 +416,7 @@ const worker = async ({ opts, from, to }) => {
     if (opts.omen) save.found = [...new Set([...save.found, `omen:${opts.omen}`])]
   }
 
-  const emptyStats = () => ({ softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {}, loops: {}, noRoute: [] })
+  const emptyStats = () => ({ boxed: [], softlockRooms: [], softMaps: [], assistWhy: [], hits: {}, ticks: 0, lockedOut: 0, timeIn: {}, ringTime: {}, loops: {}, noRoute: [] })
 
   const playRun = (index, opts) => {
     Math.random = seededRandom(opts.seed * 1000003 + index * 7919)
@@ -451,8 +460,9 @@ const worker = async ({ opts, from, to }) => {
       if (g.menus.length) answerMenu(g, opts)
       warp(g, bot)
       const input = g.reveal ? {} : decide(g, bot, stats)
-      const sample = t % 8 === 0
+      const sample = t % 8 === 0 || bot.opts.slow
       const before = sample ? performance.now() : 0
+      const roomBefore = keyOf(g.x, g.y)
       try {
         step(g, input, TICK)
       } catch (err) {
@@ -464,6 +474,7 @@ const worker = async ({ opts, from, to }) => {
         tickTotal += took
         tickSamples += 1
         tickMax = Math.max(tickMax, took)
+        if (bot.opts.slow && took > 20) (stats.slow ??= []).push(`${took.toFixed(0)}ms ${keyOf(g.x, g.y) !== roomBefore ? 'new room' : 'same room'} ${g.rooms[keyOf(g.x, g.y)]?.layout}@${g.ring}`)
       }
       if (t % 30 === 0) {
         nan = insane(g)
@@ -538,12 +549,15 @@ const worker = async ({ opts, from, to }) => {
       mutations: g.mutations,
       clean: g.cleanClears,
       mercy: g.mercyBombs ?? 0,
+      escapes: g.escapes ?? [],
       secrets,
       met: secretsAt,
       omen: g.omen,
       bands: g.bands,
       softlocks: bot.softlocks,
       softlockRooms: stats.softlockRooms,
+      boxed: stats.boxed,
+      slow: stats.slow ?? [],
       softMaps: stats.softMaps,
       assists: bot.assists,
       assistWhy: stats.assistWhy,
@@ -600,6 +614,10 @@ const report = (results, opts, realSeconds) => {
   line(`bot teleports (stuck, not necessarily a softlock): mean ${fmt(mean(results.map(r => r.assists)))} per run`)
   line(`locked out (no bomb, no open gate, bot could not open the door): ${fmt(mean(results.map(r => r.lockedOut)))} per run`)
   line(`mercy bombs: ${fmt(mean(results.map(r => r.mercy)))} per run`)
+  if (results.some(r => r.slow.length)) line(`slow ticks over 20ms: ${results.flatMap(r => r.slow).join(', ')}`)
+  const boxed = results.flatMap(r => r.boxed ?? []).sort((a, b) => a - b)
+  line(`boxed in until an exit opened: ${boxed.length} times, seconds ${boxed.length ? [0.5, 0.9, 1].map(q => boxed[Math.min(boxed.length - 1, Math.floor(q * boxed.length))].toFixed(1)).join(' / ') : '-'} (median / 90% / worst)`)
+  line(`escapes carved after being boxed in: ${results.reduce((n, r) => n + r.escapes.length, 0)} in ${results.reduce((n, r) => n + r.rooms, 0)} rooms. ${top(tally(results.flatMap(r => r.escapes)), 8)}`)
   line(`  why: ${top(tally(results.flatMap(r => r.assistWhy)), 14)}`)
   const rooms = results.reduce((n, r) => n + r.rooms, 0)
   line(`wanted door not reachable by the bot's model on arrival: ${results.reduce((n, r) => n + r.noRoute.length, 0)} of ${rooms} rooms. ${top(tally(results.flatMap(r => r.noRoute)), 8)}`)

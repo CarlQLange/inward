@@ -445,11 +445,21 @@ const rot = (grid, rand, share) => {
   }
 }
 
-const standing = (grid, extra) => (x, y) => {
-  const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || SOLID.has(grid[b][a])
-  const wet = (a, b) => ['~', 'o', 'u'].includes(grid[b]?.[a])
-  const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || grid[y]?.[x] === 'v' || extra.has(`${x},${y}`)
-  return { solid, ok: !solid(x, y) && !solid(x, y - 1) && stands }
+const WET = new Set(['~', 'o', 'u'])
+
+const footingOf = (grid, extra) => {
+  const solidCells = new Uint8Array(ROOM * ROOM)
+  for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) solidCells[y * ROOM + x] = SOLID.has(grid[y][x]) ? 1 : 0
+  const solid = (a, b) => a < 0 || b < 0 || a >= ROOM || b >= ROOM || solidCells[b * ROOM + a] === 1
+  const wet = (a, b) => b < ROOM && WET.has(grid[b][a])
+  const stand = new Uint8Array(ROOM * ROOM)
+  for (let y = 1; y < ROOM; y++) {
+    for (let x = 0; x < ROOM; x++) {
+      const stands = solid(x, y + 1) || wet(x, y) || wet(x, y + 1) || grid[y][x] === 'v' || extra.has(`${x},${y}`)
+      stand[y * ROOM + x] = !solid(x, y) && !solid(x, y - 1) && stands ? 1 : 0
+    }
+  }
+  return { solid, stand }
 }
 
 const arcIsOpen = (solid, x0, y0, x1, y1) => {
@@ -463,37 +473,83 @@ const arcIsOpen = (solid, x0, y0, x1, y1) => {
   return true
 }
 
-const reachable = (grid, start, extra) => {
-  const seen = new Set([start.join()])
-  const queue = [start]
-  const at = standing(grid, extra)
+const reachable = ({ solid, stand }, [sx, sy]) => {
+  const seen = new Uint8Array(ROOM * ROOM)
+  seen[sy * ROOM + sx] = 1
+  const queue = [sy * ROOM + sx]
   while (queue.length) {
-    const [x, y] = queue.pop()
+    const k = queue.pop()
+    const x = k % ROOM
+    const y = (k - x) / ROOM
     for (let dx = -5; dx <= 5; dx++) {
       for (let dy = -3; dy <= 10; dy++) {
         const nx = x + dx
         const ny = y + dy
-        if (nx < 0 || nx >= ROOM || ny < 1 || ny >= ROOM || seen.has(`${nx},${ny}`)) continue
-        if (dy === -3 && Math.abs(dx) > 3) continue
-        const { solid, ok } = at(nx, ny)
-        if (!ok || !arcIsOpen(solid, x, y, nx, ny)) continue
-        seen.add(`${nx},${ny}`)
-        queue.push([nx, ny])
+        if (nx < 0 || nx >= ROOM || ny < 1 || ny >= ROOM) continue
+        const i = ny * ROOM + nx
+        if (seen[i] || (dy === -3 && Math.abs(dx) > 3)) continue
+        if (!stand[i] || !arcIsOpen(solid, x, y, nx, ny)) continue
+        seen[i] = 1
+        queue.push(i)
       }
     }
   }
   return seen
 }
 
+const returnable = ({ solid, stand }, anchors) => {
+  const back = new Uint8Array(ROOM * ROOM)
+  const queue = anchors.map(([x, y]) => y * ROOM + x)
+  queue.forEach(i => { back[i] = 1 })
+  while (queue.length) {
+    const k = queue.pop()
+    const x = k % ROOM
+    const y = (k - x) / ROOM
+    for (let dx = -5; dx <= 5; dx++) {
+      for (let dy = -3; dy <= 10; dy++) {
+        const sx = x - dx
+        const sy = y - dy
+        if (sx < 0 || sx >= ROOM || sy < 1 || sy >= ROOM) continue
+        const i = sy * ROOM + sx
+        if (back[i] || !stand[i] || (dy === -3 && Math.abs(dx) > 3)) continue
+        if (!arcIsOpen(solid, sx, sy, x, y)) continue
+        back[i] = 1
+        queue.push(i)
+      }
+    }
+  }
+  return back
+}
+
+const VINE_REACH = 12
+
+const mendTraps = (grid, anchors) => {
+  for (let mends = 0; mends < 6 && anchors.length; mends++) {
+    const footing = footingOf(grid, new Set(anchors.map(a => a.join())))
+    const ahead = reachable(footing, anchors[0])
+    const back = returnable(footing, anchors)
+    const trapped = []
+    for (let i = 0; i < ROOM * ROOM; i++) if (ahead[i] && !back[i]) trapped.push([i % ROOM, Math.floor(i / ROOM)])
+    if (trapped.length === 0) return
+    const climb = ([x, y]) => {
+      let top = y
+      while (top - 1 > 0 && y - top < VINE_REACH && grid[top - 1][x] === '.') top--
+      return top
+    }
+    const [x, y] = trapped.sort((a, b) => climb(a) - climb(b) || b[1] - a[1])[0]
+    const top = climb([x, y])
+    if (y - top < 2) return
+    for (let row = top; row <= y; row++) if (grid[row][x] === '.') grid[row][x] = 'v'
+  }
+}
+
 const passes = (grid, anchors, goals) => {
-  const extra = new Set(anchors.map(a => a.join()))
-  const sets = anchors.map(a => reachable(grid, a, extra))
-  const joined = sets.every(seen => anchors.every(a => seen.has(a.join())))
+  const footing = footingOf(grid, new Set(anchors.map(a => a.join())))
+  const sets = anchors.map(a => reachable(footing, a))
+  const has = (seen, x, y) => x >= 0 && y >= 0 && x < ROOM && y < ROOM && seen[y * ROOM + x] === 1
+  const joined = sets.every(seen => anchors.every(([x, y]) => has(seen, x, y)))
   if (!joined || sets.length === 0) return joined
-  const near = ([gx, gy]) => [...sets[0]].some(k => {
-    const [x, y] = k.split(',').map(Number)
-    return Math.abs(x - gx) <= 1 && Math.abs(y - gy) <= 1
-  })
+  const near = ([gx, gy]) => [-1, 0, 1].some(dy => [-1, 0, 1].some(dx => has(sets[0], gx + dx, gy + dy)))
   return goals.every(near)
 }
 
@@ -721,6 +777,7 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   if (special.event === 'arena') {
     for (const s of layout.segments.slice(1)) placeFoe(pickFoe(theme, rand, enemies), s, grid, ceilings, range, enemies)
   }
+  mendTraps(grid, anchors)
   const ok = passes(grid, anchors, goals)
   applyLocks(grid, links, doors, layout, enemies, ceilings)
 
