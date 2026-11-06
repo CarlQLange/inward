@@ -275,6 +275,10 @@ vec3 deep(vec2 p, vec2 dir) {
   vec2 next = (ahead - p) * sgn * inverse;
   vec2 stride = ${CELL} * inverse;
   float started = liquidOf(cellAt(c));
+  vec2 up = c - vec2(0.0, 1.0);
+  float homeFlow = flowOf(cellAt(c));
+  bool surfaced = !outside(up) && cellAt(up).r < 0.1 && abs(liquidOf(cellAt(up)) - started) > 0.5;
+  if (started > 0.5 && dir.y > 0.0 && surfaced && (homeFlow < 0.5 || homeFlow > 2.5)) return liquidSheet(p, dir, 0.0, started);
   for (int i = 0; i < 12; i++) {
     float z = min(next.x, next.y);
     if (z >= 1.0) break;
@@ -365,13 +369,15 @@ float rippleLift(vec2 p) {
   return lift;
 }
 
-vec3 water(vec2 p, float below, float surfaceY) {
+float grain(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
+
+vec3 water(vec2 p, float below, float surfaceY, float settled) {
   vec2 chunk = floor(p);
   float ripple = sin(p.y * 0.42 + time * 1.7) + sin(p.x * 0.23 - time * 1.1) * 0.6;
   vec2 bent = vec2(ripple * 1.5 + (noiseAt(p * 0.6 + time * vec2(3.0, 1.0)).r - 0.5) * 2.6, ripple * 0.7) * refract;
   vec3 behind = worldAt(p + bent).rgb;
 
-  float deepness = clamp(below / 42.0, 0.0, 1.0);
+  float deepness = clamp(settled / 42.0, 0.0, 1.0);
   vec3 tint = mix(vec3(0.09, 0.36, 0.42), vec3(0.04, 0.17, 0.26), deepness);
   float band = floor(mod(chunk.x * 0.5 + chunk.y + time * 7.0 + sin(chunk.y * 0.3) * 3.0, 12.0) / 4.0);
   vec3 cycled = tint * (0.82 + band * 0.2);
@@ -417,11 +423,24 @@ vec3 lava(vec2 p, float below) {
 
 vec3 oil(vec2 p, float below, vec3 behind) {
   vec2 chunk = floor(p);
-  float sheen = noiseAt(chunk * 0.8 + time * vec2(1.0, 0.3)).g;
-  vec3 film = 0.5 + 0.5 * cos(6.28 * (sheen * 1.4 + vec3(0.0, 0.33, 0.67)) + time * 0.4);
-  vec3 colour = mix(vec3(0.16, 0.09, 0.19), vec3(0.09, 0.03, 0.12), clamp(below / 20.0, 0.0, 1.0));
-  colour += step(0.8, sheen) * mix(vec3(0.16, 0.1, 0.22), film * 0.45, refract);
-  if (below < 1.0) return mod(chunk.x + floor(time * 7.0), 11.0) < 1.0 ? vec3(0.9, 0.72, 0.94) : vec3(0.63, 0.42, 0.69);
+  float depth = clamp(below / 24.0, 0.0, 1.0);
+  vec3 colour = mix(vec3(0.15, 0.08, 0.19), vec3(0.07, 0.03, 0.1), depth);
+  float row = floor(below);
+  float drift = chunk.x + time * (grain(vec2(row, 7.0)) - 0.5) * 6.0;
+  float streak = step(0.62, grain(vec2(row, 3.0))) * step(fract(drift / (12.0 + grain(vec2(row, 4.0)) * 14.0)), 0.4);
+  colour += vec3(0.15, 0.1, 0.19) * streak * (1.0 - clamp(below / 40.0, 0.0, 1.0));
+  if (refract > 0.01) {
+    float warp = noiseAt(p * 0.35 + time * vec2(0.5, 0.15)).r;
+    float v = p.x * 0.025 + below * 0.06 + warp * 2.5 + time * 0.04;
+    float ribbon = 1.0 - step(0.07, abs(fract(v) - 0.5));
+    vec3 film = 0.5 + 0.5 * cos(6.28 * (v * 0.7 + vec3(0.0, 0.33, 0.67)));
+    colour = mix(colour, film * 0.6, ribbon * refract * 0.6 * (1.0 - depth * 0.7));
+  }
+  if (below < 1.0) {
+    vec3 line = mod(chunk.x + floor(time * 7.0), 11.0) < 1.0 ? vec3(0.9, 0.72, 0.94) : vec3(0.63, 0.42, 0.69);
+    vec3 film = 0.5 + 0.5 * cos(6.28 * (chunk.x * 0.04 + time * 0.1 + vec3(0.0, 0.33, 0.67)));
+    return mix(line, film, refract * 0.35);
+  }
   return mix(colour, behind, 0.06 * blend);
 }
 
@@ -435,7 +454,6 @@ vec3 acid(vec2 p, float below, vec3 behind) {
   return colour;
 }
 
-float grain(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
 
 bool sameLiquid(vec2 c, float kind) { return !outside(c) && abs(liquidOf(cellAt(c)) - kind) < 0.5; }
 
@@ -637,10 +655,10 @@ vec2 filletAt(vec2 p) {
 
 float runSpeed(float kind) { return kind < 1.5 ? 22.0 : kind < 2.5 ? 4.0 : kind < 3.5 ? 10.0 : 15.0; }
 
-vec3 running(vec2 p, float kind, float dir, float below, float surfaceY, vec3 behind) {
+vec3 running(vec2 p, float kind, float dir, float below, float surfaceY, float settled, vec3 behind) {
   float drift = p.x - dir * time * runSpeed(kind);
   if (kind < 1.5) {
-    vec3 colour = water(p, max(below, 1.0), surfaceY);
+    vec3 colour = water(p, max(below, 1.0), surfaceY, settled);
     if (below < 1.0) return mod(floor(drift / 2.0), 5.0) < 1.0 ? vec3(0.95, 1.0, 1.0) : vec3(0.5, 0.86, 0.9);
     if (below < 6.0 && fract(drift / 13.0 + grain(vec2(floor(below), floor(p.y / ${CELL})))) < 0.2) colour = mix(colour, vec3(0.75, 0.94, 1.0), 0.55);
     return colour;
@@ -665,9 +683,22 @@ vec3 running(vec2 p, float kind, float dir, float below, float surfaceY, vec3 be
   return colour;
 }
 
+float levelAt(vec2 c, float kind, float surfaceY) {
+  float sum = surfaceY;
+  float n = 1.0;
+  for (int i = -2; i <= 2; i++) {
+    vec2 s = c + vec2(float(i), 0.0);
+    if (i == 0 || !pooled(s, kind)) continue;
+    sum += (s.y - floor(cellAt(s).b * 255.0 / ${CELL_SHADER.surfaceStep.toFixed(1)} + 0.5)) * ${CELL};
+    n += 1.0;
+  }
+  return sum / n;
+}
+
 vec3 surfaceLiquid(vec2 p, vec2 c, float kind, float flow, float below, float surfaceY, vec3 behind) {
-  if (flow > 3.5) return running(p, kind, flow < 4.5 ? -1.0 : 1.0, below, surfaceY, behind);
-  vec3 colour = kind < 1.5 ? water(p, below, surfaceY) : kind < 2.5 ? lava(p, below) : kind < 3.5 ? oil(p, below, behind) : acid(p, below, behind);
+  float settled = kind < 1.5 ? max(0.0, p.y - levelAt(c, kind, surfaceY)) : below;
+  if (flow > 3.5) return running(p, kind, flow < 4.5 ? -1.0 : 1.0, below, surfaceY, settled, behind);
+  vec3 colour = kind < 1.5 ? water(p, below, surfaceY, settled) : kind < 2.5 ? lava(p, below) : kind < 3.5 ? oil(p, below, behind) : acid(p, below, behind);
   return abs(flow - 3.0) < 0.5 ? landing(p, c, kind, colour, below) : colour;
 }
 
