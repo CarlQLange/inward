@@ -245,7 +245,8 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   other regions' systems, so a lava vein can sit in an ice room and a nest of ember bats in the Moss Caves. With depth each
   shows faintly on the far wall with its own colour and motion: a water line and drip, sand grains, gold glints, ice
   facets, rising bubbles, a sheen, blinking eyes, a glowing crack, an arch with a chest. Ring 0 never shows depth, so its
-  pockets (water, sand, ore, rime) are unseen until something breaks one. Blasts beside a pocket break it, and a bomb
+  pockets, only water and ore, are unseen until something breaks one, and the seal moment reveals what was there.
+  Sand, lava, rime and seam pockets only sit high over open drops away from doors, so a spill rarely cuts a crossing. Blasts beside a pocket break it, and a bomb
   thrown at one bursts on it. So do two hammer blows, acid against it, a falling block, a worm digging through, and fire,
   lava or a lens beam over time. Heat and charge also do what the contents would: marsh gas blows up, tar pours burning,
   rime melts to water, a seam conducts and cracks. A nest wakes if the hero lingers near it or a blast goes off close by.

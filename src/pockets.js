@@ -131,9 +131,10 @@ const breach = (g, pocket, hooks) => {
   if (pocket.kind === 'alcove' && hooks.chest(g, pocket)) pocket.stock = 0
 }
 
-const blow = (g, pocket) => {
+const blow = (g, pocket, by) => {
   const { x, y } = middle(pocket)
   const w = g.world
+  pocket.by = by
   pocket.open = true
   pocket.crack = 1
   pocket.stock = 0
@@ -160,7 +161,7 @@ const dug = (g, pocket) => g.enemies.some(e => e.kind === 'worm' && !e.friendly 
   gapTo(pocket, Math.floor((e.x + e.w / 2) / BLOCK), Math.floor((e.y + e.h / 2) / BLOCK)) === 0)
 
 const HEATED = {
-  marsh: (g, pocket) => blow(g, pocket),
+  marsh: (g, pocket) => blow(g, pocket, 'heat'),
   tar: (g, pocket) => { pocket.lit = true },
   rime: (g, pocket) => { pocket.melted = true },
   nest: (g, pocket, step) => { pocket.stir += step * 2 },
@@ -173,15 +174,16 @@ const feel = (g, pocket, step) => {
   let charge = false
   let crush = false
   let acid = 0
+  const own = POURS[pocket.kind]
   for (let y = pocket.y - 1; y <= pocket.y + pocket.h; y++) {
     for (let x = pocket.x - 1; x <= pocket.x + pocket.w; x++) {
       if (x < 0 || y < 0 || x >= ROOM || y >= ROOM) continue
       const i = y * ROOM + x
       const m = w.mat[i]
       if (w.burn[i] > 0) heat = true
-      if (m === M.LAVA) lava = true
+      if (m === M.LAVA && own !== M.LAVA) lava = true
       if (w.charge[i] > 0) charge = true
-      if (covers(pocket, x, y) && w.crushing[i]) crush = true
+      if (covers(pocket, x, y) && w.crushing[i] && m !== own && !props(m).slides) crush = true
       if (m !== M.ACID || pocket.open) continue
       acid += 1
       if (Math.random() < P.acidSpent) setCell(w, x, y, M.EMPTY)
@@ -191,12 +193,24 @@ const feel = (g, pocket, step) => {
   if ((heat || lava) && HEATED[pocket.kind]) HEATED[pocket.kind](g, pocket, step)
   if (pocket.open) return
   if (charge && pocket.kind === 'marsh') {
-    blow(g, pocket)
+    blow(g, pocket, 'charge')
     return
   }
-  const seamCharged = charge && pocket.kind === 'seam'
-  pocket.crack += step * ((heat ? P.heatCrack : 0) + (lava ? P.lavaCrack : 0) + (dug(g, pocket) ? P.digCrack : 0) + acid * P.acidCrack + (seamCharged ? P.chargeCrack : 0))
-  if (crush) pocket.crack += P.crushCrack
+  const digging = dug(g, pocket)
+  const causes = [
+    ['heat', heat ? P.heatCrack * step : 0],
+    ['lava', lava ? P.lavaCrack * step : 0],
+    ['dig', digging ? P.digCrack * step : 0],
+    ['acid', acid * P.acidCrack * step],
+    ['charge', charge && pocket.kind === 'seam' ? P.chargeCrack * step : 0],
+    ['crush', crush ? P.crushCrack : 0],
+  ].filter(([, amount]) => amount > 0)
+  for (const [cause, amount] of causes) crackBy(pocket, cause, amount)
+}
+
+const crackBy = (pocket, cause, amount) => {
+  pocket.crack += amount
+  pocket.by = cause
 }
 
 const stir = (g, pocket, dt) => {
@@ -204,7 +218,7 @@ const stir = (g, pocket, dt) => {
   const p = g.player
   const near = gapTo(pocket, (p.x + p.w / 2) / BLOCK, (p.y + p.h / 2) / BLOCK) <= P.stirNear
   pocket.stir = clamp(pocket.stir + (near ? P.stirRate : -P.stirFade) * dt, 0, 1.2)
-  if (pocket.stir >= 1) pocket.crack += P.hatch * dt
+  if (pocket.stir >= 1) crackBy(pocket, 'stir', P.hatch * dt)
 }
 
 const freeCell = (w, pocket, rising) => {
@@ -293,8 +307,8 @@ export const blastPockets = (g, { x, y, reach }) => {
     if (pocket.stock <= 0) continue
     const gap = gapTo(pocket, x, y)
     if (gap <= reach + P.blastNear) {
-      if (pocket.kind === 'marsh') blow(g, pocket)
-      else pocket.crack = Math.max(pocket.crack, 1)
+      if (pocket.kind === 'marsh') blow(g, pocket, 'blast')
+      else if (!pocket.open) crackBy(pocket, 'blast', Math.max(0, 1 - pocket.crack))
     } else if (pocket.kind === 'nest' && !pocket.open && gap <= reach + P.stirReach) pocket.stir += P.stirBlast
   }
 }
@@ -302,7 +316,7 @@ export const blastPockets = (g, { x, y, reach }) => {
 export const strikePocket = (g, x, y) => {
   const pocket = pocketAt(g.world, x, y)
   if (!pocket || pocket.stock <= 0) return false
-  pocket.crack += P.hammerCrack
+  crackBy(pocket, 'hammer', P.hammerCrack)
   if (pocket.kind === 'nest') pocket.stir += P.stirBlast
   rubble(g, pocket, 5)
   return true
