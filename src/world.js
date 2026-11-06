@@ -56,6 +56,7 @@ export const createWorld = (rows, overloaded = false) => {
     events: [],
     drains: [],
     pours: [],
+    pockets: [],
     overloaded,
   }
 }

@@ -65,7 +65,7 @@ colours that the shader lets through untouched.
 The picture is built in layers, all at game resolution so distortion stays in chunky pixels:
 
 - The world pass draws terrain fronts, side faces traced back from the play plane through the
-  cell texture, the far wall and its silhouettes, all lit from the light map.
+  cell texture, the far wall with its silhouettes and pockets, all lit from the light map.
 - The optics pass adds what moves over the world: liquids, haze, fog, shafts and gas.
 - The frame pass places that room in the view with door slides, shake and warps, bleeds its edges
   into the pit in the margins, then composites the actor canvas on top. Nothing but zoom and the
@@ -239,6 +239,18 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   bakes into brick. Steam freezes into snow against ice and falls as snow in the Ice Shafts. Blasts throw sand,
   scrap, floes, snow and mud outward, ash beside water grows back as moss, and charged metal pulls scrap and
   magnetic foes. The world reports shatters and throws as events, and `src/loose.js` turns them into flying matter.
+- The far wall holds pockets (`src/pockets.js`), which is how the depth matters for play. A pocket is a cistern of water,
+  a hopper of sand, an ore seam of coins and scrap, rime that drops floes and snow, marsh gas, tar, a nest of foes, a lava
+  vein, an acid seep or, rarely, an alcove with a chest. Rooms get up to three, more deeper in, and about a third come from
+  other regions' systems, so a lava vein can sit in an ice room and a nest of ember bats in the Moss Caves. With depth each
+  shows faintly on the far wall with its own colour and motion: a water line and drip, sand grains, gold glints, ice
+  facets, rising bubbles, a sheen, blinking eyes, a glowing crack, an arch with a chest. Ring 0 never shows depth, so its
+  pockets (water, sand, ore, rime) are unseen until something breaks one. Blasts beside a pocket break it, and a bomb
+  thrown at one bursts on it. So do two hammer blows, acid against it, a falling block, a worm digging through, and fire,
+  lava or a lens beam over time. Heat and charge also do what the contents would: marsh gas blows up, tar pours burning,
+  rime melts to water, a seam conducts and cracks. A nest wakes if the hero lingers near it or a blast goes off close by.
+  A cracked pocket seeps before it bursts, and a broken one pours into the play plane until it's empty and stays a hole.
+  Pockets live on the world object and save with the room. Tuning is `TUNING.pockets`.
 - Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
   (electrifies water), worm (digs), turret, bomber, imp
   (freezes water), ember bat (lights things), slime (leaves acid), shield crab, nest, mimic,

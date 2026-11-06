@@ -5,6 +5,7 @@ import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, ove
 import { burst, hurt } from './combat.js'
 import { chunks, liquidColour, sip } from './feel.js'
 import { chipsAt } from './fx.js'
+import { strikePocket } from './pockets.js'
 import { shotBox } from './cast.js'
 import { feedEvent } from './feed.js'
 import { UP, pullFromAim } from './float.js'
@@ -564,6 +565,7 @@ export const quake = (g, count, power = 6) => {
 
 export const smash = (g, x, y) => {
   const m = matAt(g.world, x, y)
+  if (m === M.EMPTY) strikePocket(g, x, y)
   if (m === M.VOLATILE) ignite(g.world, x, y)
   else if (m === M.ROCK) setCell(g.world, x, y, M.SAND)
   else if (!shatterFrom(g, x, y) && BREAKS.has(m)) setCell(g.world, x, y, M.EMPTY)
