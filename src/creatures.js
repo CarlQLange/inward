@@ -257,7 +257,6 @@ const drawBurning = (ctx, e, art, at, y, pose, time) => {
 
 const DEAD = '#141414'
 
-
 const drawRemains = (ctx, g) => {
   const R = TUNING.enemies.lives.remains
   for (const r of remainsOf(g)) {
