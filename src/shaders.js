@@ -588,7 +588,7 @@ float corner(vec2 l, vec2 c, float kind, float side) {
   return r - length(vec2(x, r - l.y));
 }
 
-float sheetOf(float kind) { return kind < 1.5 ? 4.0 : kind < 2.5 ? 6.0 : kind < 3.5 ? 5.0 : 4.0; }
+float sheetOf(float kind) { return kind < 1.5 ? ${CELL_SHADER.film[0]} : kind < 2.5 ? ${CELL_SHADER.film[1]} : kind < 3.5 ? ${CELL_SHADER.film[2]} : ${CELL_SHADER.film[3]}; }
 float lipOf(float kind) { return kind < 1.5 ? 8.0 : kind < 2.5 ? 3.0 : kind < 3.5 ? 4.5 : 6.0; }
 
 bool deepAt(vec2 c, float kind) {

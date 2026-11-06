@@ -9,7 +9,9 @@ const FLOW_STEP = 4
 const GAS_SCALE = { [M.SMOKE]: 0.5, [M.STEAM]: 0.7, [M.METHANE]: 0.05 }
 const GAS_CHANNEL = { [M.SMOKE]: 0, [M.STEAM]: 1, [M.METHANE]: 2 }
 
-export const CELL_SHADER = { liquidStep: LIQUID_STEP, surfaceStep: SURFACE_STEP, flowStep: FLOW_STEP, size: ROOM }
+export const FILM = { [M.WATER]: 4, [M.LAVA]: 6, [M.OIL]: 5, [M.ACID]: 4 }
+
+export const CELL_SHADER = { liquidStep: LIQUID_STEP, surfaceStep: SURFACE_STEP, flowStep: FLOW_STEP, size: ROOM, film: [M.WATER, M.LAVA, M.OIL, M.ACID].map(m => FILM[m].toFixed(1)) }
 
 const emptyLayer = () => ({ bytes: new Uint8Array(AREA * 4), scratch: new Uint8Array(AREA * 4), changed: true })
 

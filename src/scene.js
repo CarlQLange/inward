@@ -9,6 +9,7 @@ import { drawSkillMatter } from './skillart.js'
 import { standingFixtures } from './light.js'
 import { airOf } from './backdrop.js'
 import { SCARF_DEEP, SCARF_RED } from './hero.js'
+import { FILM } from './cells.js'
 
 const GREEN = '#76d648'
 const WHITE = '#f4f8f2'
@@ -271,9 +272,9 @@ const drawVines = (ctx, world) => {
   for (let y = 0; y < ROOM; y++) for (let x = 0; x < ROOM; x++) if (matAt(world, x, y) === M.VINE) drawVine(ctx, x, y)
 }
 
-const drawArc = (ctx, x, y) => {
+const drawArc = (ctx, x, y, top = 0) => {
   let px = x * BLOCK + Math.floor(Math.random() * BLOCK)
-  let py = y * BLOCK + Math.floor(Math.random() * BLOCK)
+  let py = y * BLOCK + top + Math.floor(Math.random() * (BLOCK - top))
   const steps = 3 + Math.floor(Math.random() * 3)
   const dx = Math.random() < 0.5 ? 1 : -1
   ctx.fillStyle = YELLOW
@@ -286,7 +287,29 @@ const drawArc = (ctx, x, y) => {
   ctx.fillRect(px, py, 1, 1)
 }
 
+const filmTop = (world, x, y) => {
+  const m = matAt(world, x, y)
+  const below = matAt(world, x, y + 1)
+  const thin = FILM[m] && matAt(world, x, y - 1) !== m && below !== m && below !== M.EMPTY && !props(below).gas
+  return thin ? BLOCK - FILM[m] : 0
+}
+
+const drawBurningLiquid = (ctx, world, x, y, time, m) => {
+  if (matAt(world, x, y - 1) === m) return
+  const h = hash(x, y)
+  const frame = (Math.floor(time * 9) + h) % SPRITES.flames.length
+  const below = matAt(world, x, y + 1)
+  if (below === M.EMPTY || props(below).gas) {
+    ctx.drawImage(SPRITES.flames[frame], x * BLOCK + 1, y * BLOCK + 1, BLOCK - 2, BLOCK - 2)
+    return
+  }
+  const top = y * BLOCK + filmTop(world, x, y)
+  const height = 4 + (Math.floor(time * 13 + h * 3) % 3)
+  ctx.drawImage(SPRITES.flames[frame], x * BLOCK, top - height, BLOCK, height + 2)
+}
+
 const drawBurning = (ctx, world, x, y, time) => {
+  if (FILM[matAt(world, x, y)]) return drawBurningLiquid(ctx, world, x, y, time, matAt(world, x, y))
   const h = hash(x, y)
   const pulse = Math.floor(time * 11 + h) % 3
   ctx.fillStyle = ['rgba(255, 96, 24, 0.62)', 'rgba(255, 170, 40, 0.5)', 'rgba(200, 40, 16, 0.6)'][pulse]
@@ -320,10 +343,11 @@ const drawOverlays = (ctx, world, time) => {
       if (m === M.VOLATILE || m === M.ICE || m === M.GLASS) drawGlint(ctx, x, y, time, m)
       if (burningAt(world, x, y)) drawBurning(ctx, world, x, y, time)
       if (chargedAt(world, x, y)) {
-        if (!busy || hash(x, y) % 3 === 0) drawArc(ctx, x, y)
+        if (!busy || hash(x, y) % 3 === 0) drawArc(ctx, x, y, filmTop(world, x, y))
         if (Math.random() < 0.35) {
+          const top = filmTop(world, x, y)
           ctx.fillStyle = 'rgba(255, 232, 74, 0.28)'
-          ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK)
+          ctx.fillRect(x * BLOCK, y * BLOCK + top, BLOCK, BLOCK - top)
         }
       }
     }
