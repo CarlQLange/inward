@@ -531,25 +531,26 @@ const LOCK_COLOURS = { peat: '#a07a3a', gate: '#b6bbbd', brick: '#8a9c3e', ice: 
 const STEPS = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }
 const MAP_RINGS = ['#1c3a22', '#1e3f26', '#20442a', '#22492e', '#254f32', '#285536', '#2c5c3a', '#31643f']
 
+const MAP_CELLS = Array.from({ length: 15 * 15 }, (_, i) => [i % 15, Math.floor(i / 15)])
+
 export const drawMapGrid = (ctx, g, left, top, pitch) => {
   const cellSize = pitch - 1
-  for (let y = 0; y < 15; y++) {
-    for (let x = 0; x < 15; x++) {
-      const room = g.rooms[keyOf(x, y)]
-      const seen = room?.visited
-      const here = x === g.x && y === g.y
-      const core = x === 7 && y === 7
-      ctx.fillStyle = here ? (Math.floor(g.time * 4) % 2 ? WHITE : YELLOW) : seen ? GREEN : core ? YELLOW : MAP_RINGS[ringOf(x, y)]
-      ctx.fillRect(left + x * pitch, top + y * pitch, cellSize, cellSize)
-      if (!seen) continue
-      for (const [dir, link] of Object.entries(room.links)) {
-        const [dx, dy] = STEPS[dir]
-        const lock = link.lock && room.doors[dir] && (link.lock === 'seal' ? g.seals < 3 : lockStands(room, dir))
-        ctx.fillStyle = lock ? LOCK_COLOURS[link.lock] : GREEN
-        const px = left + x * pitch + (cellSize - 1) / 2 + dx * (pitch / 2 + (cellSize - 1) / 4)
-        const py = top + y * pitch + (cellSize - 1) / 2 + dy * (pitch / 2 + (cellSize - 1) / 4)
-        ctx.fillRect(Math.round(px), Math.round(py), 1, 1)
-      }
+  const middle = (cellSize - 1) / 2
+  const reach = pitch / 2 + (cellSize - 1) / 4
+  const seen = MAP_CELLS.filter(([x, y]) => g.rooms[keyOf(x, y)]?.visited)
+  for (const [x, y] of MAP_CELLS) {
+    const here = x === g.x && y === g.y
+    const core = x === 7 && y === 7
+    ctx.fillStyle = here ? (Math.floor(g.time * 4) % 2 ? WHITE : YELLOW) : g.rooms[keyOf(x, y)]?.visited ? GREEN : core ? YELLOW : MAP_RINGS[ringOf(x, y)]
+    ctx.fillRect(left + x * pitch, top + y * pitch, cellSize, cellSize)
+  }
+  for (const [x, y] of seen) {
+    const room = g.rooms[keyOf(x, y)]
+    for (const [dir, link] of Object.entries(room.links)) {
+      const [dx, dy] = STEPS[dir]
+      const lock = link.lock && room.doors[dir] && (link.lock === 'seal' ? g.seals < 3 : lockStands(room, dir))
+      ctx.fillStyle = lock ? LOCK_COLOURS[link.lock] : GREEN
+      ctx.fillRect(Math.round(left + x * pitch + middle + dx * reach), Math.round(top + y * pitch + middle + dy * reach), 1, 1)
     }
   }
   drawWardenMarks(ctx, g, left, top, pitch)

@@ -40,7 +40,9 @@ export const stepMoment = (g, dt, wantsSkip) => {
     return false
   }
   m.t += dt
-  if (wantsSkip && !m.first && m.t > 0.4 && m.t < m.plan.length - m.plan.plan.settle) m.t = m.plan.length - m.plan.plan.settle
+  const pressed = wantsSkip && m.released
+  m.released = !wantsSkip
+  if (pressed && !m.first && m.t > 0.4 && m.t < m.plan.length - m.plan.plan.settle) m.t = m.plan.length - m.plan.plan.settle
   const { landed } = pitView(m.t, m.plan, m.tile)
   if (landed > 0 && !m.landed) land(g, m)
   if (landed > 0 && m.gainsDepth) g.depthDrive = landed * spring(landed)
