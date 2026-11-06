@@ -125,8 +125,9 @@ effects must spread across blocks visibly and be readable without text.
   hero, the Scatter Gun included. The small screen jolt on each shot stays.
 - On-screen text says literally what happens, in plain flat words: name the concrete thing and state the cost
   directly. No riddles, mood lines or objects with agency. Use the same word for the same thing everywhere.
-  Name triggers the player can see (shots, fire, a hit, dead foes), never hidden states like noise, cold
-  or fear: the game is silent, and "NOISE WAKES IT" made him furious.
+  Write it the way a human game designer would. Short fragments with the subject left out, as in a
+  bestiary: "SLEEPS ON CEILINGS. WAKES AT GUNFIRE", not "NOISE WAKES IT". Constructions that hang on
+  "IT" read as machine-written. Name triggers the player can see, never hidden states like cold or fear.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
