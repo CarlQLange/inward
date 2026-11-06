@@ -117,6 +117,10 @@ effects must spread across blocks visibly and be readable without text.
   Sealed doorways show red bars and each foe left carries a red marker, both in the scarf's exact reds so they survive
   the four-shade look. Break or blink through an arena's seal and you can leave, giving up its chest; it seals again
   if you come back while foes are left. Warden and Core seals are bedrock, so nothing breaks them.
+- He still sees "the same interactions" after the glass, mud and snow rules, and says emergence isn't just chaining
+  rules. What's wanted is situations nobody wrote: creatures with their own drives meeting each other and the world,
+  and hidden things to find. He liked the idea of the far wall of a room becoming something you can act on once rooms
+  have depth.
 - He hates the gun knocking the hero back: it makes the game very hard to play on a phone. Firing never moves the
   hero, the Scatter Gun included. The small screen jolt on each shot stays.
 - On-screen text says literally what happens, in plain flat words: name the concrete thing and state the cost
