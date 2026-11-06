@@ -1677,7 +1677,7 @@ const stepPlayer = (g, input, dt) => {
   p.wasJumpFeel = input.jump
   if (p.digging > 0) swim(g, p, input, dt)
   else {
-    move(world, p, dt, down)
+    move(world, p, dt, down, P.mudDrag)
     pushOutOfSolid(world, p, down)
     if (hitsSolid(world, p)) unbury(world, p)
   }
@@ -2154,7 +2154,7 @@ export const step = (g, input, realDt) => {
   if (g.ending) stepEnding(g, dt)
   if (g.phase !== 'playing') return
   if (g.hitstop > 0) {
-    g.hitstop -= dt
+    g.hitstop -= dt / TUNING.feel.tempo
     return
   }
   if (g.keystoneDue && !g.sealHold && !g.ending) {
@@ -2195,7 +2195,7 @@ export const step = (g, input, realDt) => {
   stepLockHints(g, dt)
   stepPlayer(g, input, dt / TUNING.feel.tempo)
   if (g.phase !== 'playing') return
-  stepShots(g, dt)
+  stepShots(g, dt / TUNING.feel.tempo)
   stepEffectList(g, stopped ? 0 : dt)
   if (stopped) return
   stepEnemies(g, dt)

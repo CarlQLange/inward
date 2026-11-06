@@ -83,6 +83,7 @@ export const TUNING = {
     drift: 0.45,
     skillSlots: 3,
     startBombs: 1,
+    mudDrag: 0.65,
   },
   skills: {
     bolt: { every: 1.8, energy: 44, fenceLife: 6, fenceEvery: 0.45, fenceDamage: 1, fenceStun: 0.7, fenceMost: 150, globeSpeed: 34, globeLife: 5.5, globeEvery: 0.4, globeReach: 56, nailLife: 5, nailEvery: 0.9, nailWarn: 0.3, nailDamage: 2, leydenTime: 2.4, leydenMost: 4, leydenReach: 120, forms: { 'bolt.globe': 3.2, 'bolt.nail': 2.8, 'bolt.leyden': 2.2 } },
