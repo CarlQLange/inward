@@ -26,6 +26,7 @@ const CELL_LOOKUPS = `
 vec4 cellAt(vec2 c) { return texture2D(cells, (c + 0.5) / ${CELLS}); }
 bool outside(vec2 c) { return c.x < 0.0 || c.y < 0.0 || c.x >= ${CELLS} || c.y >= ${CELLS}; }
 float liquidOf(vec4 d) { return floor(d.g * 255.0 / ${CELL_SHADER.liquidStep.toFixed(1)} + 0.5); }
+float flowOf(vec4 d) { return floor((d.g * 255.0 - liquidOf(d) * ${CELL_SHADER.liquidStep.toFixed(1)}) / ${CELL_SHADER.flowStep.toFixed(1)} + 0.5); }
 `
 
 const LIQUID_TINTS = `
@@ -289,7 +290,8 @@ vec3 deep(vec2 p, vec2 dir) {
     vec4 d = cellAt(c);
     if (d.r > 0.5) return wallFace(p, dir, z, c, sgn, across, d);
     float kind = liquidOf(d);
-    if (kind > 0.5 && started < 0.5) return liquidSheet(p, dir, z, kind);
+    float flow = flowOf(d);
+    if (kind > 0.5 && started < 0.5 && (flow < 0.5 || flow > 2.5)) return liquidSheet(p, dir, z, kind);
   }
   return farWall(p, dir);
 }
@@ -433,6 +435,118 @@ vec3 acid(vec2 p, float below, vec3 behind) {
   return colour;
 }
 
+float grain(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
+
+bool sameLiquid(vec2 c, float kind) { return !outside(c) && abs(liquidOf(cellAt(c)) - kind) < 0.5; }
+
+float insetOf(float kind) { return kind < 1.5 ? 1.8 : kind < 2.5 ? 0.9 : kind < 3.5 ? 1.4 : 1.5; }
+float pourSpeed(float kind) { return kind < 1.5 ? 96.0 : kind < 2.5 ? 26.0 : kind < 3.5 ? 54.0 : 72.0; }
+float wobbleOf(vec2 p, vec2 c, float kind) {
+  bool slow = kind > 1.5 && kind < 2.5;
+  return sin(p.y * 0.33 - time * (slow ? 2.0 : 5.0) + c.x * 1.9) * (slow ? 0.4 : 0.75);
+}
+
+vec3 spray(vec2 p, vec2 c, float kind, vec3 colour);
+
+vec3 stream(vec2 p, vec2 c, float kind, float flow, vec3 behind) {
+  vec2 l = p - c * ${CELL};
+  float wob = wobbleOf(p, c, kind);
+  float left = sameLiquid(c - vec2(1.0, 0.0), kind) ? -1.0 : insetOf(kind) + wob;
+  float right = sameLiquid(c + vec2(1.0, 0.0), kind) ? ${CELL} + 1.0 : ${CELL} - insetOf(kind) + wob;
+  if (flow < 1.5) {
+    float tail = max(0.0, l.y - 4.0);
+    left += tail * 0.7;
+    right -= tail * 0.7;
+    if (!sameLiquid(c - vec2(0.0, 1.0), kind)) {
+      float head = max(0.0, 3.0 - l.y);
+      left += head * 0.8;
+      right -= head * 0.8;
+    }
+  }
+  if (l.x < left || l.x > right) return spray(p, c, kind, behind);
+  float edge = min(l.x - left, right - l.x);
+  float run = p.y - time * pourSpeed(kind);
+  float lane = floor(l.x);
+  float dash = fract(run / 9.0 + grain(vec2(lane, c.x)) * 3.0);
+  if (kind < 1.5) {
+    vec3 colour = mix(vec3(0.2, 0.52, 0.62), behind, 0.15 + 0.3 * blend);
+    if (edge < 1.0) colour = vec3(0.48, 0.8, 0.88);
+    if (dash < 0.16) colour = vec3(0.86, 0.97, 1.0);
+    return colour;
+  }
+  if (kind < 2.5) {
+    vec3 colour = mix(vec3(0.98, 0.5, 0.15), lava(vec2(p.x, run), 9.0), 0.45);
+    if (edge > 2.2) colour = mix(colour, vec3(1.0, 0.82, 0.32), 0.4);
+    if (dash < 0.1) colour = vec3(1.0, 0.92, 0.55);
+    if (edge < 1.0) colour = vec3(0.78, 0.26, 0.08);
+    return colour;
+  }
+  if (kind < 3.5) {
+    vec3 colour = mix(vec3(0.22, 0.11, 0.26), behind, 0.06 * blend);
+    float gloss = step(1.0, l.x - left) * step(l.x - left, 2.0) * step(0.35, fract(run / 17.0 + grain(vec2(c.x, 3.0))));
+    vec3 film = 0.5 + 0.5 * cos(6.28 * (fract(run / 40.0) + vec3(0.0, 0.33, 0.67)));
+    colour = mix(colour, mix(vec3(0.72, 0.54, 0.8), film * 0.85, refract * 0.6), gloss);
+    if (edge < 1.0) colour = vec3(0.38, 0.22, 0.44);
+    return colour;
+  }
+  vec3 colour = mix(vec3(0.42, 0.82, 0.18), behind, 0.22 * blend);
+  if (edge < 1.0) colour = vec3(0.72, 1.0, 0.4);
+  if (dash < 0.12) colour = vec3(0.8, 1.0, 0.5);
+  if (grain(vec2(lane, floor((p.y + time * 30.0) / 2.0))) > 0.9) colour = vec3(0.92, 1.0, 0.72);
+  return colour;
+}
+
+vec3 landing(vec2 p, vec2 c, float kind, vec3 colour) {
+  vec2 l = p - c * ${CELL};
+  if (l.y > 3.5) return colour;
+  float churn = grain(floor(p) + floor(time * 12.0));
+  float reach = 0.6 + l.y * 0.12;
+  if (kind < 1.5) return churn > reach - 0.15 ? vec3(0.88, 0.98, 1.0) : colour;
+  if (kind < 2.5) return churn > reach ? vec3(1.0, 0.93, 0.62) : colour;
+  if (kind < 3.5) return fract(abs(l.x - 4.0) / 3.0 - time * 1.5) < 0.25 ? vec3(0.45, 0.3, 0.5) : colour;
+  return churn > reach - 0.05 ? vec3(0.92, 1.0, 0.66) : colour;
+}
+
+vec3 sprayColour(float kind) {
+  if (kind < 1.5) return vec3(0.86, 0.97, 1.0);
+  if (kind < 2.5) return vec3(1.0, 0.86, 0.4);
+  if (kind < 3.5) return vec3(0.42, 0.26, 0.48);
+  return vec3(0.86, 1.0, 0.6);
+}
+
+bool landingAt(vec2 c, float kind) {
+  if (outside(c)) return false;
+  vec4 d = cellAt(c);
+  return abs(liquidOf(d) - kind) < 0.5 && flowOf(d) > 2.5;
+}
+
+vec3 spray(vec2 p, vec2 c, float kind, vec3 colour) {
+  vec2 below = c + vec2(0.0, 1.0);
+  if (!landingAt(below, kind) && !landingAt(below - vec2(1.0, 0.0), kind) && !landingAt(below + vec2(1.0, 0.0), kind)) return colour;
+  vec2 l = p - c * ${CELL};
+  float x = floor(p.x);
+  bool hot = kind > 1.5 && kind < 2.5;
+  float hop = fract(time * (hot ? 1.6 : 2.6) + grain(vec2(x, c.y)));
+  float height = (1.0 - abs(hop * 2.0 - 1.0)) * (hot ? 6.0 : 4.0);
+  bool lit = grain(vec2(x, floor(time * 2.6 + grain(vec2(x, 9.0))))) > 0.55;
+  return lit && abs(${CELL} - 1.0 - l.y - floor(height)) < 0.5 ? sprayColour(kind) : colour;
+}
+
+vec3 trail(vec2 p, vec3 colour) {
+  vec2 c = floor(p / ${CELL});
+  vec2 below = c + vec2(0.0, 1.0);
+  if (outside(below)) return colour;
+  vec4 d = cellAt(below);
+  float kind = liquidOf(d);
+  float flow = flowOf(d);
+  if (kind < 0.5 || sameLiquid(c, kind)) return colour;
+  if (flow < 0.5 || flow > 1.5) return spray(p, c, kind, colour);
+  vec2 l = p - c * ${CELL};
+  float x = ${CELL} * 0.5 - 0.5 + wobbleOf(p, below, kind);
+  if (l.y < 3.0 || abs(l.x - x) > 0.8) return colour;
+  return mix(colour, liquidTint(kind) * 1.7, (l.y - 3.0) / 5.0 * 0.7);
+}
+
 vec3 gas(vec2 p, vec3 under, vec3 glow) {
   vec4 f = texture2D(fields, p / ${ROOM_PX});
   if (gasOn < 0.5 || (f.r + f.g + f.b < 0.02 && ink < 0.01)) return under;
@@ -464,7 +578,8 @@ void main() {
   vec4 here = cellAt(floor(p / ${CELL}));
   vec4 under = cellAt(floor((p + vec2(0.0, 4.0)) / ${CELL}));
   float lift = 0.0;
-  if (liquidOf(here) > 0.5 || liquidOf(under) > 0.5) {
+  float hereFlow = flowOf(here);
+  if ((liquidOf(here) > 0.5 || liquidOf(under) > 0.5) && (hereFlow < 0.5 || hereFlow > 2.5)) {
     lift = (sin(time * 2.4 + floor(p.x) * 0.55) > 0.2 ? 0.0 : 1.0) + rippleLift(p);
     lift = floor(lift + 0.5);
   }
@@ -487,11 +602,17 @@ void main() {
   if (kind > 0.5) {
     float surfaceY = (floor(raised.y / ${CELL}) - floor(cell.b * 255.0 / ${CELL_SHADER.surfaceStep.toFixed(1)} + 0.5)) * ${CELL} - lift;
     float below = p.y - surfaceY;
-    if (kind < 1.5) colour = water(p, below, surfaceY);
-    else if (kind < 2.5) colour = lava(p, below);
-    else if (kind < 3.5) colour = oil(p, below, colour);
-    else colour = acid(p, below, colour);
-  }
+    vec2 c = floor(raised / ${CELL});
+    float flow = flowOf(cell);
+    if (flow > 0.5 && flow < 2.5) colour = stream(p, c, kind, flow, colour);
+    else {
+      if (kind < 1.5) colour = water(p, below, surfaceY);
+      else if (kind < 2.5) colour = lava(p, below);
+      else if (kind < 3.5) colour = oil(p, below, colour);
+      else colour = acid(p, below, colour);
+      if (flow > 2.5) colour = landing(p, c, kind, colour);
+    }
+  } else if (here.r < 0.5) colour = trail(p, colour);
 
   vec4 light = texture2D(lightMap, uv);
 
