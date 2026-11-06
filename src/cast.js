@@ -4,14 +4,14 @@ const ART = {
   nest: [16, 24], mimic: [22, 16], gasbag: [15, 24], tick: [10, 6], pillbug: [20, 12], stilt: [27, 27], snapweed: [12, 26],
   scrapper: [20, 24], dripper: [12, 20], shade: [20, 24], urchin: [21, 20], coil: [20, 26], lantern: [24, 21],
   mole: [22, 24], hermit: [17, 22], miner: [22, 22],
-  bellows: [66, 65], colossus: [69, 59], crucible: [54, 68], eel: [28, 26], eelseg: [16, 19], brood: [43, 65],
+  bellows: [66, 65], colossus: [69, 59], crucible: [57, 57], eel: [28, 26], eelseg: [16, 19], brood: [43, 65],
   conductor: [48, 66], core: [64, 54],
 }
 
 const ANCHORS = {
   fish: 'free', spore: 'free', bat: 'free', jelly: 'free', emberbat: 'free', gasbag: 'free', puffer: 'free', lantern: 'free',
-  urchin: 'free', shade: 'free', gnat: 'free', core: 'free', eel: 'free', eelseg: 'free', orbit: 'free',
-  snapweed: 'hang', dripper: 'hang', brood: 'hang', crucible: 'hang', lamp: 'hang', battery: 'hang', tank: 'hang', carboy: 'hang', ladle: 'hang', sandbag: 'hang', turret: 'wall',
+  urchin: 'free', shade: 'free', gnat: 'free', core: 'free', eel: 'free', eelseg: 'free', orbit: 'free', crucible: 'free',
+  snapweed: 'hang', dripper: 'hang', brood: 'hang', lamp: 'hang', battery: 'hang', tank: 'hang', carboy: 'hang', ladle: 'hang', sandbag: 'hang', turret: 'wall',
 }
 
 const ART_ALIAS = { eel: 'eelhead', eelseg: 'eelbody' }
