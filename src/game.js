@@ -228,7 +228,7 @@ const broodFor = (g, ring) => count => {
 }
 
 const floorUnder = (world, x, y) => {
-  for (let row = y; row < 27; row++) if (props(matAt(world, x, row + 1)).solid) return row + 1
+  for (let row = y; row < WORLD_PX / BLOCK - 1; row++) if (props(matAt(world, x, row + 1)).solid) return row + 1
   return y + 1
 }
 

@@ -113,8 +113,8 @@ vec3 intact(float k, vec2 at, vec2 q, vec2 e, float r, vec4 box, vec4 s, float s
     look = mix(base, vec3(0.16, 0.05, 0.03), 0.45);
     float line = 0.5 + 0.5 * (abs(fract(q.x * 1.6 + seed) - 0.5) - 0.25) * (1.0 - abs(e.x) * 0.6);
     float off = abs(q.y - line) * box.w;
-    if (off < 0.9) glow += stuff * pulse * 0.85;
-    else if (off < 2.2) look = stuff * 0.22;
+    if (off < 0.9) glow += stuff * pulse * 1.1;
+    else if (off < 2.2) look = stuff * 0.3;
   } else if (is(k, SEEP)) {
     float bub = bubbles(at, box, seed, 0.4);
     look = stuff * (0.22 + 0.4 * bub);
