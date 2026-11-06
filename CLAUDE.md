@@ -131,10 +131,12 @@ effects must spread across blocks visibly and be readable without text.
   "IT" read as machine-written. Name triggers the player can see, never hidden states like cold or fear.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
-- Levelling up and finding new skills was far too quick. He wants at least three times as long between each.
-  A level costs 18 experience per level reached, so a run gets a third as many level-ups at every point, and
-  skill cards, miners and hermits turn up a third as often. A level-up heals six hearts, keeping healing per room
-  where it was.
+- Levelling up and finding new skills was far too quick. He wants each new power to feel like "oh wow, I can do
+  this now", not "another one". A level costs 40 experience per level reached (less 6), about 4.5 times the gap
+  of the original curve at every point in a run, and skill cards, miners and hermits are as rare in proportion.
+  A level-up is a full heal. Gaining a skill or form slows time for a beat with a burst in its colour, and the
+  next unvisited room is built around it (`src/showcase.js`): the materials and pockets it acts on, a layout that
+  suits a movement skill, or extra foes for a control skill.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
   ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
   match the body and feet, and a smaller contact box keeps touching them forgiving.

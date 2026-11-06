@@ -168,7 +168,7 @@ const hangLoad = (grid, ceilings, x, theme) => {
 }
 
 const dress = (grid, { segments, pits }, floors, ceilings, depth, lean, rand, range, theme) => {
-  const help = 1 - depth
+  const help = lean.full ? 1 : 1 - depth
   for (const s of segments) {
     for (let x = s.from; x <= s.to; x++) if (rand() < 0.6) grid[s.floor][x] = theme.top
   }
@@ -694,12 +694,15 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   const theme = aquatic ? { ...region, lava: 0 } : region
   const rand = seeded(seed)
   const range = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1))
-  const help = 1 - depth
+  const help = lean.full ? 1 : 1 - depth
 
   const grid = Array.from({ length: ROOM }, (_, y) =>
     Array.from({ length: ROOM }, (_, x) => (x === 0 || y === 0 || x === ROOM - 1 || y === ROOM - 1 ? '#' : 'R')))
 
-  const layoutName = aquatic ? 'cistern' : THEME_LAYOUTS[themeIndex][Math.floor(rand() * THEME_LAYOUTS[themeIndex].length)]
+  const roll = rand()
+  const choices = THEME_LAYOUTS[themeIndex]
+  const staged = choices.filter(name => (special.layouts ?? []).includes(name))
+  const layoutName = aquatic ? 'cistern' : (staged.length ? staged : choices)[Math.floor(roll * (staged.length || choices.length))]
   const shape = LAYOUTS[layoutName]
   const layout = walkFloors(rand, range, clamp(shape.pits + (theme.pits ?? 0) + (lean.water ? help * 0.2 : 0), 0, 1), shape)
   const floors = floorsByColumn(layout)
@@ -776,6 +779,10 @@ const attempt = ({ seed, depth, links, lean, special, theme: region, themeIndex 
   }
   if (special.event === 'arena') {
     for (const s of layout.segments.slice(1)) placeFoe(pickFoe(theme, rand, enemies), s, grid, ceilings, range, enemies)
+  }
+  for (let n = 0; n < (special.crowd ?? 0); n++) {
+    const s = layout.segments[1 + Math.floor(rand() * Math.max(1, layout.segments.length - 1))] ?? layout.segments[0]
+    placeFoe(pickFoe(theme, rand, enemies), s, grid, ceilings, range, enemies)
   }
   mendTraps(grid, anchors)
   const ok = passes(grid, anchors, goals)

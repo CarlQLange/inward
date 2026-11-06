@@ -101,12 +101,13 @@ const makePocket = (kind, spot, ring, brood) => {
   }
 }
 
-export const seedPockets = (world, { ring, region, doors, brood, relics }) => {
+export const seedPockets = (world, { ring, region, doors, brood, relics, prefer = [] }) => {
   const [first, second] = P.count[Math.min(ring, P.count.length - 1)]
-  const wanted = [first, second, ring >= 4 ? P.third : 0].filter(chance => Math.random() < chance).length
+  const fits = prefer.filter(kind => P.kinds[kind].ring <= ring).slice(0, 2)
+  const wanted = Math.max(fits.length, [first, second, ring >= 4 ? P.third : 0].filter(chance => Math.random() < chance).length)
   const pockets = []
   for (let n = 0; n < wanted; n++) {
-    const kind = pickKind(ring, region, relics, pockets)
+    const kind = fits[n] ?? pickKind(ring, region, relics, pockets)
     const spot = kind && findSpot(world, kind, doors, pockets, n % 2 === 0)
     if (spot) pockets.push(makePocket(kind, spot, ring, brood))
   }

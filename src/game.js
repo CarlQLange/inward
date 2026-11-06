@@ -12,10 +12,10 @@ import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, puppeted, seatEnemy, settleFooting, steerPuppet } from './enemies.js'
 import { swim } from './earth.js'
 import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
-import { feedEvent, stepFeeds, stepHand } from './feed.js'
+import { feedColour, feedEvent, stepFeeds, stepHand } from './feed.js'
 import { composeOffer } from './offers.js'
 import { dust } from './feel.js'
-import { beginDoor, blastFx, chipsAt, coinMote, createFx, fallFx, impact, killFx, levelBurstDone, roomClearFx, shotFx, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
+import { beginDoor, blastFx, chipsAt, coinMote, createFx, fallFx, impact, killFx, levelBurstDone, roomClearFx, shotFx, slowMo, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
 import { SKILL_ACTIONS, skillAction } from './controls.js'
 import { RELICS, RELIC_BY_ID, hasRelic } from './relics.js'
 import { stepEffectList } from './effects.js'
@@ -25,6 +25,7 @@ import { isCatalogued, isKnown, knownFrom, knownOf, meet, pickSecrets, plantsFor
 import { OMENS, applyOmens, omenFoes, omenTheme } from './omens.js'
 import { buildArena, openArena, stepArena } from './wardens.js'
 import { exitsFrom } from './reach.js'
+import { stageFor } from './showcase.js'
 import { KEYSTONE_BY_ID, bombReady, bombThrown, castWait, crowdedOut, hasKeystone, heartCap, openKeystones, rechargeRate, slotsOf, stainColour, stainStrikes, stepKeystones } from './keystones.js'
 import { MUTATION_BY_ID, deepKill, mutateFoe, rollMutation, stepMutations } from './deep.js'
 import { emptyTally, noteKill, outwitted, wardedAgainst } from './wards.js'
@@ -251,8 +252,8 @@ const POCKET_HOOKS = {
   },
 }
 
-const thinFoes = (g, ring, foes) => {
-  const limit = R.foeLimit[ring] * (g.omens.includes('swarm') ? 1.6 : 1)
+const thinFoes = (g, ring, extra, foes) => {
+  const limit = R.foeLimit[ring] * (g.omens.includes('swarm') ? 1.6 : 1) + extra
   const kept = []
   const protectedKinds = new Set((g.secrets ?? []).map(key => key.split(':')[1]))
   let load = foes.filter(e => protectedKinds.has(e.kind)).reduce((n, e) => n + crowding(e), 0)
@@ -274,7 +275,9 @@ const buildRoom = (g, x, y) => {
   const depth = ring / CORE_RING
   const themeIndex = regionFor(g, ring)
   const arenaId = arenaFor(g, key, ring)
-  const special = start || arenaId ? {} : withPlant(g, ring, rollSpecial(g))
+  const showcase = start || arenaId || ring === CORE_RING ? null : stageFor(g.showcase)
+  if (showcase) g.showcase = null
+  const special = start || arenaId ? {} : { ...withPlant(g, ring, rollSpecial(g)), ...(showcase ? { layouts: showcase.layouts, crowd: showcase.crowd } : {}) }
   const definition = arenaId
     ? buildArena(arenaId, links)
     : start
@@ -283,7 +286,7 @@ const buildRoom = (g, x, y) => {
         seed: g.seed + x * 7919 + y * 104723,
         depth,
         links: resolveLinks(g, links, depth),
-        lean: lean(g),
+        lean: showcase ? { ...lean(g), ...Object.fromEntries(Object.entries(showcase.lean).filter(([, on]) => on)), full: true } : lean(g),
         special,
         theme: regionTheme(g, ring, themeIndex),
         themeIndex,
@@ -292,7 +295,7 @@ const buildRoom = (g, x, y) => {
   world.drains = definition.drains ?? []
   world.cold = THEMES[themeIndex]?.cold === true
   if (!arenaId && !start && ring !== CORE_RING) {
-    world.pockets = seedPockets(world, { ring, region: themeIndex, doors: definition.doors, brood: broodFor(g, ring), relics: g.relicPool.length > 0 })
+    world.pockets = seedPockets(world, { ring, region: themeIndex, doors: definition.doors, brood: broodFor(g, ring), relics: g.relicPool.length > 0, prefer: showcase?.pockets })
   }
   return {
     x, y, ring, links,
@@ -304,7 +307,7 @@ const buildRoom = (g, x, y) => {
     doors: definition.doors,
     world,
     arena: definition.arena,
-    enemies: thinFoes(g, ring, definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean)).map(makeElite(g, ring)).map(dressEnemy(g, ring)).map(e => mutateFoe(g, e, themeIndex)),
+    enemies: thinFoes(g, ring, showcase?.crowd ?? 0, definition.enemies.map(createEnemy).map(seatEnemy(world)).filter(Boolean)).map(makeElite(g, ring)).map(dressEnemy(g, ring)).map(e => mutateFoe(g, e, themeIndex)),
     cards: definition.cards.map(createCard(g)),
     wares: (definition.wares ?? []).map(createWare(g)),
     pickups: [],
@@ -662,15 +665,21 @@ const unownedSkills = g => {
   return knownOf(g, 'skill').filter(s => !carried.has(s) && !lying.has(s))
 }
 
-const evolve = (g, skill, node) => {
-  const p = g.player
-  p.upgrades.add(node.id)
-  g.evolving = { skill, name: node.name, tint: node.tint, life: R.evolveLife }
-  const c = centre(p)
-  ring(g, c.x, c.y, node.tint, 32, 150)
+const unveil = (g, kind, tint) => {
+  const c = centre(g.player)
+  ring(g, c.x, c.y, tint, 32, 150)
+  ring(g, c.x, c.y, tint, 64, 90)
+  slowMo(g, R.unveilSlow, R.unveilScale)
   g.pulse = 1
   g.shake = Math.max(g.shake, 4)
-  p.iframes = Math.max(p.iframes, 0.6)
+  g.player.iframes = Math.max(g.player.iframes, 1.2)
+  g.showcase = kind
+}
+
+const evolve = (g, skill, node) => {
+  g.player.upgrades.add(node.id)
+  g.evolving = { skill, name: node.name, tint: node.tint, life: R.evolveLife }
+  unveil(g, skill, node.tint)
 }
 
 const learn = (g, kind) => {
@@ -679,8 +688,7 @@ const learn = (g, kind) => {
   g.cardPool = g.cardPool.filter(s => s !== kind)
   showToast(g, SKILL_NAMES[kind], SKILL_DETAILS[kind])
   g.toast.prompts = [skillAction(p.skills.length - 1)]
-  g.pulse = 1
-  g.shake = Math.max(g.shake, 3)
+  unveil(g, kind, feedColour({ kind }))
   if (!g.awake) {
     g.awake = true
     g.depth = g.depthOverride ?? depthFor(g, g.ring)
@@ -697,6 +705,7 @@ const learnOrSwap = (g, kind, onTake = () => {}, onLeave = () => {}) => {
   openSwap(g, kind, gm => {
     gm.cardPool = gm.cardPool.filter(s => s !== kind)
     showToast(gm, SKILL_NAMES[kind], SKILL_DETAILS[kind])
+    unveil(gm, kind, feedColour({ kind }))
     onTake(gm)
   }, onLeave)
 }
@@ -769,7 +778,7 @@ const gainXp = (g, amount) => {
     g.level += 1
     g.nextLevel = R.firstLevel + (g.level - 1) * R.levelGrowth
     g.pendingOffers += 1
-    g.player.hp = Math.min(heartCap(g.player), g.player.hp + R.levelHeal)
+    g.player.hp = heartCap(g.player)
   }
 }
 
