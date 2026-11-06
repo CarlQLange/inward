@@ -1682,7 +1682,13 @@ export const settleFooting = (g, e, dt) => {
   if (Math.abs(e.vx) > 1 && solidAt(g.world, e.x + (e.vx > 0 ? e.w + 1 : -1), under)) return
   const held = []
   for (let px = 0; px < e.w; px++) if (solidAt(g.world, e.x + px, under)) held.push(px)
-  if (held.length === 0 || held.length >= e.w * FOOTING_MIN) return
+  if (held.length === 0) {
+    const corner = [e.w - 0.01, 0].find(px => solidAt(g.world, e.x + px, under))
+    const by = corner === undefined ? 0 : (corner > 0 ? -1 : 1) * FOOTING_SLIDE * dt
+    if (by && clearAt(g.world, e, e.x + by, e.y)) e.x += by
+    return
+  }
+  if (held.length >= e.w * FOOTING_MIN) return
   const middle = (held[0] + held.at(-1)) / 2
   const wide = held.at(-1) - held[0] + 1 >= e.w * FOOTING_MIN
   const towardFloor = middle < e.w / 2 ? -1 : 1
