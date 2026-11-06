@@ -78,8 +78,11 @@ const CLASHES = {
   stain: ['fists'],
 }
 
+const FIREPROOF_MOOT = new Set(['livewire'])
+
 const fits = p => k =>
   !hasKeystone(p, k.id) &&
+  !(p.fireproof && FIREPROOF_MOOT.has(k.id)) &&
   !(CLASHES[k.id] ?? []).some(id => hasKeystone(p, id)) &&
   heartCap(p) - (k.hearts ?? 0) >= 2
 
@@ -164,7 +167,8 @@ const stepLiveWire = (g, p, dt) => {
   const c = centre(p)
   const reach = { x: c.x + (Math.random() - 0.5) * 18, y: c.y + (Math.random() - 0.5) * 22 }
   zap(g, c, reach)
-  g.enemies.filter(e => !e.friendly && !e.ally && overlap(p, e)).forEach(e => {
+  const near = { x: p.x - K().wireReach, y: p.y - K().wireReach, w: p.w + K().wireReach * 2, h: p.h + K().wireReach * 2 }
+  g.enemies.filter(e => !e.friendly && !e.ally && overlap(near, e)).forEach(e => {
     hurt(g, e, 2, 'world', 'CHARGE')
     e.stun = Math.max(e.stun, 0.7)
   })
@@ -240,15 +244,18 @@ const STAINS = [
     if (matAt(g.world, x, y) === M.WATER) setCell(g.world, x, y, M.ICE)
     if (foe) foe.stun = Math.max(foe.stun, 1.1)
   }],
-  [m => STONES.has(m), (g, x, y, foe) => {
+  [m => STONES.has(m), (g, x, y, foe, s) => {
     if (!foe) return
-    const above = cell(foe.y) - 2
-    if (matAt(g.world, x, above) === M.EMPTY) setCell(g.world, x, above, M.SAND)
+    hurt(g, foe, 1, 'world', 'CRUSHED')
+    if (foe.heavy) return
+    foe.vx = Math.sign(s.vx || 1) * K().stainShove
+    foe.vy = -60
+    foe.shoved = 0.3
   }],
 ]
 
 export const stainStrikes = (g, s, x, y, foe) => {
   const found = STAINS.find(([test]) => test(s.stain))
   burstSparks(g, s.x, s.y, stainColour(s.stain), 4)
-  if (found) found[1](g, x, y, foe)
+  if (found) found[1](g, x, y, foe, s)
 }

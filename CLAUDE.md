@@ -147,6 +147,9 @@ effects must spread across blocks visibly and be readable without text.
 - Yank made the grapple useless and spoiled later forms like Sling, because hooking any breakable block tore it out
   instead of pulling you. The hook now pulls or swings as normal, and pressing again soon after (or just after
   letting go of a swing) tears out the hooked block. A tap skill can open a short second-press window this way.
+- He asked for two more skills, then decided against any: none of the pitches would enable new gameplay. Rejected:
+  BAIT (carcass for scavengers), TAP (crack the far wall), PORTAL, INVERT (gravity), POSSESS, MIRROR, SHIFT (become
+  a material), acting on the next room through a door, and a stealth skill. Don't pitch new skills unprompted.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
   ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
   match the body and feet, and a smaller contact box keeps touching them forgiving.

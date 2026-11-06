@@ -74,7 +74,7 @@ export const hostOf = e => {
   return h && h.hp > 0 ? h : null
 }
 
-export const makeNoise = (g, x, y, reach, hero = false) => listOf(sounds, g.world).push({ x, y, reach, at: g.time, hero })
+export const makeNoise = (g, x, y, reach, from = null) => listOf(sounds, g.world).push({ x, y, reach, at: g.time, from })
 
 const heardNow = g => {
   const fresh = listOf(sounds, g.world).filter(s => g.time - s.at < L().echo)
@@ -109,7 +109,7 @@ const onTick = g => {
   const fired = seen && p.shotReady > seen.shotReady + 0.01
   const state = { at: g.time, world: g.world, shotReady: p.shotReady, lights: glowOf(g) }
   ticks.set(g, state)
-  if (fired) makeNoise(g, centre(p).x, centre(p).y, L().hear, true)
+  if (fired) makeNoise(g, centre(p).x, centre(p).y, L().hear, 'hero')
   return state
 }
 
@@ -334,7 +334,9 @@ const seesHero = (g, e) => {
 
 const hitByHero = e => e.lastSource === 'player' && e.flash > 0
 
-const hearsHero = (g, e) => !L().deaf.includes(e.kind) && heardNow(g).some(s => s.hero && dist(s, centre(e)) < s.reach)
+const ALARMS = new Set(['hero', 'bait'])
+
+const hearsAlarm = (g, e) => !L().deaf.includes(e.kind) && heardNow(g).some(s => ALARMS.has(s.from) && dist(s, centre(e)) < s.reach)
 
 const startle = (g, e) => {
   e.startle = L().startle
@@ -353,7 +355,7 @@ export const feel = (g, e, dt) => {
   feelFire(g, e, dt)
   feelFear(g, e)
   const was = e.noticed > 0
-  if ((e.spawned && g.boss) || seesHero(g, e) || hitByHero(e) || hearsHero(g, e)) e.noticed = L().attention
+  if ((e.spawned && g.boss) || seesHero(g, e) || hitByHero(e) || hearsAlarm(g, e)) e.noticed = L().attention
   else e.noticed = Math.max(0, (e.noticed ?? 0) - dt)
   if (!was && e.noticed > 0) startle(g, e)
   if (e.alight > 0 && !rooted(e)) return 'burning'

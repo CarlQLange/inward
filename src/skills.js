@@ -47,7 +47,7 @@ export const FORKS = {
   ],
   hammer: [
     [form('hammer.hurl', 'HURL', 'A HAMMER THAT COMES BACK WHEN THROWN', MAGNET), form('hammer.slam', 'SLAM', 'PRESS DOWN IN THE AIR TO SLAM', BLOOD)],
-    [form('hammer.tremor', 'TREMOR', 'BLOCKS ABOVE FALL', STONE), form('hammer.tamp', 'TAMP', 'PACKS SAND, SNOW AND MUD SOLID', WHITE)],
+    [form('hammer.tremor', 'TREMOR', 'BLOCKS ABOVE FALL', STONE), form('hammer.tamp', 'TAMP', 'SWING DOWN TO PACK SAND, SNOW AND MUD SOLID', WHITE)],
   ],
   gust: [
     [form('gust.siphon', 'SIPHON', 'PULLS IN, THEN BLOWS OUT', GAS), form('gust.twister', 'TWISTER', 'A WHIRLWIND THAT MOVES ALONG', WHITE)],
@@ -95,10 +95,10 @@ export const FORKS = {
   ],
   well: [
     [form('well.rogue', 'ROGUE', 'A DRIFTING BLACK HOLE', BLOOD), form('well.nova', 'NOVA', 'PUSHES EVERYTHING AWAY', WHITE)],
-    [form('well.grind', 'GRINDER', 'CRUSHES FOES AT THE CENTRE', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
+    [form('well.grind', 'GRINDER', 'CRUSHES TRAPPED FOES', STONE), form('well.lodestone', 'LODESTONE', 'DRAWS SAND, GAS, WATER', MAGNET)],
   ],
   swap: [
-    [form('swap.shuffle', 'SHUFFLE', 'ALL FOES TRADE PLACES', GAS), form('swap.goat', 'SCAPEGOAT', 'OTHER FOES TURN ON THE SWAPPED FOE', BLOOD)],
+    [form('swap.shuffle', 'SHUFFLE', 'THE OTHER FOES TRADE PLACES TOO', GAS), form('swap.goat', 'SCAPEGOAT', 'OTHER FOES TURN ON THE SWAPPED FOE', BLOOD)],
     [form('swap.recall', 'RECALL', 'PRESS AGAIN TO SWAP BACK', MAGNET), form('swap.ground', 'GROUND', 'THE GROUND UNDER YOU SWAPS TOO', STONE)],
   ],
   stop: [
@@ -118,7 +118,7 @@ export const FORKS = {
     [form('mine.launch', 'CATAPULT', 'LAUNCHES INSTEAD OF EXPLODING', SKY), form('mine.cryo', 'CRYO', 'FREEZES INSTEAD OF EXPLODING', COLD)],
   ],
   roar: [
-    [form('roar.shout', 'SHOUT', 'SENDS A SHOCKWAVE FORWARD', WHITE), form('roar.crack', 'CRACK', 'SHATTERS ROCK', STONE)],
+    [form('roar.shout', 'SHOUT', 'SENDS A SHOCKWAVE FORWARD', WHITE), form('roar.crack', 'CRACK', 'TURNS ROCK TO SAND', STONE)],
     [form('roar.swell', 'SWELL', 'HOLD FOR A BIGGER ROAR', BLOOD), form('roar.rime', 'RIME', 'STUNS AND FREEZES', COLD)],
   ],
   flask: [
@@ -263,6 +263,11 @@ export const aimSpot = (g, p, reach) => {
 }
 
 const addEffect = (g, effect) => g.effects.push({ age: 0, ...effect })
+
+const offerEncore = (p, kind, life) => {
+  const own = p.skills.find(s => s.kind === kind)
+  if (own) own.encore = life - 0.05
+}
 
 const lineCells = (from, to, visit) => {
   const length = distance(from, to)
@@ -433,7 +438,7 @@ const lode = (g, p) => {
   const here = centre(p)
   const covered = inCone(from, p.aim, R.lodeReach, R.width * 1.5)
   forEachCell((x, y, point) => {
-    if (matAt(g.world, x, y) === M.SCRAP && covered(point)) fling(g, x, y, towards(point, here), R.fling, p, { safe: true })
+    if (matAt(g.world, x, y) === M.SCRAP && covered(point)) fling(g, x, y, towards(point, here), R.fling, p, { safe: true, live: false, charged: false })
   })
   const caught = g.enemies.filter(e => e.magnetic && !e.heavy && covered(centre(e)))
   caught.forEach(e => {
@@ -598,7 +603,17 @@ const pack = (g, x, y) => {
   return true
 }
 
-export const hammerCell = (g, p, x, y) => (owns(p, 'hammer.tamp') && pack(g, x, y)) || smash(g, x, y)
+const breakOverhead = (g, x, y) => {
+  setCell(g.world, x, y, M.EMPTY)
+  chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, M.ROCK, 7)
+  feedEvent(g, 'smashed', (x + 0.5) * BLOCK, (y + 0.5) * BLOCK)
+  return true
+}
+
+export const hammerCell = (g, p, x, y) =>
+  (owns(p, 'hammer.tamp') && p.aim.y > 0.5 && pack(g, x, y)) ||
+  (p.aim.y < -0.5 && matAt(g.world, x, y) === M.ROCK && breakOverhead(g, x, y)) ||
+  smash(g, x, y)
 
 export const hammerStrikes = (g, p, e, aim) => {
   hurt(g, e, 2, 'player')
@@ -614,13 +629,14 @@ const hammer = (g, p) => {
     addEffect(g, { kind: 'hurl', x: from.x, y: from.y, aim: p.aim, life: 999, out: true, travelled: 0, landed: false })
     return
   }
-  const bodyHigh = Math.abs(p.aim.x) > Math.abs(p.aim.y) && !p.crouching ? 1 : 0
+  const level = Math.abs(p.aim.x) > Math.abs(p.aim.y) && !p.crouching
+  const body = [cell(p.y + 1), cell(p.y + p.h - 1)]
   let broke = null
   for (let reach = 1; reach <= S.hammer.reach; reach++) {
     const x = cell(from.x + p.aim.x * reach * BLOCK)
     const y = cell(from.y + p.aim.y * reach * BLOCK)
-    if (hammerCell(g, p, x, y)) broke ??= [x, y]
-    if (bodyHigh && hammerCell(g, p, x, y + 1)) broke ??= [x, y + 1]
+    const rows = level ? [...new Set([y, ...body])] : [y]
+    for (const row of rows) if (hammerCell(g, p, x, row)) broke ??= [x, row]
   }
   const covered = inCone(from, p.aim, (S.hammer.reach + 1) * BLOCK, BLOCK)
   const struck = g.enemies.filter(e => covered(centre(e)))
@@ -714,7 +730,7 @@ const exhale = (g, p) => {
   const covered = inCone(from, p.aim, S.gust.reach, S.gust.width)
   const spots = []
   forEachCell((x, y, point) => { if (covered(point) && matAt(g.world, x, y) === M.EMPTY) spots.push([x, y, distance(point, from)]) })
-  spots.sort((a, b) => a[2] - b[2])
+  spots.sort((a, b) => b[2] - a[2])
   const blown = p.lungs.slice(0, spots.length)
   blown.forEach(({ mat, life }, i) => setCell(g.world, spots[i][0], spots[i][1], mat, life || TUNING.world.offgasLife))
   p.lungs = []
@@ -785,8 +801,10 @@ const tradeMatter = (g, p) => {
 
 const blinkTarget = (g, p) => {
   for (let d = S.blink.reach; d > 4; d -= 2) {
-    const box = { x: p.x + p.aim.x * d, y: p.y + p.aim.y * d, w: p.w, h: p.h }
-    if (box.x > 1 && box.y > 1 && box.x + box.w < WORLD_PX - 1 && box.y + box.h < WORLD_PX - 1 && !hitsSolid(g.world, box)) return box
+    for (let lift = 0; lift <= S.blink.lift; lift++) {
+      const box = { x: p.x + p.aim.x * d, y: p.y + p.aim.y * d - lift, w: p.w, h: p.h }
+      if (box.x > 1 && box.y > 1 && box.x + box.w < WORLD_PX - 1 && box.y + box.h < WORLD_PX - 1 && !hitsSolid(g.world, box)) return box
+    }
   }
   return null
 }
@@ -810,8 +828,6 @@ const arrive = (g, p, origin) => {
       hurt(g, e, S.blink.lanceDamage, 'player')
       e.stun = Math.max(e.stun, 0.6)
     })
-    energize(g.world, cell(origin.x), cell(origin.y + 10), S.bolt.energy / 2)
-    energize(g.world, cell(arrival.x), cell(arrival.y + 10), S.bolt.energy / 2)
   }
   if (owns(p, 'blink.ghost')) addEffect(g, { kind: 'ghost', x: origin.x - 4, y: origin.y - 8, life: S.blink.ghostLife })
   g.pulse = Math.max(g.pulse, 0.5)
@@ -830,14 +846,17 @@ const blink = (g, p) => {
     }
   }
   if (owns(p, 'blink.trade')) {
-    if (tradeMatter(g, p)) arrive(g, p, origin)
+    if (!tradeMatter(g, p)) return FREE
+    fedByCrossing(g, origin, centre(p))
+    arrive(g, p, origin)
     return
   }
   const target = blinkTarget(g, p)
-  if (!target) return
+  if (!target) return FREE
   if (owns(p, 'blink.anchor')) {
     g.effects.filter(f => f.kind === 'anchor').forEach(f => { f.life = 0; f.done = true })
     addEffect(g, { kind: 'anchor', x: p.x, y: p.y, life: S.blink.anchorLife })
+    offerEncore(p, 'blink', S.blink.anchorLife)
   }
   p.x = target.x
   p.y = target.y
@@ -874,10 +893,7 @@ const hangVine = (g, from, to) => lineCells(from, to, (x, y) => {
   if (inPlay(x, y) && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.VINE, 0)
 })
 
-const offerYank = (g, p, life) => {
-  const own = p.skills.find(s => s.kind === 'grapple')
-  if (own) own.encore = life - 0.05
-}
+
 
 const tearOut = (g, p, yank) => {
   yank.life = 0
@@ -887,8 +903,10 @@ const tearOut = (g, p, yank) => {
   const m = matAt(g.world, yank.x, yank.y)
   if (!shatterFrom(g, yank.x, yank.y)) setCell(g.world, yank.x, yank.y, M.EMPTY)
   const c = centre(p)
-  const d = Math.max(1, distance(c, yank.at))
-  if (m === M.SCRAP || m === M.ROCK) g.flung.push(flungFrom(p, { x: yank.at.x - 4, y: yank.at.y - 4, vx: ((c.x - yank.at.x) / d) * S.grapple.yankThrow, vy: ((c.y - yank.at.y) / d) * S.grapple.yankThrow - 30 }))
+  const from = { x: (yank.x + 0.5) * BLOCK, y: (yank.y + 0.5) * BLOCK }
+  const d = Math.max(1, distance(c, from))
+  const toward = { x: (c.x - from.x) / d, y: (c.y - from.y) / d }
+  if (m === M.SCRAP || m === M.ROCK) g.flung.push(flungFrom(p, { x: from.x - 4, y: from.y - 4, vx: toward.x * S.grapple.yankThrow, vy: toward.y * S.grapple.yankThrow - 30, mat: m, safe: true }))
   g.shake = Math.max(g.shake, 3)
 }
 
@@ -915,11 +933,12 @@ const grapple = (g, p) => {
   const y = cell(hit.y)
   if (owns(p, 'grapple.piton')) hangVine(g, from, hit.last)
   if (owns(p, 'grapple.yank') && BREAKS.has(hit.m)) {
-    addEffect(g, { kind: 'yank', x, y, at: { x: hit.last.x, y: hit.last.y }, life: owns(p, 'grapple.sling') ? 999 : S.grapple.yankWindow })
-    offerYank(g, p, owns(p, 'grapple.sling') ? 999 : S.grapple.yankWindow)
+    const swinging = owns(p, 'grapple.sling')
+    addEffect(g, { kind: 'yank', x, y, at: { x: hit.last.x, y: hit.last.y }, life: swinging ? S.grapple.slingTime + 1 : S.grapple.yankWindow })
+    if (!swinging) offerEncore(p, 'grapple', S.grapple.yankWindow)
   }
   if (owns(p, 'grapple.sling')) {
-    addEffect(g, { kind: 'rope', x: hit.last.x, y: hit.last.y, length: Math.max(BLOCK * 2, distance(hit.last, centre(p))), life: 999 })
+    addEffect(g, { kind: 'rope', x: hit.last.x, y: hit.last.y, length: Math.max(BLOCK * 2, Math.min(S.grapple.slingRope, distance(hit.last, centre(p)))), life: 999 })
     return
   }
   zipTo(g, p, hit, S.grapple.pull)
@@ -929,6 +948,7 @@ const dash = (g, p) => {
   const aim = p.aim.y !== 0 && p.aim.x === 0 ? p.aim : { x: p.facing * Math.abs(p.aim.x || 1), y: p.aim.y * 0.7 }
   p.vx = aim.x * S.dash.speed
   p.vy = aim.y * S.dash.speed
+  p.dashAim = aim
   p.dashing = S.dash.time
   p.dashAim = aim
   p.drift = S.dash.time + 0.1
@@ -942,8 +962,14 @@ const carry = (g, p, box) => {
   if (!p.carried) p.carried = hostile(g).find(e => !e.heavy && overlap(box, e)) ?? null
   if (!p.carried) return
   const e = p.carried
-  e.x = p.x + p.w / 2 - e.w / 2 + p.dashAim.x * 8
-  e.y = p.y + p.h / 2 - e.h / 2 + p.dashAim.y * 8
+  const spot = { x: p.x + p.w / 2 - e.w / 2 + p.dashAim.x * 8, y: p.y + p.h / 2 - e.h / 2 + p.dashAim.y * 8, w: e.w, h: e.h }
+  if (hitsSolid(g.world, spot)) {
+    flingCarried(g, p)
+    g.shake = Math.max(g.shake, 4)
+    return
+  }
+  e.x = spot.x
+  e.y = spot.y
   e.stun = Math.max(e.stun, 0.3)
 }
 
@@ -976,8 +1002,18 @@ export const stepDash = (g, p, dt) => {
   p.dashing -= dt
   const box = { x: p.x - 2, y: p.y - 1, w: p.w + 4, h: p.h + 2 }
   if (owns(p, 'dash.ram')) {
-    for (let y = cell(box.y); y <= cell(box.y + box.h); y++) {
-      for (let x = cell(box.x); x <= cell(box.x + box.w); x++) if (BREAKS.has(matAt(g.world, x, y))) smash(g, x, y)
+    const aim = p.dashAim ?? { x: p.facing, y: 0 }
+    const top = cell(aim.y < -0.3 ? p.y - 2 : p.y)
+    const bottom = cell(aim.y > 0.3 ? p.y + p.h + 1 : p.y + p.h - 1)
+    let broke = false
+    for (let y = top; y <= bottom; y++) {
+      for (let x = cell(box.x); x <= cell(box.x + box.w); x++) {
+        if (BREAKS.has(matAt(g.world, x, y))) broke = smash(g, x, y) || broke
+      }
+    }
+    if (broke) {
+      p.vx = aim.x * S.dash.speed
+      p.vy = aim.y * S.dash.speed
     }
   }
   if (owns(p, 'dash.carom') && p.hitWall && p.caroms < S.dash.caromMost) caromOff(g, p)
@@ -1057,17 +1093,14 @@ const rewind = (g, p) => {
   ring(g, here.x, here.y, colour, 18, 70)
   if (owns(p, 'rewind.return')) sendShotsBack(g)
   const dragged = owns(p, 'rewind.undertow') ? hostile(g).filter(e => !e.heavy && !e.prop && !e.warden && !e.partOf && distance(centre(e), here) < S.rewind.undertowReach) : []
-  if (owns(p, 'rewind.epoch')) {
-    if (restorePast(g)) ring(g, here.x, here.y, colour, 34, 180)
-  } else {
-    if (owns(p, 'rewind.wraith')) addEffect(g, { kind: 'wraith', path: trail.slice(-S.rewind.steps).map(({ x, y }) => ({ x, y })), w: p.w, h: p.h, x: past.x, y: past.y, life: Math.min(trail.length, S.rewind.steps) * 0.1 })
-    if (!hitsSolid(g.world, { x: past.x, y: past.y, w: p.w, h: p.h })) {
-      p.x = past.x
-      p.y = past.y
-    }
-    p.vx = 0
-    p.vy = 0
+  if (owns(p, 'rewind.epoch') && restorePast(g)) ring(g, here.x, here.y, colour, 34, 180)
+  if (owns(p, 'rewind.wraith')) addEffect(g, { kind: 'wraith', path: trail.slice(-S.rewind.steps).map(({ x, y }) => ({ x, y })), w: p.w, h: p.h, x: past.x, y: past.y, life: Math.min(trail.length, S.rewind.steps) * 0.1 })
+  if (!hitsSolid(g.world, { x: past.x, y: past.y, w: p.w, h: p.h })) {
+    p.x = past.x
+    p.y = past.y
   }
+  p.vx = 0
+  p.vy = 0
   dragBack(g, p, dragged, from, past)
   p.iframes = Math.max(p.iframes, 0.4)
   g.pulse = 1
@@ -1403,6 +1436,8 @@ const well = (g, p) => {
   })
 }
 
+const swappable = e => !e.heavy && !e.warden && !e.partOf && !e.prop && !e.friendly && !e.stowed
+
 const swapBodies = (g, a, b, stun) => {
   const [ax, ay] = [a.x + a.w / 2, a.y + a.h]
   const [bx, by] = [b.x + b.w / 2, b.y + b.h]
@@ -1410,8 +1445,10 @@ const swapBodies = (g, a, b, stun) => {
   a.y = by - a.h
   b.x = ax - b.w / 2
   b.y = ay - b.h
-  if (a !== g.player) a.stun = Math.max(a.stun, stun)
-  if (b !== g.player) b.stun = Math.max(b.stun, stun)
+  ;[a, b].filter(e => e !== g.player).forEach(e => {
+    e.stun = Math.max(e.stun, stun)
+    e.swappedUntil = g.time + stun
+  })
 }
 
 const trade = (g, p, a, b) => {
@@ -1430,30 +1467,36 @@ const swapBack = (g, p, recall) => {
   ring(g, centre(p).x, centre(p).y, MAGNET, 14, 80)
 }
 
+const shuffleOthers = (g, p, target) => {
+  const others = hostile(g)
+    .filter(e => e !== target && swappable(e))
+    .map(e => [Math.random(), e])
+    .sort((a, b) => a[0] - b[0])
+    .map(([, e]) => e)
+  others.slice(1).forEach((e, i) => {
+    swapBodies(g, others[i], e, 0.5)
+    ring(g, centre(e).x, centre(e).y, hue(p, 'swap', GAS), 6, 30)
+  })
+}
+
 const swap = (g, p) => {
   const recall = g.effects.find(f => f.kind === 'recall' && !f.done)
   if (recall) {
     swapBack(g, p, recall)
     return
   }
-  const foes = hostile(g).filter(e => !e.heavy)
-  if (owns(p, 'swap.shuffle') && foes.length > 1) {
-    const order = foes.map(e => [Math.random(), e]).sort((a, b) => a[0] - b[0]).map(([, e]) => e)
-    order.slice(1).forEach((e, i) => trade(g, p, order[i], e))
-    g.pulse = 1
-    return
-  }
   const covered = inCone(muzzle(p), p.aim, S.swap.reach, S.swap.width)
-  const target = nearestTo(g.enemies.filter(e => covered(centre(e))), centre(p))
-  if (!target) return
+  const target = nearestTo(g.enemies.filter(e => swappable(e) && covered(centre(e))), centre(p))
+  if (!target) return FREE
   const [fromX, fromY] = [p.x, p.y]
   trade(g, p, target, p)
   p.iframes = Math.max(p.iframes, 0.3)
+  if (owns(p, 'swap.shuffle')) shuffleOthers(g, p, target)
   if (owns(p, 'swap.goat')) {
-    addEffect(g, { kind: 'lure', loud: true, follow: target, x: target.x, y: target.y, life: S.swap.goatTime })
+    bait(g, target, S.swap.goatTime)
     target.goat = S.swap.goatTime
   }
-  g.pulse = Math.max(g.pulse, 0.6)
+  g.pulse = Math.max(g.pulse, owns(p, 'swap.shuffle') ? 1 : 0.6)
   if (owns(p, 'swap.recall')) {
     addEffect(g, { kind: 'recall', foe: target, x: fromX, y: fromY, life: S.swap.recallTime })
     return FREE
@@ -1483,12 +1526,14 @@ export const releaseMatter = g => {
   g.matterHeld = false
 }
 
+export const timeHeld = g => g.timeStop > 0 || g.effects.some(f => f.kind === 'still' || f.kind === 'hold')
+
 const stop = (g, p) => {
   if (owns(p, 'stop.still')) {
     holdMatter(g)
     addEffect(g, { kind: 'still', life: S.stop.stillTime })
   } else if (owns(p, 'stop.hold')) {
-    g.enemies.filter(e => !e.friendly).forEach(e => {
+    g.enemies.filter(e => !e.friendly && !e.ally).forEach(e => {
       const held = e.heavy ? S.stop.heavyHold : S.stop.holdTime
       e.stun = Math.max(e.stun, held)
       e.frozen = Math.max(e.frozen, held)
@@ -1511,11 +1556,21 @@ export const crackWorld = g => {
     }
     if (m === M.VOLATILE) ignite(g.world, x, y)
   })
-  g.enemies.filter(e => !e.friendly).forEach(e => { e.stun = Math.max(e.stun, 1.5) })
+  g.enemies.filter(e => !e.friendly && !e.ally).forEach(e => { e.stun = Math.max(e.stun, 1.5) })
   const c = centre(g.player)
   ring(g, c.x, c.y, BLOOD, 40, 220)
   g.shake = Math.max(g.shake, 8)
   g.pulse = 1
+}
+
+const bait = (g, e, life) => {
+  const lure = g.effects.find(f => f.kind === 'lure' && f.follow === e && !f.done)
+  if (lure) {
+    lure.life = Math.max(lure.life, life)
+    return
+  }
+  addEffect(g, { kind: 'lure', loud: true, follow: e, x: e.x, y: e.y, life, hpBefore: e.hp, clock: 0 })
+  e.hp += S.charm.baitHealth
 }
 
 export const charmOne = (g, e, p) => {
@@ -1523,7 +1578,7 @@ export const charmOne = (g, e, p) => {
   e.plague = owns(p, 'charm.plague')
   e.puppet = owns(p, 'charm.puppet')
   e.bond = owns(p, 'charm.bond')
-  if (owns(p, 'charm.lure')) addEffect(g, { kind: 'lure', loud: true, follow: e, x: e.x, y: e.y, life: S.charm.time })
+  if (owns(p, 'charm.lure')) bait(g, e, S.charm.time)
   const c = centre(e)
   ring(g, c.x, c.y, hue(p, 'charm', 'gas'), 12, 40)
 }
@@ -1531,7 +1586,8 @@ export const charmOne = (g, e, p) => {
 const charm = (g, p) => {
   const covered = inCone(muzzle(p), p.aim, S.charm.reach, S.charm.width)
   const target = nearestTo(hostile(g).filter(e => !e.heavy && covered(centre(e))), centre(p))
-  if (target) charmOne(g, target, p)
+  if (!target) return FREE
+  charmOne(g, target, p)
 }
 
 const drone = (g, p) => {
@@ -1569,10 +1625,12 @@ const mine = (g, p) => {
   if (limpet) zap(g, muzzle(p), hit.last, BLOOD)
 }
 
+const underFoot = (p, x, y) => y === cell(p.y + p.h + 1) && x >= cell(p.x) && x <= cell(p.x + p.w - 0.01)
+
 export const roarCell = (g, p, x, y) => {
   const m = matAt(g.world, x, y)
   if (m === M.VOLATILE) ignite(g.world, x, y)
-  else if (m === M.ROCK && owns(p, 'roar.crack') && Math.random() < 0.25) setCell(g.world, x, y, M.SAND)
+  else if (m === M.ROCK && owns(p, 'roar.crack') && !underFoot(p, x, y) && Math.random() < 0.25) setCell(g.world, x, y, M.SAND)
   if (owns(p, 'roar.rime')) {
     if (m === M.WATER) setCell(g.world, x, y, M.ICE)
     if (g.world.burn[y * ROOM + x] > 0) g.world.burn[y * ROOM + x] = 0
@@ -1580,7 +1638,7 @@ export const roarCell = (g, p, x, y) => {
 }
 
 export const roarFoe = (g, p, e, away, shove) => {
-  if (e.friendly) return
+  if (e.friendly || e.ally) return
   e.stun = Math.max(e.stun, 1)
   if (!e.heavy) {
     e.vx = away.x * shove
@@ -1609,7 +1667,7 @@ export const shoutFront = (g, p, f) => {
   })
 }
 
-const roarSize = p => (owns(p, 'roar.swell') ? S.roar.swellMin + (S.roar.swellMax - S.roar.swellMin) * p.power : 1)
+const roarSize = p => (owns(p, 'roar.swell') ? 1 + (S.roar.swellMax - 1) * p.power : 1)
 
 const roar = (g, p) => {
   const here = centre(p)
@@ -1626,7 +1684,7 @@ const roar = (g, p) => {
       if (size > S.roar.swellBreaks) shoutBreaks(g, x, y)
     }
   })
-  for (const e of g.enemies) {
+  for (const e of g.enemies.filter(e => !e.ally)) {
     const c = centre(e)
     if (distance(c, here) <= reach) {
       roarFoe(g, p, e, towards(here, c), 160 * size)
@@ -2115,7 +2173,7 @@ const outwardFrom = piece => {
   return { vx: Math.cos(a) * v, vy: Math.sin(a) * v - C.lift }
 }
 
-const lobAt = (from, to, speed) => {
+export const lobAt = (from, to, speed) => {
   const t = Math.max(1, distance(from, to)) / speed
   return { vx: (to.x - from.x) / t, vy: (to.y - from.y) / t - 0.5 * TUNING.flung.gravity * t }
 }
@@ -2170,7 +2228,8 @@ const bellAround = (g, p) => {
 const peal = (g, p) => {
   const here = centre(p)
   const pieces = []
-  for (const found of chimeCells(g, here)) {
+  const rung = chimeCells(g, here)
+  for (const found of rung) {
     if (found.m === M.VOLATILE) {
       ignite(g.world, found.x, found.y)
       continue
@@ -2186,6 +2245,7 @@ const peal = (g, p) => {
   addEffect(g, { kind: 'peal', x: here.x, y: here.y, life: S.chime.ringTime, broke: pieces.length, tint: hue(p, 'chime', null) })
   g.shake = Math.max(g.shake, pieces.length ? 3 : 1)
   g.pulse = Math.max(g.pulse, 0.4)
+  return rung.length
 }
 
 export const ringBell = g => peal(g, g.player)
@@ -2198,7 +2258,7 @@ const chime = (g, p) => {
     return FREE
   }
   if (bell) Object.assign(bell, { life: 0, done: true })
-  peal(g, p)
+  if (!peal(g, p)) return FREE
 }
 
 const jetFlow = (g, p, dt, skill) => {
@@ -2269,7 +2329,7 @@ const letGo = (g, p) => {
   const yank = g.effects.find(f => f.kind === 'yank' && !f.done)
   if (!yank) return
   yank.life = S.grapple.yankWindow
-  offerYank(g, p, S.grapple.yankWindow)
+  offerEncore(p, 'grapple', S.grapple.yankWindow)
 }
 
 const glideOn = g => held(g, 'glide') !== undefined

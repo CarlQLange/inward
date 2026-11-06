@@ -85,10 +85,9 @@ const sideEffects = (g, f, from, e, school, cause) => {
   }
 }
 
-const strike = (g, e, amount, source, cause) => {
-  if (e.warden) hurt(g, e, amount, 'player', cause)
-  else hurt(g, e, amount, source, cause)
-}
+const IMMUNITY = { FIRE: 'fireproof', LAVA: 'fireproof', CHARGE: 'insulated', ACID: 'acidproof' }
+
+const shrugs = (e, cause) => Boolean(e[IMMUNITY[cause]])
 
 const share = (g, f, from, amount, source, cause) => {
   if (f.passing) return
@@ -96,7 +95,7 @@ const share = (g, f, from, amount, source, cause) => {
   const school = schoolOf(source, cause) ?? 'BLOW'
   for (const e of f.members) {
     if (e === from || e.hp <= 0) continue
-    strike(g, e, amount, source, cause)
+    if (!shrugs(e, cause)) hurt(g, e, amount, source, cause)
     sideEffects(g, f, from, e, school, cause)
     pulse(g, f, from, e, SCHOOLS[school] ?? PALE)
     heatTie(f, e, school)

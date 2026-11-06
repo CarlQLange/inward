@@ -7,11 +7,11 @@ import { LOCK_CELLS, THEMES, WATER_FOES, generateRoom } from './generate.js'
 import { CORE_RING, OPPOSITE, buildMap, keyOf, loopRooms, ringOf } from './map.js'
 import { WORLD_PX, cell, centre, hitsSolid, liquidAtPx, miredAtPx, move, moveAxis, nudgeOutOfSolid, overlap, pushOutOfSolid, solidAt, unbury } from './physics.js'
 import { LOOSE_EVENTS, stepMagnets } from './loose.js'
-import { applyCrush, applyHazards, burst, hurt } from './combat.js'
+import { applyCrush, applyHazards, burst, hurt, settled, steady } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, puppeted, seatEnemy, settleFooting, steerPuppet } from './enemies.js'
 import { swim } from './earth.js'
-import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, burstGuts, spillNapalm, stepDash, torchNear } from './skills.js'
+import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, charmOne, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, burstGuts, spillNapalm, stepDash, torchNear, zap } from './skills.js'
 import { feedColour, feedEvent, stepFeeds, stepHand } from './feed.js'
 import { composeOffer } from './offers.js'
 import { dust } from './feel.js'
@@ -377,6 +377,7 @@ const enterRoom = (g, x, y) => {
   placeWarden(g, x, y)
   g.rooms[key] ??= buildRoom(g, x, y)
   if (g.player) g.player.iframes = Math.max(g.player.iframes, TUNING.feel.entryShield)
+  g.player?.skills.forEach(skill => { skill.encore = 0 })
   const room = g.rooms[key]
   const firstVisit = !room.visited
   room.visited = true
@@ -395,7 +396,7 @@ const enterRoom = (g, x, y) => {
     wares: room.wares,
     pickups: room.pickups,
     depth: g.depthOverride ?? depthFor(g, room.ring),
-    shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: [], spawns: [], rings: [], lights: [], ripples: [],
+    shots: [], fireballs: [], flung: [], bolts: [], particles: [], popups: [], effects: (g.effects ?? []).filter(f => f.kind === 'orbit' && !f.done), spawns: [], rings: [], lights: [], ripples: [],
     timeStop: 0,
     wasHolding: false,
     boss: null,
@@ -837,7 +838,7 @@ const leaveChest = g => {
 }
 
 const pickSlough = (g, p) => {
-  const count = Math.max(2, p.skills.length)
+  const count = Math.max(1, p.skills.length)
   const kinds = shuffled(knownOf(g, 'skill').filter(kind => !p.skills.some(s => s.kind === kind))).slice(0, count)
   if (kinds.length === 0) return
   g.cardPool = [...g.cardPool.filter(kind => !kinds.includes(kind)), ...p.skills.map(s => s.kind)]
@@ -961,8 +962,10 @@ const blastJustNow = (g, c) => {
     .some(blast => Math.hypot(blast.x * BLOCK - c.x, blast.y * BLOCK - c.y) < (blast.reach + 3) * BLOCK)
 }
 
+const minedLately = (g, e) => e.minedAt !== undefined && g.time - e.minedAt < TUNING.feed.mineWindow
+
 const feedOnKill = (g, e, c, environmental) => {
-  if (environmental && e.lastCause === 'CRUSHED' && blastJustNow(g, c)) feedEvent(g, 'blastKill', c.x, c.y)
+  if ((environmental && e.lastCause === 'CRUSHED' && blastJustNow(g, c)) || minedLately(g, e)) feedEvent(g, 'blastKill', c.x, c.y)
   if (!environmental) return
   feedEvent(g, 'worldKill', c.x, c.y)
   const ally = g.enemies.filter(o => o.ally > 0 && o !== e).map(o => [Math.hypot(centre(o).x - c.x, centre(o).y - c.y), o]).filter(([d]) => d < TUNING.feed.allyReach).sort((a, b) => a[0] - b[0])[0]?.[1]
@@ -987,6 +990,7 @@ const onKill = (g, e) => {
     dropLoot(g, e, 5)
     return
   }
+  if (e.lastSource === 'bond') return
   if (e.kind === 'mimic') gainRelic(g, nextRelic(g))
   const p = g.player
   const environmental = e.lastSource !== 'player'
@@ -1017,13 +1021,19 @@ const onKill = (g, e) => {
   dropLoot(g, e, environmental ? 2 : 1)
 }
 
+const wakeEnds = (g, e) => {
+  const c = centre(e)
+  e.hp = 0
+  ring(g, c.x, c.y, 'gas', 10, 40)
+}
+
 const keystoneKill = (g, e, p) => {
   const c = centre(e)
   if (hasKeystone(p, 'powder')) explode(g.world, cell(c.x), cell(c.y), e.w > K.blastBigAbove ? K.blastBig : K.blastSmall)
   if (!hasKeystone(p, 'wake') || e.spawned || e.hatched || e.heavy) return
   if (g.enemies.filter(o => o.woken).length >= K.wakeMost) return
   const woken = createEnemy({ kind: e.kind, x: e.x, y: e.y })
-  Object.assign(woken, { woken: true, silent: true, detonates: true, ally: K.wakeLife, hp: K.wakeHp, facing: e.facing })
+  Object.assign(woken, { woken: true, silent: true, ally: K.wakeLife, hp: K.wakeHp, facing: e.facing })
   g.spawns.push(woken)
   ring(g, c.x, c.y, 'gas', 10, 40)
 }
@@ -1149,7 +1159,6 @@ const shoot = (g, p) => {
   else fireShot(g, p, aim)
   shotFx(g, p, aim)
   p.shotReady = hasKeystone(p, 'fists') ? K.punchEvery : P.shotEvery * (scatter ? 3 : 1)
-  if (hasKeystone(p, 'fists')) p.vx += aim.x * K.punchLunge
 }
 
 const fireSkill = (g, p, kind) => {
@@ -1673,7 +1682,7 @@ const stepPlayer = (g, input, dt) => {
   p.aim = aimFrom(p, input)
 
   const vine = vineAt(world, cell(middle), cell(p.y + p.h / 2))
-  const climbing = vine && !input.jump && (input.up || input.down)
+  const climbing = vine && !input.jump && !(p.zipping > 0) && (input.up || input.down)
   const floating = input.jump && hasRelic(p, 'feather') && p.vy > 0
   const gravity = swimming ? P.gravity * P.swimGravity : P.gravity
   const maxFall = swimming ? P.swimMaxFall : floating ? R.featherFall : vine ? R.vineSlide : P.maxFall
@@ -1768,16 +1777,19 @@ const stepPlayer = (g, input, dt) => {
   }
   recordTrail(p, dt)
 
-  p.shotReady -= dt
+  const breath = g.held && g.tempo > 0 ? 1 / g.tempo : 1
+  p.shotReady -= dt * breath
   if (!input.shoot) p.holdFire = false
   const target = input.autofire && !input.shoot && !stunned ? autoTarget(g, p) : null
+  const steered = p.aim
   if (target) {
     p.aim = target
     p.assist = 0
     if (Math.abs(target.x) > 0.05) p.facing = target.x < 0 ? -1 : 1
   }
   if (!stunned && (input.shoot || target) && !p.holdFire && p.shotReady <= 0) shoot(g, p)
-  useSkills(g, p, input, stunned, dt)
+  p.aim = steered
+  useSkills(g, p, input, stunned, dt * breath)
   if (!stunned) throwBomb(g, p, input)
   p.iframes -= dt
   p.stun -= dt
@@ -1792,7 +1804,7 @@ const stepPlayer = (g, input, dt) => {
   if (g.phase === 'playing') useDoors(g, p)
   if (p.hp <= 0 && g.phase === 'playing' && hasRelic(p, 'phoenix')) {
     p.relics.delete('phoenix')
-    p.hp = R.phoenixHearts
+    p.hp = Math.min(heartCap(p), R.phoenixHearts)
     p.iframes = 2
     const c = centre(p)
     explode(world, cell(c.x), cell(c.y), 2)
@@ -1820,12 +1832,27 @@ const stepElite = (g, e, dt) => {
   }
 }
 
+const puppetStep = (g, e, dt) => {
+  const { x, y, vx, vy } = e
+  STEPPERS[e.kind](g, e, dt)
+  Object.assign(e, { x, y, vx, vy })
+  steerPuppet(g, e, dt)
+}
+
+const allyBites = (g, e, foe) => {
+  const before = foe.hp
+  hurt(g, foe, 1)
+  hurt(g, e, 1)
+  if (e.plague && !foe.heavy && foe.hp > 0 && foe.hp < before) charmOne(g, foe, g.player)
+}
+
 const stepEnemies = (g, dt) => {
   for (const e of g.enemies) {
     e.flash = Math.max(0, (e.flash ?? 0) - dt)
     applyCrush(g, e)
+    steady(e, dt)
     if (e.floated > 0) driftFoe(g, e, dt)
-    else if (puppeted(e)) steerPuppet(g, e, dt)
+    else if (puppeted(e)) puppetStep(g, e, dt)
     else STEPPERS[e.kind](g, e, dt)
     stepMutations(g, e, dt)
     if (e.kind !== 'worm' && !e.free) nudgeOutOfSolid(g.world, e)
@@ -1834,19 +1861,18 @@ const stepEnemies = (g, dt) => {
     e.iframes -= dt
     e.stun -= dt
     e.frozen -= dt
+    settled(e)
     if (e.ally > 0) {
       e.ally -= dt
       if (e.ally <= 0) e.ally = 0
+      if (e.ally === 0 && e.woken) wakeEnds(g, e)
     }
     stepElite(g, e, dt)
     applyHazards(g, e, dt)
     if (e.friendly || e.stun > 0 || e.asleep || e.intangible || e.stowed) continue
     if (e.ally) {
       const foe = g.enemies.find(o => o !== e && !o.friendly && !o.ally && overlap(e, o))
-      if (foe) {
-        hurt(g, foe, 1)
-        hurt(g, e, 1)
-      }
+      if (foe) allyBites(g, e, foe)
     } else if (overlap(contactBox(e), g.player)) hurt(g, g.player, 1, 'world', 'BITTEN')
   }
   for (const e of g.enemies) if (e.hp <= 0) onKill(g, e)
@@ -1854,11 +1880,25 @@ const stepEnemies = (g, dt) => {
   g.spawns = []
 }
 
+const arcOn = (g, victim) => {
+  const from = centre(victim)
+  const next = g.enemies
+    .filter(o => o !== victim && o.hp > 0 && !o.friendly && !o.ally && !o.intangible)
+    .map(o => [Math.hypot(centre(o).x - from.x, centre(o).y - from.y), o])
+    .filter(([d]) => d < R.shockArc)
+    .sort((a, b) => a[0] - b[0])[0]?.[1]
+  if (!next) return
+  zap(g, from, centre(next))
+  hurt(g, next, 1, 'world', 'CHARGE')
+}
+
 const shotEffects = (g, s, x, y, victim) => {
   const p = g.player
   if (!s.friendly) return
   if (hasRelic(p, 'incendiary')) ignite(g.world, x, y)
   if (hasRelic(p, 'shock')) energize(g.world, x, y, R.shockShot)
+  if (victim && hasRelic(p, 'incendiary') && !victim.fireproof) victim.alight = Math.max(victim.alight ?? 0, TUNING.enemies.lives.burnFor)
+  if (victim && hasRelic(p, 'shock')) arcOn(g, victim)
   if (victim && hasRelic(p, 'frostshot')) victim.stun = Math.max(victim.stun, 0.4)
   if (hasRelic(p, 'acidskull') && !victim && Math.random() < R.acidShot) {
     const m = matAt(g.world, x, y)
@@ -1878,6 +1918,7 @@ const deflect = (g, s, victim, dt) => {
 }
 
 const landShot = (g, s, victim) => {
+  if (s.loosed) victim.iframes = 0
   if (s.stain === undefined || victim.prop) hurt(g, victim, s.power ?? 1, 'player', 'SHOT')
   else stainStrikes(g, s, cell(s.x), cell(s.y), victim)
 }
@@ -2001,7 +2042,12 @@ const stepFlung = (g, dt) => {
   for (const f of g.flung) {
     f.age += dt
     f.vy += F.gravity * dt
-    const blocked = moveAxis(g.world, f, 'x', f.vx * dt) || moveAxis(g.world, f, 'y', f.vy * dt)
+    const hitX = moveAxis(g.world, f, 'x', f.vx * dt)
+    const hitY = moveAxis(g.world, f, 'y', f.vy * dt)
+    const fresh = f.age < F.grace
+    if (fresh && hitX) f.vx *= -0.3
+    if (fresh && hitY) f.vy = 0
+    const blocked = !fresh && (hitX || hitY)
     const victim = g.enemies.find(e => e !== f.thrower && !e.stowed && !e.intangible && !(f.thrower?.warden && e.partOf) && overlap(f, e))
     if (victim) {
       victim.flungBy = f.by

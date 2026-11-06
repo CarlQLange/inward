@@ -13,10 +13,7 @@ export const burst = burstSparks
 
 const spillCoins = (g, p, count) => {
   g.gold -= count
-  const here = centre(p)
-  for (let i = 0; i < count; i++) {
-    g.pickups.push({ kind: 'coin', x: here.x - 2, y: here.y - 2, w: 5, h: 5, vx: (Math.random() - 0.5) * 160, vy: -70 - Math.random() * 70 })
-  }
+  g.popups?.push({ x: centre(p).x, y: p.y - 8, text: `-${count}`, colour: 'yellow', life: 1.1 })
 }
 
 const bonded = g => g.enemies.find(e => e.ally > 0 && e.bond && e.hp > 0)
@@ -26,6 +23,7 @@ const hurtPlayer = (g, p, cause) => {
   const stand = bonded(g)
   if (stand) {
     stand.hp -= TUNING.skills.charm.bondCost
+    stand.lastSource = 'bond'
     stand.flash = TUNING.feel.enemyFlash
     g.bolts.push({ points: [centre(p), centre(stand)], life: 0.2, colour: '#6fd0ff' })
   } else if (paid) spillCoins(g, p, TUNING.run.crownHit)
@@ -105,6 +103,21 @@ export const hurt = (g, e, amount, source = 'world', cause = 'BITTEN') => {
   if (source === 'player') g.hitstop = Math.max(g.hitstop, TUNING.feel.hitStop)
   hitFx(g, e)
   if (e.link > 0) passOn(g, e, amount, source, cause)
+}
+
+export const settled = e => {
+  e.stunSeen = e.stun
+  e.frozenSeen = e.frozen
+}
+
+export const steady = (e, dt) => {
+  if (!e.heavy) return
+  e.steady = Math.max(0, (e.steady ?? 0) - dt)
+  const rose = ['stun', 'frozen'].filter(k => e[k] > (e[`${k}Seen`] ?? 0) + 1e-6)
+  if (!rose.length) return
+  const most = e.steady > 0 ? 0 : TUNING.skills.stop.heavyHold
+  rose.forEach(k => { e[k] = Math.max(e[`${k}Seen`] ?? 0, Math.min(e[k], most)) })
+  if (most > 0) e.steady = Math.max(e.stun, e.frozen || 0) + TUNING.enemies.steadyAfter
 }
 
 export const applyCrush = (g, e) => {

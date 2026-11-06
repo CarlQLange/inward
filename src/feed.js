@@ -2,7 +2,7 @@ import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
 import { centre, liquidAtPx } from './physics.js'
 import { anchorOf } from './cast.js'
-import { FREE, cooldownOf, handOf, holdOf, hostile, streamOf } from './skills.js'
+import { FREE, cooldownOf, handOf, holdOf, hostile, streamOf, timeHeld } from './skills.js'
 import { castWait } from './keystones.js'
 
 const F = TUNING.feed
@@ -70,7 +70,7 @@ const OTHERS = {
   stun: {
     colours: ['#bff2ff', '#ffe84a'], flight: 'zig',
     sense: (g, p) => {
-      const dazed = within(g, p, REACH_PX * 2).filter(e => e.stun > 0 || e.frozen > 0)
+      const dazed = within(g, p, REACH_PX * 2).filter(e => (e.stun > 0 || e.frozen > 0) && !(e.swappedUntil > g.time))
       return { amount: dazed.length / F.full.stun, spots: dazed.map(centre) }
     },
   },
@@ -86,7 +86,7 @@ const OTHERS = {
     sense: (g, p) => {
       const c = centre(p)
       const stood = p.stood ?? 0
-      return { amount: g.timeStop > 0 ? 0 : Math.max(0, (stood - F.stillAfter) / F.stillFull), spots: [{ x: c.x + Math.cos(g.time * 9) * 22, y: c.y + Math.sin(g.time * 9) * 22 }] }
+      return { amount: timeHeld(g) ? 0 : Math.max(0, (stood - F.stillAfter) / F.stillFull), spots: [{ x: c.x + Math.cos(g.time * 9) * 22, y: c.y + Math.sin(g.time * 9) * 22 }] }
     },
   },
   airborne: {
@@ -141,7 +141,7 @@ const foodOf = (_, kind) => DIETS[kind]
 export const dietOf = foodOf
 
 const EATS = {
-  variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS',
+  variety: 'DIFFERENT LIQUIDS AND GASES', stun: 'STUNNED FOES', crowd: 'FOES CLOSE TO YOU', still: 'STANDING STILL', air: 'BEING IN THE AIR', blast: 'BLASTS', blastKill: 'KILLS BY BLASTS AND MINES',
   flying: 'FLYING BLOCKS AND SHARDS', hit: 'TAKING HITS', allyKill: 'KILLS BY CHARMED FOES', dashHit: 'DASH HITS', crossed: 'BLINKS THROUGH WALLS', coin: 'COINS', smashed: 'BROKEN BLOCKS',
   airborne: 'FOES IN THE AIR', worldKill: 'WORLD KILLS',
 }

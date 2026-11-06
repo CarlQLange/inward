@@ -608,7 +608,7 @@ const drawFeedMotes = (ctx, g) => {
 
 const SWELLS = {
   roar: (ctx, g, skill, c) => {
-    const reach = S.roar.reach * (S.roar.swellMin + (S.roar.swellMax - S.roar.swellMin) * skill.swell)
+    const reach = S.roar.reach * (1 + (S.roar.swellMax - 1) * skill.swell)
     circle(ctx, c.x, c.y, reach, skill.swell >= 1 ? WHITE : BLOOD, 56)
     circle(ctx, c.x, c.y, reach * (0.5 + 0.5 * Math.sin(g.time * 14) ** 2), BLOOD, 12)
   },

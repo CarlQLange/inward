@@ -105,14 +105,18 @@ export const foeOf = (g, e) => {
     const closest = others.sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0]
     return closest ? centre(closest) : centre(g.player)
   }
-  const quarry = quarryOf(e)
-  if (quarry) return quarry
+  return quarryOf(e) ?? decoyNear(g, e) ?? centre(g.player)
+}
+
+const decoyNear = (g, e) => {
   const decoy = decoyFor(g)
-  if (decoy) {
-    const reach = decoy.loud ? 400 : TUNING.skills.blink.ghostRange
-    if (Math.hypot(decoy.x - e.x, decoy.y - e.y) < reach) return { x: decoy.x + 4, y: decoy.y + 8 }
-  }
-  return centre(g.player)
+  if (!decoy || decoy.follow === e) return null
+  const reach = decoy.loud ? 400 : TUNING.skills.blink.ghostRange
+  return Math.hypot(decoy.x - e.x, decoy.y - e.y) < reach ? { x: decoy.x + 4, y: decoy.y + 8 } : null
+}
+
+const turnTo = (e, spot) => {
+  if (spot && Math.abs(spot.x - centre(e).x) > e.w / 2) e.facing = spot.x < centre(e).x ? -1 : 1
 }
 
 export const puppeted = e => e.puppet && e.ally > 0 && !(e.shoved > 0) && ['ground', 'free'].includes(anchorOf(e.kind))
@@ -1506,6 +1510,7 @@ const tame = e => e.ally || e.friendly || e.prop || e.warden || e.partOf
 const lived = ({ attack, life, own }) => (g, e, dt) => {
   if (tame(e)) {
     hunt(e, null)
+    if (e.ally) turnTo(e, foeOf(g, e))
     attack(g, e, dt)
     return
   }
@@ -1525,6 +1530,7 @@ const lived = ({ attack, life, own }) => (g, e, dt) => {
   }
   if (e.mind === 'hero' && !own) {
     hunt(e, null)
+    turnTo(e, decoyNear(g, e))
     attack(g, e, dt)
     return
   }
