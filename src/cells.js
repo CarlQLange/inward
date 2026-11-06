@@ -1,4 +1,4 @@
-import { ROOM } from './config.js'
+import { ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
 
 const AREA = ROOM * ROOM
@@ -25,12 +25,17 @@ const swapIfChanged = layer => {
 
 export const createCellLayers = () => ({ cells: emptyLayer(), fields: emptyLayer() })
 
-const FLOW = { still: 0, falling: 1, stream: 2, landing: 3 }
+const FLOW = { still: 0, falling: 1, stream: 2, landing: 3, left: 4, right: 5 }
 
 const matOf = (world, x, y) => (x < 0 || y < 0 || x >= ROOM || y >= ROOM ? M.BEDROCK : world.mat[y * ROOM + x])
 const airy = (world, x, y) => {
   const m = matOf(world, x, y)
   return !props(m).solid && !props(m).thick && !LIQUID_CLASS[m]
+}
+
+const open = (world, x, y) => {
+  const m = matOf(world, x, y)
+  return m === M.EMPTY || props(m).gas === true
 }
 
 const STREAM_LEAST = 3
@@ -65,6 +70,45 @@ const writeFlow = (world, flow) => {
       if (LIQUID_CLASS[world.mat[i]] && flow[i] === FLOW.still && world.mat[i - ROOM] === world.mat[i] && (above === FLOW.falling || above === FLOW.stream)) flow[i] = FLOW.landing
     }
   }
+  for (let y = 0; y < ROOM; y++) {
+    for (let x = 0; x < ROOM; ) {
+      const m = world.mat[y * ROOM + x]
+      let end = x
+      while (LIQUID_CLASS[m] && end + 1 < ROOM && world.mat[y * ROOM + end + 1] === m) end++
+      if (LIQUID_CLASS[m]) writeRun(world, flow, m, x, end, y)
+      x = end + 1
+    }
+  }
+}
+
+const drains = (world, x, y, d) => {
+  for (let k = 0; k < TUNING.flowReach && open(world, x + d * k, y); k++) if (open(world, x + d * k, y + 1)) return true
+  return false
+}
+
+const stackAt = (world, m, x, y) => {
+  let n = 0
+  while (matOf(world, x, y - n - 1) === m) n++
+  return n
+}
+
+const writeRun = (world, flow, m, from, to, y) => {
+  let pushed = false
+  for (let x = from; x <= to && !pushed; x++) pushed = matOf(world, x, y - 1) === m
+  const active = (x, d) => open(world, x, y) && (pushed || drains(world, x, y, d))
+  const left = active(from - 1, -1)
+  const right = active(to + 1, 1)
+  if (!left && !right) return
+  let split = left ? to + 1 : from - 1
+  if (left && right) {
+    split = (from + to) >> 1
+    for (let x = from, best = 0; x <= to; x++) if (stackAt(world, m, x, y) > best) [best, split] = [stackAt(world, m, x, y), x]
+  }
+  for (let x = from; x <= to; x++) {
+    const i = y * ROOM + x
+    if (flow[i] !== FLOW.still || matOf(world, x, y - 1) === m || airy(world, x, y + 1)) continue
+    flow[i] = x < split ? FLOW.left : x > split ? FLOW.right : FLOW.still
+  }
 }
 
 const flowScratch = new Uint8Array(AREA)
@@ -78,8 +122,9 @@ const writeCells = (world, out) => {
       const p = props(m)
       const kind = LIQUID_CLASS[m] ?? 0
       let surface = 0
-      if (kind) for (let up = y - 1; up >= 0 && world.mat[up * ROOM + x] === m && surface < 15; up--) surface++
-      out[i * 4] = (p.solid && !p.clear) || p.thick ? 255 : 0
+      const pooledAt = up => world.mat[up * ROOM + x] === m && flowScratch[up * ROOM + x] !== FLOW.falling && flowScratch[up * ROOM + x] !== FLOW.stream
+      if (kind) for (let up = y - 1; up >= 0 && pooledAt(up) && surface < 15; up--) surface++
+      out[i * 4] = (p.solid && !p.clear) || p.thick ? 255 : p.solid ? 64 : 0
       out[i * 4 + 1] = kind * LIQUID_STEP + flowScratch[i] * FLOW_STEP
       out[i * 4 + 2] = surface * SURFACE_STEP
       out[i * 4 + 3] = world.burn[i] > 0 || world.charge[i] > 0 ? 255 : 0

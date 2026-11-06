@@ -12,6 +12,7 @@ export const TUNING = {
     chargeRate: 30,
     exciteAtCore: 2,
     flowReach: 8,
+    slide: { water: 5, acid: 4, oil: 3, lava: 1 },
     quench: 1.2,
     melt: 1.5,
     smokeLife: [5, 8],

@@ -110,6 +110,7 @@ const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE
 const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.FLOE, M.RIME, M.SCRAP, M.SNOW]
 const THROWN = new Set([M.SAND, M.SCRAP, M.FLOE, M.SNOW, M.MUD])
 const ICY = new Set([M.ICE, M.FLOE, M.RIME])
+const SLIDE = { [M.WATER]: T.slide.water, [M.ACID]: T.slide.acid, [M.OIL]: T.slide.oil, [M.LAVA]: T.slide.lava }
 const WET = new Set([M.WATER, M.MUD])
 const N8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]
 
@@ -270,7 +271,15 @@ const flow = (w, x, y) => {
   const stacked = matAt(w, x - gx, y - gy) === w.mat[i]
   const spread = stacked ? dirs.find(d => openFrom(w, i, x + d * gy, y + d * gx)) : undefined
   const d = towardDrop ?? spread
-  if (d !== undefined) swap(w, i, idx(x + d * gy, y + d * gx))
+  if (d === undefined) return
+  const sideways = k => [x + k * d * gy, y + k * d * gx]
+  const fallsAt = k => {
+    const [sx, sy] = sideways(k)
+    return openFrom(w, i, sx + gx, sy + gy)
+  }
+  let k = 1
+  while (k < (SLIDE[w.mat[i]] ?? 1) && openFrom(w, i, ...sideways(k + 1)) && !fallsAt(k)) k++
+  swap(w, i, idx(...sideways(k)))
 }
 
 const rise = (w, x, y) => {
