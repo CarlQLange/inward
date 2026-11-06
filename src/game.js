@@ -2179,7 +2179,7 @@ export const step = (g, input, realDt) => {
     return
   }
   g.wasMap = input.map
-  if (g.pendingOffers > 0 && levelBurstDone(g)) {
+  if (g.pendingOffers > 0 && levelBurstDone(g) && !g.sealHold) {
     g.pendingOffers -= 1
     openOffer(g)
     return
