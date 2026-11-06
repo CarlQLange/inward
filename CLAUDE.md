@@ -142,6 +142,11 @@ effects must spread across blocks visibly and be readable without text.
   or relic wait until about the eighth room. Planted foes and events can still turn up early.
 - He couldn't see what GUT SACK did for him. A killed foe now bursts, throwing its material at the nearest foe
   and scattering the rest, so a kill can cause another as a world kill.
+- Salamander's "fire heals you" was too easy. Standing in fire or lava now eats it while you're hurt: fuel turns to
+  ash, oil vanishes, lava cools to rock, and five cells make a heart. At full health it leaves fire alone.
+- Yank made the grapple useless and spoiled later forms like Sling, because hooking any breakable block tore it out
+  instead of pulling you. The hook now pulls or swings as normal, and pressing again soon after (or just after
+  letting go of a swing) tears out the hooked block. A tap skill can open a short second-press window this way.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
   ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
   match the body and feet, and a smaller contact box keeps touching them forgiving.

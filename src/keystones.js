@@ -21,7 +21,7 @@ export const KEYSTONES = [
   keystone('fourth', 'FOURTH HAND', 'A FOURTH SKILL SLOT', 'LOSE THREE HEARTS', '#f4f8f2', [
     '####.####', '####.####', '####.####', '####.####', '.........', '####.####', '####.####', '####.####', '####.####',
   ], { hearts: 3 }),
-  keystone('salamander', 'SALAMANDER', 'FIRE AND LAVA HEAL YOU', 'WATER HURTS YOU', '#ff9a2e', [
+  keystone('salamander', 'SALAMANDER', 'STAND IN FIRE OR LAVA TO EAT THEM AND HEAL', 'WATER HURTS YOU', '#ff9a2e', [
     '....#....', '...##....', '..###.#..', '..#####..', '.#######.', '.###.###.', '.##...##.', '.###.###.', '..#####..',
   ]),
   keystone('glutton', 'GLUTTON', 'ANY MATERIAL NEAR YOU RECHARGES SKILLS', 'SKILLS RECHARGE ONLY NEAR MATERIAL', '#8ae04a', [
@@ -129,14 +129,26 @@ const feetCells = p => {
   return NEARBY.map(([dx, dy]) => [x + dx, y + dy])
 }
 
+const swallow = (w, x, y) => {
+  const m = matAt(w, x, y)
+  if (m === M.LAVA) setCell(w, x, y, M.ROCK)
+  else setCell(w, x, y, props(m).liquid ? M.EMPTY : M.ASH, props(m).liquid ? 0 : TUNING.world.ashLife)
+}
+
 const stepSalamander = (g, p, dt) => {
-  const cells = cellsUnder(p, 1)
-  const warm = cells.some(([x, y]) => burningAt(g.world, x, y) || lavaAt(g.world, x, y))
-  p.mendClock = warm ? (p.mendClock ?? 0) + dt : 0
-  if (p.mendClock >= K().salamanderMend && p.hp < heartCap(p)) {
+  const warm = p.hp < heartCap(p) ? cellsUnder(p, 1).filter(([x, y]) => burningAt(g.world, x, y) || lavaAt(g.world, x, y)) : []
+  p.mendClock = warm.length ? (p.mendClock ?? 0) + dt : 0
+  if (warm.length && p.mendClock >= K().salamanderBite) {
     p.mendClock = 0
-    p.hp += 1
-    g.popups.push({ x: centre(p).x, y: p.y - 11, icon: 'HEAL', colour: 'heal', life: 1.2 })
+    const [x, y] = warm[0]
+    swallow(g.world, x, y)
+    spark(g, (x + 0.5) * 8, (y + 0.5) * 8, 0, -40, '#ff9a2e')
+    p.swallowed = (p.swallowed ?? 0) + 1
+    if (p.swallowed >= K().salamanderMeal) {
+      p.swallowed = 0
+      p.hp += 1
+      g.popups.push({ x: centre(p).x, y: p.y - 11, icon: 'HEAL', colour: 'heal', life: 1.2 })
+    }
   }
   if (cellsUnder(p).some(([x, y]) => matAt(g.world, x, y) === M.WATER)) hurt(g, p, 1, 'world', 'WATER')
 }

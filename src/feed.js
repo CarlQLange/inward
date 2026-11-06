@@ -290,8 +290,18 @@ const startFlow = (g, p, skill, whole, cast) => {
   skill.flowing = true
 }
 
+const encore = (g, p, skill, pressed, dt, cast) => {
+  if (!(skill.encore > 0)) return false
+  skill.encore -= dt
+  if (!pressed) return false
+  skill.encore = 0
+  cast(g, p, skill)
+  return true
+}
+
 const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast }, holding) => {
   const stream = streamOf(p, skill.kind)
+  if (!skill.flowing && encore(g, p, skill, pressed && !stunned, dt, cast)) return
   skill.ready = Math.max(0, skill.ready - dt * (skill.meal?.amount ?? 0))
   if (skill.flowing) {
     if (holding && !stunned && skill.ready < whole && stream.run(g, p, dt, skill)) skill.ready += (dt * whole) / hand.time
@@ -308,6 +318,7 @@ const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast }, holding)
 const HANDS = {
   tap: ({ g, p, skill, whole, pressed, stunned, dt, cast, boost }) => {
     skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    if (encore(g, p, skill, pressed && !stunned, dt, cast)) return
     if (pressed && !stunned && skill.ready <= 0) fire(g, p, skill, whole, cast)
   },
   stock: ({ g, p, skill, hand, whole, pressed, stunned, dt, cast, boost }) => {

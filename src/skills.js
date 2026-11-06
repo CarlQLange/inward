@@ -58,7 +58,7 @@ export const FORKS = {
     [form('blink.lance', 'LANCE', 'HURTS FOES ALONG THE PATH', CHARGE), form('blink.ghost', 'GHOST', 'LEAVES A DECOY', MAGNET)],
   ],
   grapple: [
-    [form('grapple.yank', 'YANK', 'TEARS OUT BLOCKS', STONE), form('grapple.piton', 'PITON', 'LEAVES A VINE ALONG THE LINE', ACID)],
+    [form('grapple.yank', 'YANK', 'PRESS AGAIN TO TEAR OUT THE HOOKED BLOCK', STONE), form('grapple.piton', 'PITON', 'LEAVES A VINE ALONG THE LINE', ACID)],
     [form('grapple.sling', 'SLING', 'HOLD TO SWING, RELEASE TO LET GO', WHITE), form('grapple.catch', 'CATCH', 'GRABS A FOE. PRESS AGAIN TO THROW', BLOOD)],
   ],
   dash: [
@@ -874,11 +874,34 @@ const hangVine = (g, from, to) => lineCells(from, to, (x, y) => {
   if (inPlay(x, y) && matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.VINE, 0)
 })
 
+const offerYank = (g, p, life) => {
+  const own = p.skills.find(s => s.kind === 'grapple')
+  if (own) own.encore = life - 0.05
+}
+
+const tearOut = (g, p, yank) => {
+  yank.life = 0
+  yank.done = true
+  for (const rope of g.effects.filter(f => f.kind === 'rope' && !f.done)) letGo(g, p)
+  if (!BREAKS.has(matAt(g.world, yank.x, yank.y))) return
+  const m = matAt(g.world, yank.x, yank.y)
+  if (!shatterFrom(g, yank.x, yank.y)) setCell(g.world, yank.x, yank.y, M.EMPTY)
+  const c = centre(p)
+  const d = Math.max(1, distance(c, yank.at))
+  if (m === M.SCRAP || m === M.ROCK) g.flung.push(flungFrom(p, { x: yank.at.x - 4, y: yank.at.y - 4, vx: ((c.x - yank.at.x) / d) * S.grapple.yankThrow, vy: ((c.y - yank.at.y) / d) * S.grapple.yankThrow - 30 }))
+  g.shake = Math.max(g.shake, 3)
+}
+
 const grapple = (g, p) => {
   const from = muzzle(p)
   const caught = g.effects.find(f => f.kind === 'caught' && !f.done)
   if (caught) {
     throwCaught(g, p, caught)
+    return
+  }
+  const yank = g.effects.find(f => f.kind === 'yank' && !f.done)
+  if (yank) {
+    tearOut(g, p, yank)
     return
   }
   const hit = ray(g, from, p.aim, S.grapple.reach)
@@ -892,9 +915,8 @@ const grapple = (g, p) => {
   const y = cell(hit.y)
   if (owns(p, 'grapple.piton')) hangVine(g, from, hit.last)
   if (owns(p, 'grapple.yank') && BREAKS.has(hit.m)) {
-    if (!shatterFrom(g, x, y)) setCell(g.world, x, y, M.EMPTY)
-    if (hit.m === M.SCRAP || hit.m === M.ROCK) g.flung.push(flungFrom(p, { x: hit.last.x - 4 - p.aim.x * 6, y: hit.last.y - 4 - p.aim.y * 6, vx: -p.aim.x * 200, vy: -p.aim.y * 200 - 30 }))
-    return
+    addEffect(g, { kind: 'yank', x, y, at: { x: hit.last.x, y: hit.last.y }, life: owns(p, 'grapple.sling') ? 999 : S.grapple.yankWindow })
+    offerYank(g, p, owns(p, 'grapple.sling') ? 999 : S.grapple.yankWindow)
   }
   if (owns(p, 'grapple.sling')) {
     addEffect(g, { kind: 'rope', x: hit.last.x, y: hit.last.y, length: Math.max(BLOCK * 2, distance(hit.last, centre(p))), life: 999 })
@@ -2244,6 +2266,10 @@ const letGo = (g, p) => {
   rope.life = 0
   rope.done = true
   p.drift = Math.max(p.drift, S.grapple.slingDrift)
+  const yank = g.effects.find(f => f.kind === 'yank' && !f.done)
+  if (!yank) return
+  yank.life = S.grapple.yankWindow
+  offerYank(g, p, S.grapple.yankWindow)
 }
 
 const glideOn = g => held(g, 'glide') !== undefined
