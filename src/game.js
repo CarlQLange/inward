@@ -11,7 +11,7 @@ import { applyCrush, applyHazards, burst, hurt } from './combat.js'
 import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, puppeted, seatEnemy, settleFooting, steerPuppet } from './enemies.js'
 import { swim } from './earth.js'
-import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, spillMatter, spillNapalm, stepDash, torchNear } from './skills.js'
+import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, burstGuts, spillNapalm, stepDash, torchNear } from './skills.js'
 import { feedColour, feedEvent, stepFeeds, stepHand } from './feed.js'
 import { composeOffer } from './offers.js'
 import { dust } from './feel.js'
@@ -105,10 +105,15 @@ const resolveLinks = (g, links, depth) =>
 
 const EVENTS = ['arena', 'flood', 'gasworks', 'collapse', 'vault', 'nest', 'altar', 'chest', 'chest']
 
+const REWARDS = new Set(['arena', 'vault', 'altar', 'chest'])
+
 const rollEvent = g => {
   if (Math.random() > R.eventChance) return null
   const open = EVENTS.filter(id => isKnown(g, 'event', id))
-  return open[Math.floor(Math.random() * open.length)] ?? null
+  const pick = list => list[Math.floor(Math.random() * list.length)] ?? null
+  const rolled = pick(open)
+  if (!REWARDS.has(rolled) || Math.random() < R.rewardKeep) return rolled
+  return pick(open.filter(id => !REWARDS.has(id)))
 }
 
 const BAND_OF_RING = [0, 0, 1, 1, 2, 2, 3]
@@ -169,8 +174,11 @@ const PLANTERS = {
   inhabitant: (special, id) => { special.inhabitant = id },
 }
 
+const REWARD_PLANTS = new Set(['skill', 'relic'])
+
 const plantDue = (g, ring) => g.plants.find(plant =>
-  !plant.done && PLANTERS[plant.kind] && (plant.order === 0 ? g.roomsSeen >= R.plantAfterRooms : ring >= R.plantAtRing))
+  !plant.done && PLANTERS[plant.kind] && g.roomsSeen >= (REWARD_PLANTS.has(plant.kind) ? R.plantRewardAfter : R.plantAfterRooms) &&
+  (plant.order === 0 || ring >= R.plantAtRing))
 
 const withPlant = (g, ring, special) => {
   const plant = plantDue(g, ring)
@@ -986,7 +994,7 @@ const onKill = (g, e) => {
   keystoneKill(g, e, p)
   deepKill(g, e)
   feedOnKill(g, e, c, environmental)
-  if (hasRelic(p, 'sack')) spillMatter(g, e, 3)
+  if (hasRelic(p, 'sack')) burstGuts(g, e)
   if (owns(p, 'repel.salvage')) salvage(g, e)
   const gained = environmental ? R.worldChain : 1
   const before = g.chainTime > 0 ? g.chain : 0

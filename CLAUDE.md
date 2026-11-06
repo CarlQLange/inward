@@ -137,6 +137,11 @@ effects must spread across blocks visibly and be readable without text.
   A level-up is a full heal. Gaining a skill or form slows time for a beat with a burst in its colour, and the
   next unvisited room is built around it (`src/showcase.js`): the materials and pockets it acts on, a layout that
   suits a movement skill, or extra foes for a control skill.
+  In his first runs at that pace he still got five powers in seven outer-ring rooms, mostly relics. Chest, vault,
+  altar and arena rooms now keep their reward only about a third of the time, and planted secrets that are a skill
+  or relic wait until about the eighth room. Planted foes and events can still turn up early.
+- He couldn't see what GUT SACK did for him. A killed foe now bursts, throwing its material at the nearest foe
+  and scattering the rest, so a kill can cause another as a world kill.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
   ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
   match the body and feet, and a smaller contact box keeps touching them forgiving.

@@ -1290,6 +1290,25 @@ export const spillMatter = (g, e, count = 4) => {
   })
 }
 
+export const burstGuts = (g, e) => {
+  const from = centre(e)
+  const mat = MATTER[e.kind] ?? M.ASH
+  const near = hostile(g)
+    .filter(o => o !== e && o.hp > 0 && !o.intangible)
+    .map(o => ({ o, at: centre(o) }))
+    .filter(({ at }) => Math.hypot(at.x - from.x, at.y - from.y) < S.sack.reach)
+    .sort((a, b) => Math.hypot(a.at.x - from.x, a.at.y - from.y) - Math.hypot(b.at.x - from.x, b.at.y - from.y))
+  const G = TUNING.flung.gravity
+  for (let n = 0; n < S.sack.chunks; n++) {
+    const target = n < S.sack.aimed ? near[n]?.at : null
+    const t = S.sack.flight
+    const aim = target
+      ? { vx: (target.x - from.x) / t, vy: (target.y - from.y) / t - 0.5 * G * t }
+      : { vx: (Math.random() - 0.5) * 240, vy: -120 - Math.random() * 80 }
+    g.flung.push({ x: from.x - 4, y: from.y - 4, w: 8, h: 8, ...aim, age: 0, mat, safe: true, thrower: e, by: 'sack', cause: 'CRUSHED', damage: S.sack.damage })
+  }
+}
+
 const renderFoes = (g, p, covered) => {
   for (const e of hostile(g)) {
     if (e.heavy || !covered(centre(e))) continue

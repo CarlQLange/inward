@@ -6,7 +6,7 @@ export const RELICS = [
   relic('springs', 'COILED SPRINGS', 'DOUBLE JUMP', 'springs'),
   relic('claws', 'CLIMBING CLAWS', 'CLING TO WALLS', 'claws'),
   relic('feather', 'FEATHER', 'HOLD JUMP: FALL SLOWLY', 'feather'),
-  relic('sack', 'GUT SACK', 'KILLED FOES SPILL THEIR MATERIAL', 'sack'),
+  relic('sack', 'GUT SACK', 'KILLED FOES BURST AT FOES NEARBY', 'sack'),
   relic('plate', 'REACTIVE PLATE', 'GETTING HIT SETS OFF A BLAST', 'plate'),
   relic('phoenix', 'PHOENIX', 'RETURN FROM DEATH ONCE', 'phoenix'),
   relic('incendiary', 'FIRE ROUNDS', 'SHOTS LIGHT FIRES', 'incendiary'),

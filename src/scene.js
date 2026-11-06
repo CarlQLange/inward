@@ -432,9 +432,33 @@ const drawShard = (ctx, f) => {
   ctx.fillRect(x + 1 + tilt, y + 1, 1, 1)
 }
 
+const BLOBS = {
+  [M.WATER]: ['#2f8ea0', '#7fe0ee', '#e8fbff'],
+  [M.LAVA]: ['#d8461a', '#ff9a2e', '#ffe680'],
+  [M.OIL]: ['#26122e', '#4a2a58', '#a888b8'],
+  [M.ACID]: ['#3f9a1c', '#7be03a', '#e0ff9a'],
+  [M.METHANE]: ['#6a3c8c', '#b07ce0', '#e6ccff'],
+  [M.ASH]: ['#4a4a46', '#7c7c76', '#b0b0a8'],
+}
+
+const drawBlob = (ctx, f, [edge, body, glint]) => {
+  const x = Math.round(f.x) + 1
+  const y = Math.round(f.y) + 1
+  const back = Math.sign(f.vx)
+  ctx.fillStyle = edge
+  ctx.fillRect(x + 1, y, 4, 6)
+  ctx.fillRect(x, y + 1, 6, 4)
+  ctx.fillRect(x + 2 - back * 3, y + 2 - Math.sign(f.vy) * 3, 2, 2)
+  ctx.fillStyle = body
+  ctx.fillRect(x + 1, y + 1, 4, 4)
+  ctx.fillStyle = glint
+  ctx.fillRect(x + 2, y + 1, 1, 1)
+}
+
 const drawFlung = (ctx, flung) => {
   for (const f of flung) {
     if (f.shard) drawShard(ctx, f)
+    else if (BLOBS[f.mat]) drawBlob(ctx, f, BLOBS[f.mat])
     else ctx.drawImage((SPRITES.tiles[FLUNG_TILE[f.mat]] ?? SPRITES.tiles.scrap)[0], Math.round(f.x), Math.round(f.y))
   }
 }

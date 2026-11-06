@@ -87,6 +87,7 @@ export const TUNING = {
     mudDrag: 0.65,
   },
   skills: {
+    sack: { chunks: 3, aimed: 1, reach: 120, flight: 0.45, damage: 1 },
     bolt: { every: 1.8, energy: 44, fenceLife: 6, fenceEvery: 0.45, fenceDamage: 1, fenceStun: 0.7, fenceMost: 150, globeSpeed: 34, globeLife: 5.5, globeEvery: 0.4, globeReach: 56, nailLife: 5, nailEvery: 0.9, nailWarn: 0.3, nailDamage: 2, leydenTime: 2.4, leydenMost: 4, leydenReach: 120, forms: { 'bolt.globe': 3.2, 'bolt.nail': 2.8, 'bolt.leyden': 2.2 } },
     repel: { every: 1.1, currentEnergy: 30, currentStun: 1.2, reach: 56, width: 10, recoilReach: 26, fling: 240, recoil: 300, shove: 220, shoveTime: 0.45, gather: 90, orbitMost: 7, orbitRadius: 15, orbitEvery: 0.08, lodeReach: 130, lodePull: 300, salvageCells: 2 },
     ember: { every: 1.5, speed: 150, lift: 70, wispSpeed: 54, wispLife: 6, wispSeek: 90, torchTime: 6, torchEvery: 1.2, jetEvery: 0.07, jetTime: 1.6, jetSpeed: 200, jetLift: 20, jetWispEvery: 9, jetNapalmEvery: 5, forms: { 'ember.jet': 4 } },
@@ -212,6 +213,8 @@ export const TUNING = {
     bombMercy: 0.3,
     mercyEvery: 4,
     eventChance: 0.3,
+    rewardKeep: 0.3,
+    plantRewardAfter: 8,
     coinReach: 40,
     coinSettle: 0.5,
     crownHit: 5,
