@@ -113,6 +113,10 @@ effects must spread across blocks visibly and be readable without text.
 - After playing the release pass he called the look and feel great and asked for more skills and more emergence,
   with slightly slower play to balance having more things happen at once. He left how to the game director.
   He then asked for an elegance pass that takes things out, again left to the director's judgement.
+- Rooms that shut you in must be obvious, arena rooms especially, and breaking a seal with a skill must let you out.
+  Sealed doorways show red bars and each foe left carries a red marker, both in the scarf's exact reds so they survive
+  the four-shade look. Break or blink through an arena's seal and you can leave, giving up its chest; it seals again
+  if you come back while foes are left. Warden and Core seals are bedrock, so nothing breaks them.
 - He hates the gun knocking the hero back: it makes the game very hard to play on a phone. Firing never moves the
   hero, the Scatter Gun included. The small screen jolt on each shot stays.
 - On-screen text says literally what happens, in plain flat words: name the concrete thing and state the cost

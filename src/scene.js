@@ -8,6 +8,7 @@ import { drawCreatures } from './creatures.js'
 import { drawSkillMatter } from './skillart.js'
 import { standingFixtures } from './light.js'
 import { airOf } from './backdrop.js'
+import { SCARF_DEEP, SCARF_RED } from './hero.js'
 
 const GREEN = '#76d648'
 const WHITE = '#f4f8f2'
@@ -436,6 +437,34 @@ const drawDoorPulse = (ctx, doors, amount, time) => {
   }
 }
 
+const SEAL = [SCARF_DEEP, SCARF_RED].map(([r, g, b]) => `rgb(${r}, ${g}, ${b})`)
+
+const drawSeals = (ctx, world, cells, time) => {
+  const bright = Math.floor(time * 4) % 2 === 0
+  for (const [x, y] of cells) {
+    if (!props(matAt(world, x, y)).solid) continue
+    const [px, py] = [x * BLOCK, y * BLOCK]
+    ctx.fillStyle = '#1a0808'
+    ctx.fillRect(px, py, BLOCK, BLOCK)
+    ctx.fillStyle = SEAL[bright ? 1 : 0]
+    for (const bar of [1, 5]) ctx.fillRect(px + bar, py, 2, BLOCK)
+    ctx.fillStyle = SEAL[1]
+    ctx.fillRect(px, py + 3, BLOCK, 1)
+  }
+}
+
+const drawMarks = (ctx, enemies, time) => {
+  ctx.fillStyle = SEAL[1]
+  for (const e of enemies) {
+    if (e.friendly || e.ally || e.prop) continue
+    const x = Math.round(e.x + e.w / 2)
+    const y = Math.round(e.y) - 6 - (Math.floor(time * 3) % 2)
+    ctx.fillRect(x - 2, y, 5, 1)
+    ctx.fillRect(x - 1, y + 1, 3, 1)
+    ctx.fillRect(x, y + 2, 1, 1)
+  }
+}
+
 export const drawActors = (ctx, g, room, live) => {
   const { world } = room
   const time = g.time
@@ -450,5 +479,7 @@ export const drawActors = (ctx, g, room, live) => {
   }
   drawCreatures(ctx, g, room.enemies)
   drawOverlays(ctx, world, time)
+  if (live && room.sealed && room.sealCells) drawSeals(ctx, world, room.sealCells, g.fxClock)
+  if (live && room.sealed && room.event === 'arena') drawMarks(ctx, room.enemies, g.fxClock)
   if (live) drawDoorPulse(ctx, room.doors, g.doorPulse, g.fxClock)
 }

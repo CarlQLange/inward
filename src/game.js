@@ -403,7 +403,7 @@ const RUN_FIELDS = [
 const packRoom = room => ({
   x: room.x, y: room.y, ring: room.ring, doors: room.doors, visited: room.visited,
   theme: room.theme, event: room.event, sealed: room.sealed, cleared: room.cleared, safetyNet: room.safetyNet, healed: room.healed, layout: room.layout,
-  arena: room.arena, hadFoes: room.hadFoes, hurtHere: room.hurtHere, sealsOpen: room.sealsOpen,
+  arena: room.arena, sealCells: room.sealCells, hadFoes: room.hadFoes, hurtHere: room.hurtHere, sealsOpen: room.sealsOpen,
   enemies: room.enemies, cards: room.cards, wares: room.wares, pickups: room.pickups,
   drains: room.world.drains, world: encodeWorld(room.world),
 })
@@ -1418,13 +1418,17 @@ const throwBomb = (g, p, input) => {
   })
 }
 
+const doorCells = (dir, door) => {
+  const [x, y] = doorCell(dir, door)
+  return dir === 'left' || dir === 'right' ? [[x, y], [x, y + 1]] : [[x, y], [x + 1, y]]
+}
+
 const sealRoom = (g, room) => {
   room.sealed = true
-  for (const [dir, door] of Object.entries(room.doors)) {
-    const [x, y] = doorCell(dir, door)
+  room.sealCells = Object.entries(room.doors).flatMap(([dir, door]) => doorCells(dir, door))
+  for (const [x, y] of room.sealCells) {
     setCell(g.world, x, y, M.BRICK)
-    if (dir === 'left' || dir === 'right') setCell(g.world, x, y + 1, M.BRICK)
-    else setCell(g.world, x + 1, y, M.BRICK)
+    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, 'blood', 5)
   }
   g.shake = Math.max(g.shake, 6)
 }
@@ -1432,12 +1436,8 @@ const sealRoom = (g, room) => {
 const unsealRoom = (g, room) => {
   room.sealed = false
   room.cleared = true
-  for (const [dir, door] of Object.entries(room.doors)) {
-    const [x, y] = doorCell(dir, door)
-    setCell(g.world, x, y, M.EMPTY)
-    if (dir === 'left' || dir === 'right') setCell(g.world, x, y + 1, M.EMPTY)
-    else setCell(g.world, x + 1, y, M.EMPTY)
-  }
+  for (const [x, y] of room.sealCells ?? []) setCell(g.world, x, y, M.EMPTY)
+  g.doorPulse = 1.8
   const c = centre(g.player)
   g.cards.push({ kind: 'chest', x: c.x - 6, y: c.y - 16, w: 12, h: 12, relic: nextRelic(g) })
   g.pulse = 1
@@ -1445,6 +1445,7 @@ const unsealRoom = (g, room) => {
 
 const sealArena = (g, room) => {
   room.sealed = true
+  room.sealCells = room.arena.seals
   for (const [x, y] of room.arena.seals) setCell(g.world, x, y, M.BEDROCK)
   g.shake = Math.max(g.shake, 8)
 }
@@ -1564,12 +1565,16 @@ const stepMercy = (g, p, dt) => {
 
 const useDoors = (g, p) => {
   const room = g.rooms[keyOf(g.x, g.y)]
-  if (room.sealed) return
+  if (room.sealed && room.arena) return
   const open = dir => room.doors[dir] && (room.links[dir]?.lock !== 'seal' || g.seals >= R.wardenRings.length)
-  if (open('right') && p.x + p.w >= WORLD_PX - 0.5) walkThrough(g, 'right')
-  else if (open('left') && p.x <= 0.5) walkThrough(g, 'left')
-  else if (open('down') && p.y + p.h >= WORLD_PX - 0.5) walkThrough(g, 'down')
-  else if (open('up') && p.y <= 0.5) walkThrough(g, 'up')
+  const leave = dir => {
+    if (room.sealed) Object.assign(room, { sealed: false, sealedFor: 0 })
+    walkThrough(g, dir)
+  }
+  if (open('right') && p.x + p.w >= WORLD_PX - 0.5) leave('right')
+  else if (open('left') && p.x <= 0.5) leave('left')
+  else if (open('down') && p.y + p.h >= WORLD_PX - 0.5) leave('down')
+  else if (open('up') && p.y <= 0.5) leave('up')
 }
 
 const seatPlayer = (world, p, wish, dt) => {
