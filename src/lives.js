@@ -110,16 +110,16 @@ const onTick = g => {
   const state = { at: g.time, world: g.world, shotReady: p.shotReady, lights: glowOf(g) }
   ticks.set(g, state)
   if (fired) makeNoise(g, centre(p).x, centre(p).y, L().hear, true)
-  const dt = seen && seen.world === g.world ? Math.max(0, g.time - seen.at) : 0
-  const bodies = remainsOf(g)
-  for (const r of bodies) r.age += dt
-  remainsByWorld.set(g.world, bodies.filter(r => r.age < L().remains.life && r.meat > 0))
   return state
 }
 
 export const lightsOf = g => onTick(g).lights
 
-export const remainsOf = g => listOf(remainsByWorld, g.world)
+export const remainsOf = g => {
+  const fresh = listOf(remainsByWorld, g.world).filter(r => g.time - r.at < L().remains.life && r.meat > 0)
+  remainsByWorld.set(g.world, fresh)
+  return fresh
+}
 
 const settle = (world, x, y, h) => {
   let bottom = y + h
@@ -148,7 +148,7 @@ export const leaveRemains = (g, e) => {
   const bodies = remainsOf(g)
   const c = centre(e)
   const h = Math.max(4, Math.round(e.h * 0.5))
-  bodies.push({ kind: e.kind, x: c.x - e.w / 2, y: settle(g.world, c.x, e.y + e.h - h, h), w: e.w, h, facing: e.facing, meat: R.meat, age: 0 })
+  bodies.push({ kind: e.kind, x: c.x - e.w / 2, y: settle(g.world, c.x, e.y + e.h - h, h), w: e.w, h, facing: e.facing, meat: R.meat, at: g.time })
   if (bodies.length > R.most) bodies.shift()
   makeNoise(g, c.x, c.y, L().deathHeard)
 }
@@ -159,6 +159,7 @@ export const bite = (g, by, victim, amount, cause = 'BITTEN') => {
   victim.lastBy = by.kind
   victim.grudge = L().grudge
   quarries.set(victim, by)
+  if (!FIGHTERS.has(victim.kind) && !by.riding && !rooted(victim)) scare(victim, centre(by), L().fearFor)
   by.eating = 0.35
   const c = centre(victim)
   burstSparks(g, c.x, c.y, BLOOD, 4, 50)
@@ -208,6 +209,7 @@ export const cellNear = (g, e, reach, test) => {
 
 export const exposed = (g, x, y) => [[0, -1], [1, 0], [-1, 0], [0, 1]].some(([dx, dy]) => !props(matAt(g.world, x + dx, y + dy)).solid)
 
+const FIGHTERS = new Set(['spitter', 'stilt', 'scrapper', 'turret', 'tick', 'crab', 'mimic', 'urchin', 'snapweed', 'worm'])
 const SWIMMERS = new Set(['fish', 'jelly', 'puffer', 'lantern'])
 const ROOTED = new Set(['turret', 'nest', 'snapweed', 'dripper', 'mimic', 'worm', 'spitter'])
 const FIRE_BOLD = new Set(['imp', 'bomber'])

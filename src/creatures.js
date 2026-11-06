@@ -267,7 +267,7 @@ const drawRemains = (ctx, g) => {
     const h = Math.max(2, Math.round(art.height * (0.35 + 0.35 * (r.meat / R.meat))))
     const x = Math.round(r.x + r.w / 2 - art.width / 2)
     const bottom = Math.round(r.y + r.h)
-    ctx.globalAlpha = Math.min(1, (R.life - r.age) / 4)
+    ctx.globalAlpha = Math.min(1, (R.life - (g.time - r.at)) / 4)
     ctx.save()
     ctx.translate(0, bottom * 2 - h)
     ctx.scale(1, -1)

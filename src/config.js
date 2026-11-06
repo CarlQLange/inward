@@ -394,6 +394,7 @@ export const TUNING = {
       gasbagLeak: 2.6,
       hostBite: 6,
       hostReach: 70,
+      riding: 0.5,
       moth: 140,
       glows: 14,
       mothOrbit: [0, 10],

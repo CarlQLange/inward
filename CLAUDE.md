@@ -26,7 +26,7 @@ options, so snapshot localStorage in sessionStorage first and restore it afterwa
 random soak can reach the option that forgets everything. Screenshots can lag, so wait
 half a second first. The page opens on the title screen, and `game.restart()` skips it.
 
-`node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes, and on a second line how often each newer world rule fires per minute and the sand, mud, snow and glass a room starts with. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
+`node scripts/chains.mjs` reports, per region, how often fire, charge, falling matter and acid are active, what's hung in the rooms and what kills foes, and on a second line how often each newer world rule fires per minute and the sand, mud, snow and glass a room starts with. `node scripts/footing.mjs` reports how often creatures stand over empty air. `node scripts/lives.mjs` plays rooms per region, half with the hero standing by the door, and reports how foes spend their time, who kills them, what they do to the world and how often they hit the hero. `node scripts/soak.mjs` plays many headless runs with a bot and reports errors, softlocks,
 rooms and time per run, deaths per ring, kills by source, secrets met and tick cost. Its header
 lists the flags, such as `--god`, `--found rand`, `--career`, `--warden bellows --gun` and, to reach and pass the
 Core, `--god --express --deeper --loops 2`. The bot walks badly, so read its time-per-run numbers as an upper bound
@@ -242,7 +242,29 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Foes: crawler, spitter, fish, bat, spore (leaves gas), slug (leaves oil), jelly
   (electrifies water), worm (digs), turret, bomber, imp
   (freezes water), ember bat (lights things), slime (leaves acid), shield crab, nest, mimic,
-  gasbag. Foes can be charmed and then fight each other.
+  gasbag, tick, pillbug, gnat, stilt, snapweed, scrapper, dripper, shade, urchin, coil, puffer and lantern.
+  Foes can be charmed and then fight each other.
+- Every foe has a life of its own. `src/lives.js` holds what they share (senses, fear, fire, noise, light, remains, bites) and `enemies.js` holds each
+  kind's habit beside its attack. A foe minds its own business until it sees the hero, hears the gun or is hit; then it
+  flickers red, hops and turns on you, and loses interest a few seconds after losing you. Rooms are busy when you arrive.
+- Shared reactions: anything not fireproof shies from fire, lava, charge, acid, falling blocks and blasts. A creature that
+  catches fire runs in a panic with flames on it, lights what it passes and sets alight whatever it touches, until water,
+  mud or snow puts it out or it dies. Gunfire, blasts, bites and deaths are noises. The dead lie belly-up for half a minute
+  and scavengers eat them. A bitten creature flees its attacker, or turns on it if it has a way to fight.
+- Habits: crawlers, crabs and pillbugs eat the dead; pillbugs also eat ash, and curl into a ball that bowls others over when
+  scared. Slugs graze moss and vine. Slimes sit by gates and scrap and dribble acid on them, so a slime can open a gate.
+  Spitters lob at anything that walks into their patch, stilts lob at small walkers, turrets fire at whatever crosses their
+  line, snapweeds lunge at anything below, crabs pinch walkers they bump into, urchin spines hurt whatever touches them, and
+  mimics stay shut but bite anything that walks into them. Ticks jump onto a passing host and ride it, feeding, then leap
+  at the hero. Bats sleep upside down on the ceiling until a noise or fire wakes them, then hunt gnats, ticks and spores.
+  Gnats circle the nearest light and fly into fires. Ember bats sit by fire, lava or lamps and light fuel when cold. Imps
+  run to fires and stamp them out, and freeze pools. Spores settle on fuel, turn rock beside them to moss and leak gas;
+  gasbags rise to the ceiling and leak there. Worms lie still until something walks or a noise sounds nearby, then dig
+  toward it and bite what they reach. Bombers walk toward noises and lights and light their fuse in fire, charge or when
+  hurt. Coils hop from metal to metal charging it. Scrappers carry scrap to a hoard and throw it at anything near the hoard.
+  Shades flee light and won't follow you into it. Drippers drip on whatever passes under. Nests breed when noise or harm
+  disturbs them. Fish school and swim to a lantern's lure, which the lantern eats; jellies pulse when a swimmer comes
+  close; puffers swell at anything near. Wardens and the Core don't have lives. Kills by creatures count as world kills.
 - Inhabitants who can be killed: hermit (upgrade), miner (new skill), mole (shop).
 - Score with chains. Kills by the world score double and give triple experience.
 - In the core room rock burns and conducts, and the core drifts toward you.

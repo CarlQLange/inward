@@ -449,8 +449,18 @@ const roost = (g, e, dt) => {
   if (e.vy === 0) e.upside = true
 }
 
+const perch = (g, e) => {
+  let y = e.y
+  while (y > BLOCK && !solidAt(g.world, centre(e).x, y - 1)) y -= 1
+  if (hitsSolid(g.world, { ...e, y })) return
+  Object.assign(e, { y, upside: true, vx: 0, vy: 0 })
+}
+
 const batLife = (g, e, dt) => {
-  e.roosting ??= Math.random() < L.roost
+  if (e.roosting === undefined) {
+    e.roosting = Math.random() < L.roost
+    if (e.roosting) perch(g, e)
+  }
   if (e.roosting) {
     roost(g, e, dt)
     return
@@ -942,20 +952,29 @@ const riding = (g, e, dt) => {
   return true
 }
 
+const mount = (g, e, host) => {
+  ride(e, host)
+  Object.assign(e, { riding: true, seat: (Math.random() - 0.5) * host.w * 0.5, suck: L.hostBite })
+  tallyLife(g, 'ride')
+}
+
 const parasite = (g, e, dt) => {
   if (riding(g, e, dt)) return
   const host = grudgeOf(e) ?? nearest(g, e, o => HOSTS.has(o.kind) && !(o.alight > 0) && !g.enemies.some(t => t.riding && hostOf(t) === o), L.hostReach)
+  if (e.settled === undefined) {
+    e.settled = true
+    if (host && Math.random() < L.riding) {
+      mount(g, e, host)
+      return
+    }
+  }
   hunt(e, host)
   if (!host) {
     stand(g, e, dt)
     return
   }
   tick(g, e, dt)
-  if (!e.grounded && overlap(e, host)) {
-    ride(e, host)
-    Object.assign(e, { riding: true, seat: (Math.random() - 0.5) * host.w * 0.5, suck: L.hostBite })
-    tallyLife(g, 'ride')
-  }
+  if (!e.grounded && overlap(e, host)) mount(g, e, host)
 }
 
 const curl = (e, away) => {
