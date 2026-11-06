@@ -131,6 +131,10 @@ effects must spread across blocks visibly and be readable without text.
   "IT" read as machine-written. Name triggers the player can see, never hidden states like cold or fear.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
+- Levelling up and finding new skills was far too quick. He wants at least three times as long between each.
+  A level costs 18 experience per level reached, so a run gets a third as many level-ups at every point, and
+  skill cards, miners and hermits turn up a third as often. A level-up heals six hearts, keeping healing per room
+  where it was.
 - Creatures must look like they're standing on the blocks they're on, with no legs floating over
   ledges and bounding boxes that fit the creature. `scripts/footing.mjs` measures this. Hitboxes
   match the body and feet, and a smaller contact box keeps touching them forgiving.
