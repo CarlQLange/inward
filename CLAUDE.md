@@ -336,6 +336,8 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
 - Each Warden's seal offers one of three keystones, big rule changes with a cost (`src/keystones.js`). A run gets
   three, plus one per descent. They sit in the found set, seven from the start and eight on the ladder. Set
   `sealHold` on the game to make the keystone offer wait, which is the seam for anything played when a seal breaks.
+- Wardens and other heavy foes can only be stunned or frozen for 1.2 s at a time, then ignore new stuns for 2 s.
+  Stuns they cause themselves through their weak points (a stranded eel, a bellows hitting a wall) are exempt.
 - Wardens from ring 3 and the Core wear a ward against whatever has been doing the killing (`src/wards.js`): that
   school does a fraction of its damage, the Warden doesn't flinch, its pictogram sits above it and on the boss bar,
   and shots bounce off. Its own world weak point is never warded. The Core changes its ward at each phase to
@@ -346,6 +348,11 @@ He asked to be surprised, so these were agent choices. Treat them as open to cha
   previews it on the whole picture. Touch needs a tap to preview and another to commit.
 - The run-end screen shows the score against the best, depth, the build, kills by school, and the chase. The title
   shows the top three runs with their keystones. The save keeps the top five.
+
+An audit of every skill, form, relic, keystone and omen (Nov 2026) was fixed except for two items: melt FISSURE
+still follows only the floor and can't reach a lock in a wall, and runs holding FOURTH HAND showed more rooms with no
+reachable exit in one soak, which wasn't confirmed or explained. CHIME VOLLEY with BELL is now very strong against
+Wardens.
 
 Not built: a design pass on archetypes. Balance has only been tested by a bot that doesn't dodge,
 and no person has played a full run. The starting room is always on the top edge.

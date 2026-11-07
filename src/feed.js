@@ -28,11 +28,11 @@ export const TASTES = {
   lava: { name: 'LAVA', colours: ['#ff5a1c', '#ffb24a'], flight: 'blob', cell: made(M.LAVA) },
   scrap: { name: 'SCRAP', colours: ['#c9b48a', '#8a7a5a'], flight: 'tumble', cell: made(M.SCRAP) },
   moss: { name: 'MOSS', colours: ['#8ad05a', '#4f9c3a'], flight: 'leaf', cell: made(M.MOSS) },
-  vine: { name: 'VINES', colours: ['#4f9c3a', '#8ad05a'], flight: 'leaf', cell: made(M.VINE), bite: gone },
-  rubble: { name: 'SAND AND ASH', colours: ['#d8c48a', '#9a9078'], flight: 'hop', cell: made(M.SAND, M.ASH), bite: gone },
+  vine: { name: 'VINES', colours: ['#4f9c3a', '#8ad05a'], flight: 'leaf', cell: made(M.VINE) },
+  rubble: { name: 'SAND AND ASH', colours: ['#d8c48a', '#9a9078'], flight: 'hop', cell: made(M.SAND, M.ASH) },
   steam: { name: 'STEAM', colours: ['#dfe8e4', '#9fb0a8'], flight: 'puff', cell: made(M.STEAM), bite: gone },
   gas: { name: 'SMOKE AND GAS', colours: ['#c79ae0', '#8a8a78'], flight: 'curl', cell: made(M.SMOKE, M.METHANE), bite: gone },
-  acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL), bite: gone },
+  acid: { name: 'ACID AND OIL', colours: ['#8ae04a', '#c8f060'], flight: 'drip', cell: made(M.ACID, M.OIL) },
   falling: { name: 'FALLING BLOCKS', colours: ['#f4f8f2', '#b0a890'], flight: 'shard', cell: (w, i) => w.crushing[i] === 1 },
   glass: { name: 'GLASS', colours: ['#d6f6f0', '#ffffff'], flight: 'shard', cell: made(M.GLASS) },
   mud: { name: 'MUD', colours: ['#8e7c60', '#b8a684'], flight: 'drip', cell: made(M.MUD) },
@@ -274,13 +274,20 @@ export const feedEvent = (g, event, x, y, amount = 1) => {
   }
 }
 
-const rateOf = (skill, boost = 1, p = null) => (1 + (p?.keystones?.has('glutton') ? 0 : skill.meal?.amount ?? 0)) * boost
+const rateOf = (skill, boost = 1) => (1 + (skill.meal?.amount ?? 0)) * boost
+
+const UNECHOED = new Set(['hold', 'stream', 'toggle'])
+
+export const echoes = (p, kind) => !UNECHOED.has(handOf(p, kind).type)
 
 const fire = (g, p, skill, whole, cast) => {
   p.power = skill.swell ?? 0
   skill.casts = (skill.casts ?? 0) + 1
   skill.ready = whole
-  if (cast(g, p, skill) === FREE) skill.ready = F.freeAfter
+  const out = cast(g, p, skill)
+  if (out === FREE) skill.ready = F.freeAfter
+  else if (out?.times) skill.ready = whole * out.times
+  return out
 }
 
 const startFlow = (g, p, skill, whole, cast) => {
@@ -299,10 +306,10 @@ const encore = (g, p, skill, pressed, dt, cast) => {
   return true
 }
 
-const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast }, holding) => {
+const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast, boost }, holding) => {
   const stream = streamOf(p, skill.kind)
   if (!skill.flowing && encore(g, p, skill, pressed && !stunned, dt, cast)) return
-  skill.ready = Math.max(0, skill.ready - dt * (skill.meal?.amount ?? 0))
+  skill.ready = Math.max(0, skill.ready - dt * (skill.meal?.amount ?? 0) * boost)
   if (skill.flowing) {
     if (holding && !stunned && skill.ready < whole && stream.run(g, p, dt, skill)) skill.ready += (dt * whole) / hand.time
     else {
@@ -311,20 +318,20 @@ const flow = ({ g, p, skill, hand, whole, pressed, stunned, dt, cast }, holding)
     }
     return
   }
-  skill.ready = Math.max(0, skill.ready - dt)
+  skill.ready = Math.max(0, skill.ready - dt * boost)
   if (pressed && !stunned && skill.ready < whole * F.flowRestart) startFlow(g, p, skill, whole, cast)
 }
 
 const HANDS = {
   tap: ({ g, p, skill, whole, pressed, stunned, dt, cast, boost }) => {
-    skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost))
     if (encore(g, p, skill, pressed && !stunned, dt, cast)) return
     if (pressed && !stunned && skill.ready <= 0) fire(g, p, skill, whole, cast)
   },
   stock: ({ g, p, skill, hand, whole, pressed, stunned, dt, cast, boost }) => {
     skill.stock ??= hand.most
     if (skill.stock < hand.most) {
-      skill.ready -= dt * rateOf(skill, boost, p)
+      skill.ready -= dt * rateOf(skill, boost)
       while (skill.ready <= 0 && skill.stock < hand.most) {
         skill.stock += 1
         skill.ready += whole
@@ -334,13 +341,13 @@ const HANDS = {
     if (!pressed || stunned || skill.stock <= 0) return
     const waiting = skill.ready
     skill.stock -= 1
-    fire(g, p, skill, whole, cast)
-    skill.ready = waiting > 0 ? waiting : whole
+    const out = fire(g, p, skill, whole, cast)
+    skill.ready = (waiting > 0 ? waiting : whole) + whole * ((out?.times ?? 1) - 1)
   },
   stream: hands => flow(hands, hands.down),
   hold: ({ g, p, skill, hand, whole, down, pressed, stunned, dt, cast, boost }) => {
     const hold = holdOf(p, skill.kind)
-    if (!skill.holding || hand.anytime) skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    if (!skill.holding || hand.anytime) skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost))
     if (skill.holding) {
       if (down && !stunned && hold.run(g, p, dt, skill)) return
       skill.holding = false
@@ -356,14 +363,14 @@ const HANDS = {
   toggle: hands => flow(hands, !hands.pressed),
   swell: ({ g, p, skill, hand, whole, down, pressed, stunned, dt, cast, boost }) => {
     if (skill.swelling) {
-      skill.swell = Math.min(1, (skill.swell ?? 0) + (dt * rateOf(skill, boost, p)) / hand.time)
+      skill.swell = Math.min(1, (skill.swell ?? 0) + (dt * rateOf(skill, boost)) / hand.time)
       if (down && !stunned) return
       skill.swelling = false
       fire(g, p, skill, whole, cast)
       skill.swell = 0
       return
     }
-    skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost, p))
+    skill.ready = Math.max(0, skill.ready - dt * rateOf(skill, boost))
     if (pressed && !stunned && skill.ready <= 0) {
       skill.swelling = true
       skill.swell = 0

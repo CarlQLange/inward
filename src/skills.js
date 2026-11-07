@@ -1,6 +1,6 @@
 import { BLOCK, ROOM, TUNING } from './config.js'
 import { M, props } from './materials.js'
-import { bake, energize, explode, ignite, matAt, puff, setCell, shatter, tallyRule } from './world.js'
+import { bake, dissolves, energize, explode, ignite, matAt, puff, rotOf, setCell, shatter, tallyRule } from './world.js'
 import { WORLD_PX, cell, cellsUnder, centre, forEachCell, hitsSolid, inCone, overlap } from './physics.js'
 import { burst, hurt } from './combat.js'
 import { chunks, liquidColour, sip } from './feel.js'
@@ -87,7 +87,7 @@ export const FORKS = {
   ],
   melt: [
     [form('melt.slag', 'SLAG', 'LOBS LAVA THAT SETS', STONE), form('melt.fissure', 'FISSURE', 'SPLITS THE FLOOR', BLOOD)],
-    [form('melt.forge', 'FORGE', 'MELTS METAL TOO', MAGNET), form('melt.flash', 'FLASH', 'TURNS WATER TO STEAM', WHITE)],
+    [form('melt.forge', 'FORGE', 'MELTS METAL TOO', MAGNET), form('melt.flash', 'FLASH', 'HEATED WATER EXPLODES. HURTS FOES IN THE WATER', WHITE)],
   ],
   alchemy: [
     [form('alchemy.transmute', 'TRANSMUTE', 'CHANGES SOLIDS TOO', STONE), form('alchemy.render', 'RENDER', 'TURNS WEAK FOES INTO MATERIAL', BLOOD)],
@@ -147,7 +147,7 @@ export const FORKS = {
   ],
   lens: [
     [form('lens.prism', 'PRISM', 'GLASS SPLITS THE BEAM IN THREE', MAGNET), form('lens.glance', 'GLANCE', 'BOUNCES OFF METAL', STONE)],
-    [form('lens.kiln', 'GLAZE', 'TURNS ROCK AND BRICK TO GLASS', FIRE), form('lens.dazzle', 'DAZZLE', 'STUNS FOES INSTEAD OF BURNING THEM', WHITE)],
+    [form('lens.kiln', 'GLAZE', 'TURNS ROCK AND BRICK TO GLASS', FIRE), form('lens.dazzle', 'DAZZLE', 'STUNS FOES INSTEAD OF BURNING THEM. BIG FOES STILL BURN', WHITE)],
   ],
   chime: [
     [form('chime.volley', 'VOLLEY', 'SHARDS FLY AT FOES ONE BY ONE', BLOOD), form('chime.hover', 'HOVER', 'SHARDS HANG IN THE AIR UNTIL A FOE COMES NEAR', GAS)],
@@ -197,6 +197,8 @@ const HANDS = {
 export const handOf = (p, kind) => ownedForms(p, kind).map(f => HANDS[f.id]).filter(Boolean).at(-1) ?? HANDS[kind] ?? TAP
 
 export const FREE = Symbol('free')
+
+const costly = times => ({ times })
 
 export const spend = (p, kind) => p.skills.filter(s => s.kind === kind).forEach(s => { s.ready = cooldownOf(p, kind) })
 
@@ -462,11 +464,11 @@ const repel = (g, p) => {
   g.pulse = Math.max(g.pulse, 0.6)
 }
 
-const lob = (g, p, aim, extra = {}) => {
+const lob = (g, p, aim, extra = {}, { speed, lift } = S.ember) => {
   const from = muzzle(p)
   g.fireballs.push({
     x: from.x - 2, y: from.y - 2, w: 4, h: 4,
-    vx: aim.x * S.ember.speed, vy: aim.y * S.ember.speed - S.ember.lift,
+    vx: aim.x * speed, vy: aim.y * speed - lift,
     age: 0, friendly: true, ...extra,
   })
 }
@@ -1131,10 +1133,16 @@ const cageFoe = (g, p, e) => {
   ring(g, e.x + e.w / 2, e.y + e.h / 2, BLOOD, 14, 50)
 }
 
+const overhead = (p, x, y) => y * BLOCK < p.y && x >= cell(p.x) && x <= cell(p.x + p.w - 0.01)
+
 const wallAt = (g, p) => {
   const { x, y } = aimedCell(g, p, S.mason.reach)
   const horizontal = Math.abs(p.aim.y) >= Math.abs(p.aim.x)
-  for (let d = -1; d <= 1; d++) lay(g, p, horizontal ? x + d : x, horizontal ? y : y + d, masonry(p))
+  for (let d = -1; d <= 1; d++) {
+    const [cx, cy] = horizontal ? [x + d, y] : [x, y + d]
+    const falls = masonry(p) === M.SAND && overhead(p, cx, cy)
+    lay(g, p, cx, cy, falls ? M.ROCK : masonry(p))
+  }
 }
 
 const walkway = (g, p) => {
@@ -1157,7 +1165,8 @@ const raisePillar = (g, p) => {
   const at = hit.struck ? { x: centre(hit.struck).x, y: hit.struck.y + hit.struck.h - 1 } : hit.solid ? hit.last : hit
   const x = cell(at.x)
   if (!inPlay(x, cell(at.y))) return FREE
-  addEffect(g, { kind: 'pillar', x, floor: floorUnder(g, x, cell(at.y)), laid: 0, clock: 0, life: 999, material: masonry(p) })
+  const rubble = owns(p, 'mason.rubble')
+  addEffect(g, { kind: 'pillar', x, floor: floorUnder(g, x, cell(at.y)), laid: 0, clock: 0, life: 999, material: rubble ? M.ROCK : masonry(p), settles: rubble ? M.SAND : null })
 }
 
 const mason = (g, p) => {
@@ -1167,7 +1176,7 @@ const mason = (g, p) => {
     const foe = nearestTo(hostile(g).filter(e => !e.heavy && covered(centre(e))), centre(p))
     if (foe) {
       cageFoe(g, p, foe)
-      return
+      return costly(S.mason.cageWait / S.mason.every)
     }
   }
   wallAt(g, p)
@@ -1203,16 +1212,16 @@ const seed = (g, p) => {
   const here = muzzle(p)
   g.world.thorns = g.world.thorns || owns(p, 'seed.thorns')
   sparkle(g, here, p.aim, hue(p, 'seed', 'pale'), 8)
-  if (owns(p, 'seed.bough')) {
+  const straightUp = p.aim.y < -0.5 && Math.abs(p.aim.x) < 0.8
+  if (owns(p, 'seed.bough') && !straightUp) {
     const from = walkway(g, p)
     const dir = p.aim.x < 0 ? -1 : p.aim.x > 0 ? 1 : p.facing
     addEffect(g, { kind: 'span', x: from.x + dir * BLOCK, y: from.y, dx: dir, dy: 0, life: 999, clock: 0, laid: 0, skipped: 0, material: M.WOOD, step: S.seed.boughStep, most: S.seed.boughMost, vines: true })
     takeRoot(g, p, cell(from.x), cell(from.y))
     return
   }
-  const straightUp = p.aim.y < -0.5 && Math.abs(p.aim.x) < 0.8
   const { x, y } = straightUp ? { x: cell(here.x), y: cell(p.y + p.h - 1) } : aimedCell(g, p, S.seed.reach)
-  if (owns(p, 'seed.flytrap')) {
+  if (owns(p, 'seed.flytrap') && !straightUp) {
     let row = y
     while (row < ROOM - 2 && !props(matAt(g.world, x, row + 1)).solid) row++
     setCell(g.world, x, row, M.VINE, 0)
@@ -1250,11 +1259,12 @@ const spring = (g, p) => {
   if (owns(p, 'spring.slush')) addEffect(g, { kind: 'setting', x: (x + 0.5) * BLOCK, y: (y + 0.5) * BLOCK, life: S.spring.setAfter })
 }
 
-export const freezeWaterAround = (g, x, y, radius) => {
+export const freezeWaterAround = (g, x, y, radius, [kx, ky] = []) => {
   const [cx, cy] = [cell(x), cell(y)]
   for (let dy = -radius; dy <= radius; dy++) {
     for (let dx = -radius; dx <= radius; dx++) {
-      if (dx * dx + dy * dy <= radius * radius && matAt(g.world, cx + dx, cy + dy) === M.WATER) setCell(g.world, cx + dx, cy + dy, M.ICE)
+      const kept = cx + dx === kx && cy + dy === ky
+      if (!kept && dx * dx + dy * dy <= radius * radius && matAt(g.world, cx + dx, cy + dy) === M.WATER) setCell(g.world, cx + dx, cy + dy, M.ICE)
     }
   }
 }
@@ -1264,15 +1274,15 @@ const acid = (g, p) => {
   g.world.souring = g.world.souring || owns(p, 'acid.sour')
   if (owns(p, 'acid.bore')) thrown(g, p, p.aim, 'bore', { speed: S.acid.boreFlight, gravity: 0, colour: ACID })
   else if (owns(p, 'acid.rain')) thrown(g, p, p.aim, 'cloud', { speed: S.ember.speed, lift: S.ember.lift, colour: ACID })
-  else lob(g, p, p.aim, { acid: S.acid.small })
+  else lob(g, p, p.aim, { acid: S.acid.small }, { speed: S.acid.lobSpeed, lift: S.acid.lobLift })
 }
 
 export const pourAcid = (g, x, y, count) => {
-  for (let n = 0; n < count; n++) {
-    const cx = x + (n % 3) - 1
-    const cy = y - Math.floor(n / 3)
-    if (!props(matAt(g.world, cx, cy)).solid) setCell(g.world, cx, cy, M.ACID)
-  }
+  const bites = dissolves(matAt(g.world, x, y))
+  if (bites) setCell(g.world, x, y, M.ACID)
+  const open = ([cx, cy]) => !props(matAt(g.world, cx, cy)).solid
+  const from = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1]].map(([dx, dy]) => [x + dx, y + dy]).find(open)
+  if (from) spill(g, from[0], from[1], M.ACID, count - (bites ? 1 : 0))
 }
 
 const BORES = new Set([...BREAKS, M.METAL, M.GATE].filter(m => m !== M.GLASS))
@@ -1280,14 +1290,38 @@ const BORES = new Set([...BREAKS, M.METAL, M.GATE].filter(m => m !== M.GLASS))
 export const boreCell = (g, x, y) => {
   const m = matAt(g.world, x, y)
   if (!BORES.has(m)) return m !== M.BEDROCK
-  const metal = m === M.METAL || m === M.GATE
-  setCell(g.world, x, y, g.world.rusting && metal ? M.SCRAP : M.EMPTY)
+  setCell(g.world, x, y, rotOf(g.world, m))
   burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, ACID, 3)
   return true
 }
 
 const MELTS = new Set([M.ROCK, M.SAND, M.BRICK])
 const FORGED = new Set([M.METAL, M.SCRAP, M.GATE])
+
+const poolFrom = (g, x, y) => {
+  const seen = new Set([y * ROOM + x])
+  const queue = [[x, y]]
+  for (let n = 0; n < queue.length && seen.size < S.melt.scaldCells; n++) {
+    const [cx, cy] = queue[n]
+    ;[[0, 1], [-1, 0], [1, 0], [0, -1]].map(([dx, dy]) => [cx + dx, cy + dy])
+      .filter(([nx, ny]) => matAt(g.world, nx, ny) === M.WATER && !seen.has(ny * ROOM + nx))
+      .forEach(([nx, ny]) => {
+        seen.add(ny * ROOM + nx)
+        queue.push([nx, ny])
+      })
+  }
+  return queue.map(([cx, cy]) => ({ x: cx * BLOCK, y: cy * BLOCK, w: BLOCK, h: BLOCK }))
+}
+
+const scald = (g, x, y) => {
+  const pool = poolFrom(g, x, y)
+  hostile(g).filter(e => pool.some(box => overlap(e, box))).forEach(e => {
+    e.iframes = 0
+    hurt(g, e, S.melt.scald, 'world', 'FIRE')
+  })
+  explode(g.world, x, y, S.melt.scaldBlast)
+  ring(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, WHITE, 14, 90)
+}
 
 export const heat = (g, p, x, y, budget = { flashes: 0 }) => {
   const m = matAt(g.world, x, y)
@@ -1300,8 +1334,7 @@ export const heat = (g, p, x, y, budget = { flashes: 0 }) => {
     setCell(g.world, x, y, M.STEAM, 2)
     if (owns(p, 'melt.flash') && budget.flashes > 0) {
       budget.flashes -= 1
-      explode(g.world, x, y, 1)
-      ring(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, WHITE, 10, 70)
+      scald(g, x, y)
     }
   } else ignite(g.world, x, y)
   return false
@@ -1329,6 +1362,7 @@ const melt = (g, p) => {
 }
 
 const TRANSMUTE = { [M.WATER]: M.OIL, [M.OIL]: M.ACID, [M.ACID]: M.LAVA, [M.LAVA]: M.ROCK }
+const CASCADE = { [M.WATER]: M.OIL, [M.OIL]: M.LAVA, [M.ACID]: M.LAVA, [M.LAVA]: M.ROCK }
 const TRANSMUTE_SOLID = { [M.ROCK]: M.SAND, [M.SAND]: M.WATER, [M.ICE]: M.WATER, [M.FLOE]: M.WATER, [M.WOOD]: M.VINE, [M.MOSS]: M.VINE, [M.PEAT]: M.OIL }
 
 export const MATTER = {
@@ -1383,7 +1417,7 @@ const STEP_TINT = { [M.OIL]: GAS, [M.ACID]: ACID, [M.LAVA]: FIRE, [M.ROCK]: STON
 const keepChanging = (g, cells) => {
   if (!cells.length) return
   const [x, y] = middleOf(cells)
-  addEffect(g, { kind: 'cascade', x, y, clock: S.alchemy.cascadeEvery, life: 999 })
+  addEffect(g, { kind: 'cascade', x, y, clock: S.alchemy.cascadeEvery, steps: 0, life: 999 })
 }
 
 export const stepCascade = (g, f, dt) => {
@@ -1392,13 +1426,14 @@ export const stepCascade = (g, f, dt) => {
   f.clock = S.alchemy.cascadeEvery
   const r = S.alchemy.cascadeRadius
   const cells = []
-  forEachCell((x, y) => { if (TRANSMUTE[matAt(g.world, x, y)] !== undefined && Math.hypot(x - f.x, y - f.y) <= r) cells.push([x, y, matAt(g.world, x, y)]) })
+  forEachCell((x, y) => { if (CASCADE[matAt(g.world, x, y)] !== undefined && Math.hypot(x - f.x, y - f.y) <= r) cells.push([x, y, matAt(g.world, x, y)]) })
   cells.forEach(([x, y, m]) => {
-    setCell(g.world, x, y, TRANSMUTE[m])
-    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, STEP_TINT[TRANSMUTE[m]], 1)
+    setCell(g.world, x, y, CASCADE[m])
+    burst(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, STEP_TINT[CASCADE[m]], 1)
   })
   if (cells.length) tallyRule(g.world, 'cascade', M.ROCK)
-  if (cells.every(([, , m]) => TRANSMUTE[m] === M.ROCK)) Object.assign(f, { life: 0, done: true })
+  f.steps += 1
+  if (f.steps >= S.alchemy.cascadeSteps || cells.every(([, , m]) => CASCADE[m] === M.ROCK)) Object.assign(f, { life: 0, done: true })
 }
 
 const alchemy = (g, p) => {
@@ -1408,14 +1443,15 @@ const alchemy = (g, p) => {
   forEachCell((x, y, point) => {
     if (!covered(point)) return
     const m = matAt(g.world, x, y)
-    const next = TRANSMUTE[m] ?? (owns(p, 'alchemy.transmute') ? TRANSMUTE_SOLID[m] : undefined)
+    const liquids = owns(p, 'alchemy.cascade') ? CASCADE : TRANSMUTE
+    const next = liquids[m] ?? (owns(p, 'alchemy.transmute') ? TRANSMUTE_SOLID[m] : undefined)
     if (next !== undefined) {
       setCell(g.world, x, y, next)
       changed.set(`${m}>${next}`, { from: m, to: next, frontier: [...(changed.get(`${m}>${next}`)?.frontier ?? []), [x, y]] })
     }
   })
   if (owns(p, 'alchemy.render')) renderFoes(g, p, covered)
-  if (owns(p, 'alchemy.contagion')) changed.forEach(change => addEffect(g, { kind: 'contagion', ...change, most: props(change.from).solid ? S.alchemy.spreadSolid : S.alchemy.spreadMost, life: 999, clock: 0, laid: 0 }))
+  if (owns(p, 'alchemy.contagion')) [...changed.values()].filter(change => props(change.from).liquid).forEach(change => addEffect(g, { kind: 'contagion', ...change, most: S.alchemy.spreadMost, life: 999, clock: 0, laid: 0 }))
   if (owns(p, 'alchemy.cascade')) keepChanging(g, [...changed.values()].filter(c => props(c.to).liquid).flatMap(c => c.frontier))
   sparkle(g, from, p.aim, hue(p, 'alchemy', 'gas'), 20)
   g.pulse = Math.max(g.pulse, 0.5)
@@ -1855,11 +1891,11 @@ const leech = (g, p, dt, skill) => {
   for (let n = 0; n < 2 + got * 2; n++) sip(g, c.x + (Math.random() - 0.5) * foe.w, c.y + (Math.random() - 0.5) * foe.h, from, liquidColour(mat))
 }
 
-export const spill = (g, x, y, mat, count) => {
+export const spill = (g, x, y, mat, count, search = count * 6) => {
   const seen = new Set()
   const queue = [[x, y]]
   let placed = 0
-  while (queue.length && placed < count && seen.size < count * 6) {
+  while (queue.length && placed < count && seen.size < search) {
     const [cx, cy] = queue.shift()
     const key = cy * ROOM + cx
     if (seen.has(key) || !inPlay(cx, cy)) continue
@@ -1989,11 +2025,23 @@ const retireSleepers = (g, keep) => {
   waiting.slice(0, Math.max(0, waiting.length - S.wick.sleepers + 1)).forEach(f => { f.life = 0; f.done = true })
 }
 
+const nearFoot = (p, [x, y]) => {
+  const [fx, fy] = footCell(p)
+  return Math.max(Math.abs(x - fx), Math.abs(y - fy)) <= S.wick.safe
+}
+
+const disarmNear = (p, cells, fromEnd) => {
+  const order = fromEnd ? [...cells].reverse() : cells
+  const kept = order.slice(Math.max(0, order.findIndex(c => !nearFoot(p, c))))
+  return fromEnd ? kept.reverse() : kept
+}
+
 export const settleFuse = g => {
   const f = layingFuse(g)
   if (!f) return FREE
   f.laying = false
   if (!f.trail) f.cells = f.cells.slice(0, Math.max(S.wick.least, Math.floor(f.laid)))
+  f.cells = disarmNear(g.player, f.cells, f.trail)
   if (f.cells.length < (f.trail ? S.wick.least : 3)) {
     f.life = 0
     f.done = true
@@ -2116,8 +2164,7 @@ const heatCell = (g, p, { cell: [x, y], m }, dt) => {
 
 const heatFoe = (g, p, e, dt) => {
   const L = S.lens
-  if (owns(p, 'lens.dazzle')) {
-    if (e.heavy) return false
+  if (owns(p, 'lens.dazzle') && !e.heavy) {
     e.stun = Math.max(e.stun, L.dazzle)
     return false
   }

@@ -74,12 +74,20 @@ const fire = (g, e) => {
 }
 
 const daub = (g, p, e) => {
-  if (owns(p, 'clay.cast')) {
-    fire(g, e)
-    return
+  g.effects.filter(f => f.kind === 'daub' && f.foe === e).forEach(f => endDaub(g, f))
+  g.effects.push({ age: 0, kind: 'daub', foe: e, life: C.daubTime, clock: 0, drips: [] })
+}
+
+const bodyIn = (g, x, y) => [g.player, ...g.enemies].some(b => b.hp > 0 && overlap(b, cellBox(x, y)))
+
+export const endDaub = (g, f) => {
+  if (owns(g.player, 'clay.cast')) {
+    f.drips.filter(([x, y]) => matAt(g.world, x, y) === M.MUD && !bodyIn(g, x, y)).forEach(([x, y]) => {
+      setCell(g.world, x, y, M.BRICK)
+      chunks(g, (x + 0.5) * BLOCK, (y + 0.5) * BLOCK, M.BRICK, 2)
+    })
   }
-  g.effects.filter(f => f.kind === 'daub' && f.foe === e).forEach(end)
-  g.effects.push({ age: 0, kind: 'daub', foe: e, life: C.daubTime, clock: 0 })
+  end(f)
 }
 
 const smear = (g, p, e) => {
@@ -171,7 +179,8 @@ export const stepBall = (g, f, dt) => {
     return
   }
   const sunk = props(matAt(w, cell(f.x), cell(f.y - 2))).liquid
-  const blocked = walled && [...cellsUnder(box), ...ahead(f)].some(([x, y]) => props(matAt(w, x, y)).solid && !PICKS.has(matAt(w, x, y)))
+  const full = f.held >= C.rollMost
+  const blocked = walled && [...cellsUnder(box), ...ahead(f)].some(([x, y]) => props(matAt(w, x, y)).solid && (full || !PICKS.has(matAt(w, x, y))))
   if (sunk || f.life <= dt || blocked) settleBall(g, f)
 }
 
@@ -180,7 +189,7 @@ const heated = (w, e) => cellsUnder(e, 1).some(([x, y]) => burningAt(w, x, y) ||
 export const stepDaub = (g, f, dt) => {
   const e = f.foe
   if (e.hp <= 0) {
-    end(f)
+    endDaub(g, f)
     return
   }
   const w = g.world
@@ -189,12 +198,15 @@ export const stepDaub = (g, f, dt) => {
   if (f.clock <= 0) {
     f.clock = C.dripEvery
     const [x, y] = [cell(c.x), cell(e.y + e.h - 1)]
-    if (inPlay(x, y) && open(matAt(w, x, y))) setCell(w, x, y, M.MUD)
+    if (inPlay(x, y) && open(matAt(w, x, y))) {
+      setCell(w, x, y, M.MUD)
+      f.drips.push([x, y])
+    }
   }
   if (!e.grounded && !e.heavy) moveAxis(w, e, 'y', C.sag * dt)
   if (heated(w, e)) {
     fire(g, e)
-    end(f)
+    endDaub(g, f)
   }
 }
 

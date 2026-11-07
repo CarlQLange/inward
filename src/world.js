@@ -107,6 +107,7 @@ export const loosen = (w, x, y) => {
 }
 
 const ACID_EATS = new Set([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.SAND, M.ICE, M.FLOE, M.RIME, M.BRICK, M.SCRAP, M.VINE, M.VOLATILE, M.METAL, M.GATE, M.SNOW, M.MUD])
+export const dissolves = m => ACID_EATS.has(m)
 const BLAST_BREAKS = [M.ROCK, M.SAND, M.BRICK, M.GATE, M.ICE, M.FLOE, M.RIME, M.SCRAP, M.SNOW]
 const THROWN = new Set([M.SAND, M.SCRAP, M.FLOE, M.SNOW, M.MUD])
 const ICY = new Set([M.ICE, M.FLOE, M.RIME])
@@ -333,24 +334,33 @@ const stepLava = (w, x, y, dt) => {
   return !openFrom(w, i, x + gx, y + gy) && Math.random() > T.lavaFlow
 }
 
+const SOURED = 1
+
+const sour = (w, i) => {
+  note(w, 'sour', M.ACID)
+  place(w, i, M.ACID, SOURED)
+}
+
+export const rotOf = (w, m) => (w.rusting && m === M.METAL ? M.SCRAP : M.EMPTY)
+
 const stepAcid = (w, x, y) => {
   const i = idx(x, y)
+  const soured = w.life[i] === SOURED
   for (const [dx, dy] of N4) {
     const nx = x + dx
     const ny = y + dy
     const other = matAt(w, nx, ny)
     if (other === M.WATER && w.souring) {
-      if (Math.random() < T.sour) turn(w, idx(nx, ny), M.ACID, 'sour')
+      if (Math.random() < T.sour) sour(w, idx(nx, ny))
       continue
     }
     if (other === M.WATER) {
       place(w, i, M.WATER)
       return true
     }
-    if (ACID_EATS.has(other) && Math.random() < T.acidEat) {
+    if (!soured && ACID_EATS.has(other) && Math.random() < T.acidEat) {
       note(w, 'dissolve', other)
-      const metal = other === M.METAL || other === M.GATE
-      place(w, idx(nx, ny), w.rusting && metal ? M.SCRAP : M.EMPTY)
+      place(w, idx(nx, ny), rotOf(w, other))
       if (Math.random() < T.acidSpent) {
         place(w, i, M.EMPTY)
         return true

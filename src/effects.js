@@ -11,7 +11,7 @@ import {
 import { makeNoise } from './lives.js'
 import { endFloat, stepFloat } from './float.js'
 import { endLink, stepLink } from './link.js'
-import { clodLands, endKiln, stepBall, stepDaub, stepKiln } from './earth.js'
+import { clodLands, endDaub, endKiln, stepBall, stepDaub, stepKiln } from './earth.js'
 import { beamSparks, pealRings } from './matter.js'
 
 const S = TUNING.skills
@@ -167,13 +167,22 @@ const LANDS = {
     if (foe) hurt(g, foe, 3, 'player')
     for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1]]) heat(g, p, x + dx, y + dy, budget)
     const [lx, ly] = [cell(was.x), cell(was.y)]
+    const mark = slagMark(g)
     ;[[0, 0], [1, 0], [-1, 0], [0, -1], [1, -1], [-1, -1]].slice(0, S.melt.slagCells).forEach(([dx, dy]) => {
-      if (!props(matAt(g.world, lx + dx, ly + dy)).solid) setCell(g.world, lx + dx, ly + dy, M.LAVA)
+      const [sx, sy] = [lx + dx, ly + dy]
+      if (!props(matAt(g.world, sx, sy)).solid && !besideHero(p, sx, sy)) setCell(g.world, sx, sy, M.LAVA, mark)
     })
-    g.effects.push({ age: 0, kind: 'setting', x: was.x, y: was.y, life: S.melt.slagSet, sets: M.LAVA })
+    g.effects.push({ age: 0, kind: 'setting', x: was.x, y: was.y, life: S.melt.slagSet, sets: M.LAVA, mark })
     burst(g, at.x, at.y, 'fire', 14)
   },
   clod: (...args) => clodLands(...args),
+}
+
+const besideHero = (p, x, y) => overlap({ x: p.x - BLOCK, y: p.y - BLOCK, w: p.w + BLOCK * 2, h: p.h + BLOCK * 2 }, { x: x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK })
+
+const slagMark = g => {
+  g.slags = ((g.slags ?? 0) % 4000) + 1
+  return 2 + g.slags
 }
 
 const coat = (e, mat, cells) => {
@@ -232,9 +241,17 @@ const snuffs = (g, [x, y]) => {
   return !p.flammability && !p.hot && (p.liquid || p.solid)
 }
 
+const openRun = (g, x, y, dy) => {
+  let n = 0
+  while (n < 2 && !props(matAt(g.world, x, y + dy * (n + 1))).solid) n++
+  return n
+}
+
+const pinches = (g, x, y) => [-1, 1].some(dy => openRun(g, x, y, dy) === 1)
+
 const bake = (g, [x, y]) => {
   const m = matAt(g.world, x, y)
-  if (m !== M.EMPTY && !props(m).gas) return
+  if ((m !== M.EMPTY && !props(m).gas) || pinches(g, x, y)) return
   const box = fuseBox([x, y])
   if (overlap(g.player, box) || g.enemies.some(e => overlap(e, box))) return
   setCell(g.world, x, y, M.BRICK)
@@ -889,7 +906,7 @@ const stepSpan = (g, f, dt) => {
       return
     }
     if (solid) f.skipped += 1
-    else if (lay(g, g.player, x, y, f.material)) {
+    else if (!pinches(g, x, y) && lay(g, g.player, x, y, f.material)) {
       f.laid += 1
       if (f.vines && f.laid % 3 === 0 && matAt(g.world, x, y + 1) === M.EMPTY) setCell(g.world, x, y + 1, M.VINE, 0)
     }
@@ -1005,21 +1022,21 @@ const stepFont = (g, f, dt) => {
   f.clock -= dt
   if (f.clock > 0) return
   f.clock = S.spring.fontEvery
-  if (matAt(g.world, f.cx, f.cy) === M.EMPTY) setCell(g.world, f.cx, f.cy, f.liquid)
-  if (Math.random() < 0.5 && matAt(g.world, f.cx, f.cy + 1) === M.EMPTY) setCell(g.world, f.cx, f.cy + 1, f.liquid)
+  f.poured = (f.poured ?? 0) + spill(g, f.cx, f.cy, f.liquid, 1, S.spring.fontSearch)
+  if (f.poured >= S.spring.fontMost) end(f)
   f.since = (f.since ?? 0) + S.spring.fontEvery
   if (owns(g.player, 'spring.slush') && f.since > S.spring.setAfter) {
     f.since = 0
-    freezeWaterAround(g, f.x, f.y + BLOCK * 2, S.spring.setRadius)
+    freezeWaterAround(g, f.x, f.y + BLOCK * 2, S.spring.setRadius, [f.cx, f.cy])
   }
 }
 
 const endSetting = (g, f) => {
   if (f.sets === M.LAVA) {
-    const [cx, cy] = [cell(f.x), cell(f.y)]
-    for (let dy = -3; dy <= 4; dy++) {
-      for (let dx = -3; dx <= 3; dx++) if (matAt(g.world, cx + dx, cy + dy) === M.LAVA) setCell(g.world, cx + dx, cy + dy, M.ROCK)
-    }
+    const w = g.world
+    forEachCell((x, y) => {
+      if (matAt(w, x, y) === M.LAVA && w.life[y * ROOM + x] === f.mark) setCell(w, x, y, M.ROCK)
+    })
     return
   }
   freezeWaterAround(g, f.x, f.y, S.spring.setRadius)
@@ -1054,6 +1071,12 @@ const stepCloud = (g, f, dt) => {
   if (matAt(g.world, x, y) === M.EMPTY) setCell(g.world, x, y, M.ACID)
 }
 
+const meltWall = (g, f) => {
+  ;[1, 2, 3].forEach(up => heat(g, g.player, f.x, f.y - up, f.budget))
+  burst(g, (f.x + 0.5) * BLOCK, (f.y - 1) * BLOCK, 'fire', 8)
+  g.shake = Math.max(g.shake, 3)
+}
+
 const stepFissure = (g, f, dt) => {
   const F = S.melt
   f.clock -= dt
@@ -1066,6 +1089,7 @@ const stepFissure = (g, f, dt) => {
     f.x += f.dir
     const surface = [-1, -2, 0, 1, 2, 3].map(dy => f.y + dy).find(y => props(matAt(g.world, f.x, y)).solid && !props(matAt(g.world, f.x, y - 1)).solid)
     if (surface === undefined || matAt(g.world, f.x, surface) === M.BEDROCK) {
+      if (surface === undefined) meltWall(g, f)
       end(f)
       return
     }
@@ -1223,6 +1247,14 @@ const stepFence = (g, f, dt) => {
   for (const post of [f.a, f.b]) [0, 1].forEach(down => energize(g.world, cell(post.x), cell(post.y) + down, B.energy / 2))
 }
 
+const stopPillar = (g, f) => {
+  for (let k = 0; k < f.laid && f.settles; k++) {
+    const y = f.floor - 1 - k
+    if (matAt(g.world, f.x, y) === f.material) setCell(g.world, f.x, y, f.settles)
+  }
+  end(f)
+}
+
 const stepPillar = (g, f, dt) => {
   const P = S.mason
   f.clock -= dt
@@ -1230,13 +1262,13 @@ const stepPillar = (g, f, dt) => {
     f.clock += P.pillarStep
     const y = f.floor - 1 - f.laid
     if (f.laid >= P.pillarMost || y < 1 || props(matAt(g.world, f.x, y)).solid) {
-      end(f)
+      stopPillar(g, f)
       return
     }
     const box = { x: f.x * BLOCK, y: y * BLOCK, w: BLOCK, h: BLOCK }
     const bodies = [g.player, ...g.enemies.filter(e => !e.prop && !e.stowed)].filter(b => overlap(b, box))
     if (bodies.some(b => b.heavy || b.warden || b.partOf)) {
-      end(f)
+      stopPillar(g, f)
       return
     }
     const stuck = bodies.filter(b => moveAxis(g.world, b, 'y', box.y - (b.y + b.h)))
@@ -1247,7 +1279,7 @@ const stepPillar = (g, f, dt) => {
         hurt(g, e, P.pillarDamage, 'world', 'CRUSHED')
         e.stun = Math.max(e.stun, 0.6)
       })
-      end(f)
+      stopPillar(g, f)
       return
     }
     setCell(g.world, f.x, y, f.material)
@@ -1268,7 +1300,7 @@ const STEP = {
 const END = {
   drone: endDrone, flytrap: endFlytrap, lure: dropBait,
   geyser: endGeyser, setting: endSetting, still: endMatter, caught: endCaught, recall: endRecall, bottle: breakBottle, float: endFloat, link: endLink,
-  kiln: (...args) => endKiln(...args),
+  kiln: (...args) => endKiln(...args), daub: (...args) => endDaub(...args),
   volley: dropPieces, hover: dropPieces, bell: g => ringBell(g),
 }
 

@@ -12,7 +12,7 @@ import { contactBox, shotBox } from './cast.js'
 import { ENEMY_DEFS, STEPPERS, clampToRoom, createEnemy, lineClear, onDeath, puppeted, seatEnemy, settleFooting, steerPuppet } from './enemies.js'
 import { swim } from './earth.js'
 import { FORKS, SKILLS, SKILL_DETAILS, SKILL_NAMES, TREES, charmOne, cooldownOf, formOf, landSlam, muzzle, openFork, owns, pourAcid, recordTrail, releaseMatter, ring, salvage, burstGuts, spillNapalm, stepDash, torchNear, zap } from './skills.js'
-import { feedColour, feedEvent, stepFeeds, stepHand } from './feed.js'
+import { echoes, feedColour, feedEvent, stepFeeds, stepHand } from './feed.js'
 import { composeOffer } from './offers.js'
 import { dust } from './feel.js'
 import { beginDoor, blastFx, chipsAt, coinMote, createFx, fallFx, impact, killFx, levelBurstDone, roomClearFx, shotFx, slowMo, splash, stepFx, timeScale, wallHitFx, xpMotes } from './fx.js'
@@ -82,7 +82,7 @@ const depthFor = (g, ring) => {
 
 const LOCK_OPENERS = {
   peat: ['bolt', 'ember', 'hammer', 'melt', 'acid', 'blink', 'dash', 'wick', 'burrow', 'lens'],
-  gate: ['bolt', 'acid', 'blink', 'melt', 'wick'],
+  gate: ['bolt', 'acid', 'blink', 'wick'],
   brick: ['hammer', 'melt', 'acid', 'blink', 'mine', 'wick'],
   ice: ['ember', 'hammer', 'melt', 'blink', 'alchemy', 'wick', 'lens', 'chime'],
   scrap: ['repel', 'hammer', 'well', 'grapple', 'acid', 'blink'],
@@ -1172,7 +1172,7 @@ const fireSkill = (g, p, kind) => {
 const castSkill = (g, p, skill) => {
   if (crowdedOut(g, p)) return undefined
   const result = fireSkill(g, p, skill.kind)
-  if (hasKeystone(p, 'echo')) g.echoes.push({ kind: skill.kind, at: g.time + K.echoDelay })
+  if (hasKeystone(p, 'echo') && echoes(p, skill.kind)) g.echoes.push({ kind: skill.kind, at: g.time + K.echoDelay })
   return result
 }
 
@@ -1192,7 +1192,8 @@ const useSkills = (g, p, input, stunned, dt) => {
   stepFeeds(g, p, dt)
   stepEchoes(g, p, stunned)
   const boost = rechargeRate(g, p)
-  p.skills.forEach((skill, slot) => stepHand(g, p, skill, input[SKILL_ACTIONS[slot]] === true, p.wasSkills[slot], stunned, dt, castSkill, boost))
+  const unechoed = hasKeystone(p, 'echo') ? boost / K.echoRate : boost
+  p.skills.forEach((skill, slot) => stepHand(g, p, skill, input[SKILL_ACTIONS[slot]] === true, p.wasSkills[slot], stunned, dt, castSkill, echoes(p, skill.kind) ? boost : unechoed))
   SKILL_ACTIONS.forEach((key, slot) => { p.wasSkills[slot] = input[key] === true })
 }
 
@@ -1892,6 +1893,13 @@ const arcOn = (g, victim) => {
   hurt(g, next, 1, 'world', 'CHARGE')
 }
 
+const chillShot = (g, e) => {
+  if (g.time - (e.chilledAt ?? -Infinity) < R.frostEvery) return
+  e.chilledAt = g.time
+  e.stun = Math.max(e.stun, R.frostHold)
+  e.frozen = Math.max(e.frozen ?? 0, R.frostHold)
+}
+
 const shotEffects = (g, s, x, y, victim) => {
   const p = g.player
   if (!s.friendly) return
@@ -1899,7 +1907,7 @@ const shotEffects = (g, s, x, y, victim) => {
   if (hasRelic(p, 'shock')) energize(g.world, x, y, R.shockShot)
   if (victim && hasRelic(p, 'incendiary') && !victim.fireproof) victim.alight = Math.max(victim.alight ?? 0, TUNING.enemies.lives.burnFor)
   if (victim && hasRelic(p, 'shock')) arcOn(g, victim)
-  if (victim && hasRelic(p, 'frostshot')) victim.stun = Math.max(victim.stun, 0.4)
+  if (victim && hasRelic(p, 'frostshot')) chillShot(g, victim)
   if (hasRelic(p, 'acidskull') && !victim && Math.random() < R.acidShot) {
     const m = matAt(g.world, x, y)
     if ([M.ROCK, M.MOSS, M.PEAT, M.WOOD, M.BRICK, M.SAND, M.ICE, M.SCRAP].includes(m)) setCell(g.world, x, y, M.EMPTY)
@@ -1984,7 +1992,7 @@ const landFireball = (g, f) => {
     return
   }
   if (f.acid) {
-    pourAcid(g, x, y - 1, f.acid)
+    pourAcid(g, x, y, f.acid)
     f.age = -1
     return
   }
