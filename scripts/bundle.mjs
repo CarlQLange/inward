@@ -35,5 +35,5 @@ const page = `<title>Inward</title>
 `
 
 mkdirSync(join(root, 'dist'), { recursive: true })
-writeFileSync(join(root, 'dist/inward.html'), page)
-console.log(`dist/inward.html ${(page.length / 1024).toFixed(0)} KB`)
+writeFileSync(join(root, 'dist/index.html'), page)
+console.log(`dist/index.html ${(page.length / 1024).toFixed(0)} KB`)

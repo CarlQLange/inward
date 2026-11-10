@@ -1,13 +1,12 @@
-# Inward (the folder is still called core)
+# Inward
 
 A side-view roguelike Metroidvania, inspired by Game Boy era visuals, with
 emergent interactions between blocks, enemies, and skills. You work inward from
 the edge of a square map to reach the core at its centre. A run can last up to
 an hour or two.
 
-A full run works on a 15×15 map of rings around the core. The name on the title screen,
-Inward, is an agent's suggestion that Carl hasn't confirmed. Rename the folder before the
-first release if it stays.
+A full run works on a 15×15 map of rings around the core. Carl confirmed the name
+Inward in November 2026.
 
 ## Running and testing
 
@@ -36,7 +35,7 @@ and its deaths as pessimistic. Its own count of rooms with no reachable exit inc
 lost, casts and time fed, for single skills, named pairs (`--pairs ember+gust`), every pair or finished forms.
 Its bot never dodges or sets up a combo on purpose, so its numbers are comparative.
 
-`node scripts/bundle.mjs` packs everything into `dist/inward.html`, the one page published as the artifact
+`node scripts/bundle.mjs` packs everything into `dist/index.html`, the one page published as the artifact
 at https://claude.ai/artifact/6mA22hzMWHpUoG5f7wEdBS. Republish that file to update it. Add `?touch` to the
 local URL to get the phone layout on a desktop browser.
 
@@ -383,4 +382,3 @@ These came from design discussion and haven't been tested.
 
 ## Open questions
 
-- The name. Inward is on the title screen, unconfirmed.
