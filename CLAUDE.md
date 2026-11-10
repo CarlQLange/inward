@@ -130,6 +130,8 @@ effects must spread across blocks visibly and be readable without text.
   "IT" read as machine-written. Name triggers the player can see, never hidden states like cold or fear.
 - Upgrades must evolve a skill into something that plays differently. He rejected "further",
   "wider" and "the same but slightly better" outright.
+- He wanted an "unlock everything" button so people can get to the later game. UNLOCK ALL in the options marks every
+  discovery on the ladder as found from the next run; DELETE SAVE undoes it.
 - Levelling up and finding new skills was far too quick. He wants each new power to feel like "oh wow, I can do
   this now", not "another one". A level costs 40 experience per level reached (less 6), about 4.5 times the gap
   of the original curve at every point in a run, and skill cards, miners and hermits are as rare in proportion.

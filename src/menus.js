@@ -1,6 +1,6 @@
 import { TICK, TUNING } from './config.js'
 import { hasRun, knownNotes, persist, save } from './store.js'
-import { almanac } from './discover.js'
+import { LADDER, almanac } from './discover.js'
 import { almanacColumns, isTouchLayout } from './layout.js'
 import { SKILL_NAMES, formOf } from './skills.js'
 import { RELIC_BY_ID } from './relics.js'
@@ -52,6 +52,23 @@ const openOptions = g => openMenu(g, {
     ...(isTouchLayout()
       ? [{ label: () => `AUTO FIRE: ${save.settings.autofire ? 'ON' : 'OFF'}`, run: toggleSetting('autofire') }]
       : [{ label: 'CONTROLS', run: g2 => openControls(g2) }]),
+    {
+      label: 'UNLOCK ALL',
+      run: gm => openMenu(gm, {
+        page: 'confirm',
+        items: [
+          { label: 'KEEP', run: closeMenu },
+          {
+            label: 'UNLOCK',
+            run: gc => {
+              save.found = [...new Set([...save.found, ...LADDER])]
+              persist()
+              closeMenu(gc)
+            },
+          },
+        ],
+      }),
+    },
     {
       label: 'DELETE SAVE',
       run: gm => openMenu(gm, {
